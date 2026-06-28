@@ -133,25 +133,16 @@ html, body {
   color: var(--text);
 }
 
-.word {
-  border-radius: 3px;
-  padding: 1px 1px;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.12s ease;
-}
+.word { cursor: pointer; }
 .word:hover { background: var(--soft); }
 
-/* sentence-level (soft) highlight under the current sentence */
-.word.cur-sent { background: var(--sentence-bg); }
+/* Continuous highlight via the CSS Custom Highlight API: one soft block under
+   the current sentence, one strong block on the current word — no per-word boxes. */
+::highlight(ov-sentence) { background-color: var(--sentence-bg); }
+::highlight(ov-word) { background-color: var(--word-bg); color: var(--word-fg); }
 
-/* current word (strong) — medium radius, flat */
-.word.active {
-  background: var(--word-bg);
-  color: var(--word-fg);
-  border-radius: 4px;
-  padding: 1px 4px;
-  margin: 0 -3px;
-}
+/* fallback only (Highlight API unavailable) */
+.word.active { background: var(--word-bg); color: var(--word-fg); border-radius: 3px; }
 
 /* rich (formatted) clipboard text */
 .word.b { font-weight: 500; }

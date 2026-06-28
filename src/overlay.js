@@ -25,11 +25,24 @@ let charStart = []; // absolute seconds, accumulated across chunks/segments
 let charEnd = [];
 let charToWord = []; // char index -> word index (-1 for whitespace)
 let words = []; // { el, first, last, sent }
+let sentences = []; // [{ first, last }] word indices
 let currentWord = -1;
 let currentSentence = -1;
 let curSentIdx = 0; // sentence counter while building words
-let sentStartWord = 0; // first word index of the sentence being built
 let timeOffset = 0; // added to a segment's relative timestamps (multi-request)
+
+// Continuous highlight via the CSS Custom Highlight API (one range per sentence,
+// one for the word) — no per-word boxes, so the sentence reads as one block.
+const hlSupported = typeof Highlight !== 'undefined' && typeof CSS !== 'undefined' && CSS.highlights;
+let hlSentence = null;
+let hlWord = null;
+if (hlSupported) {
+  hlSentence = new Highlight();
+  hlWord = new Highlight();
+  hlWord.priority = 1; // word paints on top of the sentence
+  CSS.highlights.set('ov-sentence', hlSentence);
+  CSS.highlights.set('ov-word', hlWord);
+}
 let richMode = false; // true when formatted (HTML) text was rendered up-front
 let loadGen = 0; // gen id from main, echoed back in richReady
 // incremental word builder
@@ -68,12 +81,13 @@ function teardown() {
   charEnd = [];
   charToWord = [];
   words = [];
+  sentences = [];
   currentWord = -1;
   currentSentence = -1;
   curSentIdx = 0;
-  sentStartWord = 0;
   timeOffset = 0;
   richMode = false;
+  if (hlSupported) { hlSentence.clear(); hlWord.clear(); }
   curWordEl = null;
   curWordFirst = -1;
   curWordLast = -1;
@@ -156,10 +170,11 @@ function endsSentence(text) {
 
 function flushWord() {
   if (curWordEl) {
+    const wi = words.length;
     const w = { el: curWordEl, first: curWordFirst, last: curWordLast, sent: curSentIdx };
     words.push(w);
-    // Highlight this word as part of the sentence if it's the active one (streaming).
-    if (w.sent === currentSentence) curWordEl.classList.add('cur-sent');
+    if (!sentences[w.sent]) sentences[w.sent] = { first: wi, last: wi };
+    else sentences[w.sent].last = wi;
     if (endsSentence(curWordEl.textContent)) curSentIdx++; // next word begins a new sentence
     curWordEl = null;
     curWordFirst = -1;
@@ -231,23 +246,45 @@ function frame() {
   else raf = null;
 }
 
-// Medium-style: the current sentence gets a soft highlight, the current word the
-// strong one on top. Moving forward/back just moves both highlights.
+function rangeOfEl(el) {
+  const r = document.createRange();
+  r.selectNodeContents(el);
+  return r;
+}
+// Continuous range from the first word to the last word of a sentence (includes
+// the spaces between them, so it paints as one block).
+function rangeSpan(firstIdx, lastIdx) {
+  const a = words[firstIdx] && words[firstIdx].el;
+  const b = words[lastIdx] && words[lastIdx].el;
+  if (!a || !b) return null;
+  const r = document.createRange();
+  try { r.setStartBefore(a); r.setEndAfter(b); } catch { return null; }
+  return r;
+}
+
+// Medium-style: the current sentence gets one soft, continuous highlight; the
+// current word a strong one on top.
 function setActive(wi) {
   if (!words[wi]) return;
-  if (currentWord >= 0 && words[currentWord]) words[currentWord].el.classList.remove('active');
-
-  const si = words[wi].sent;
-  if (si !== currentSentence) {
-    for (const w of words) {
-      if (w.sent === currentSentence) w.el.classList.remove('cur-sent');
-      if (w.sent === si) w.el.classList.add('cur-sent');
-    }
-    currentSentence = si;
+  if (!hlSupported) {
+    if (currentWord >= 0 && words[currentWord]) words[currentWord].el.classList.remove('active');
+    words[wi].el.classList.add('active');
+    currentWord = wi;
+    scrollToWord(words[wi].el);
+    return;
   }
-  words[wi].el.classList.add('active');
-  scrollToWord(words[wi].el);
+  hlWord.clear();
+  hlWord.add(rangeOfEl(words[wi].el));
+  const si = words[wi].sent;
+  const sent = sentences[si];
+  if (sent) {
+    hlSentence.clear();
+    const sr = rangeSpan(sent.first, sent.last); // recomputed: grows as words stream in
+    if (sr) hlSentence.add(sr);
+  }
+  if (wi !== currentWord) scrollToWord(words[wi].el);
   currentWord = wi;
+  currentSentence = si;
 }
 
 function scrollToWord(el) {
@@ -331,9 +368,15 @@ if (window.speak) {
         richMode = true;
         words = built.words;
         charToWord = built.charToWord; // full canonical index space, pre-built
-        // assign sentence index to each pre-built word
+        // assign sentence index + ranges to each pre-built word
         let sIdx = 0;
-        for (const w of words) { w.sent = sIdx; if (endsSentence(w.el.textContent)) sIdx++; }
+        for (let i = 0; i < words.length; i++) {
+          const w = words[i];
+          w.sent = sIdx;
+          if (!sentences[sIdx]) sentences[sIdx] = { first: i, last: i };
+          else sentences[sIdx].last = i;
+          if (endsSentence(w.el.textContent)) sIdx++;
+        }
         textEl.appendChild(built.fragment);
         window.speak.richReady(loadGen, built.text, true);
         return;

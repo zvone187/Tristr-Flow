@@ -647,6 +647,7 @@ ipcMain.on('overlay:close', () => stopEverything());
 
 app.whenReady().then(() => {
   config = loadConfig();
+  nativeTheme.themeSource = 'system'; // overlay + settings follow the macOS appearance
   const saved = settingsStore.load();
   state = {
     voiceId: saved.voiceId || config.voiceId,
