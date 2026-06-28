@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Speak Selection — In-page",
+  "version": "0.1.0",
+  "description": "Read the selected text aloud with karaoke highlighting painted on the page itself (follows scroll).",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["http://127.0.0.1:8757/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": { "default_title": "Speak selected text (in-page)" },
+  "commands": {
+    "speak-selection": {
+      "suggested_key": { "default": "Ctrl+Shift+Y", "mac": "MacCtrl+Shift+Y" },
+      "description": "Read the selected text aloud with in-page highlighting"
+    }
+  }
+}

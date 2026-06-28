@@ -21,6 +21,7 @@ const { getSelectedText } = require('./selection');
 const { synthesize, synthesizeStream, clampSpeed, clampStability } = require('./elevenlabs');
 const { listVoices, CURATED } = require('./voices');
 const settingsStore = require('./settings');
+const localserver = require('./localserver');
 
 let tray = null;
 let overlayWin = null;
@@ -615,6 +616,12 @@ app.whenReady().then(() => {
 
   createOverlay();
   createTray();
+  // Localhost bridge for the Chrome extension's in-page highlighting.
+  try {
+    localserver.start({ getConfig: () => config, getState: () => state });
+  } catch (e) {
+    console.error('[localserver] failed to start:', e);
+  }
 
   const reg = registerHotkeys();
   if (!reg.h1) {
