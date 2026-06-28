@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; media-src data:; style-src 'self' 'unsafe-inline'; script-src 'self';"
+    />
+    <link rel="stylesheet" href="onboarding.css" />
+    <title>Welcome to Tristr Flow</title>
+  </head>
+  <body>
+    <div id="wizard">
+      <div id="dots">
+        <span class="dot active" data-step="1"></span>
+        <span class="dot" data-step="2"></span>
+      </div>
+
+      <!-- STEP 1 — account -->
+      <section class="step" id="step1">
+        <h1>Welcome to Tristr&nbsp;Flow</h1>
+        <p class="lede">
+          Select text in any app, press your shortcut, and hear it read aloud —
+          with each word highlighted as it’s spoken.
+        </p>
+
+        <div class="card">
+          <h2>Start free</h2>
+          <p class="muted">
+            Create an account and get <strong>$2 of reading</strong> on us — no
+            API key required.
+          </p>
+          <div class="fields">
+            <input id="email" type="email" placeholder="you@email.com" autocomplete="username" />
+            <input id="pass" type="password" placeholder="Password (8+ characters)" autocomplete="new-password" />
+          </div>
+          <div class="row">
+            <button id="btnSignup" class="primary">Create account</button>
+            <button id="btnLogin" class="ghost">I already have one</button>
+          </div>
+          <p id="acctMsg" class="msg"></p>
+        </div>
+
+        <details id="ownKeyWrap" class="card subtle">
+          <summary>Advanced — use my own ElevenLabs key</summary>
+          <p class="muted">Runs entirely on your own ElevenLabs account. No login, no credits.</p>
+          <div class="fields">
+            <input id="ownKey" type="password" placeholder="sk_…" autocomplete="off" />
+            <button id="btnOwnKey" class="ghost">Use my key</button>
+          </div>
+        </details>
+      </section>
+
+      <!-- STEP 2 — setup -->
+      <section class="step" id="step2" hidden>
+        <h1>You’re in <span id="who"></span> 🎉</h1>
+        <p class="lede">Two quick choices and you’re ready to go.</p>
+
+        <div class="card">
+          <h2>Voice</h2>
+          <select id="voice" aria-label="Voice"></select>
+        </div>
+
+        <div class="card">
+          <h2>Shortcut</h2>
+          <div class="sc">
+            <kbd id="combo">⌃⇧Space</kbd>
+            <button id="btnRec" class="ghost">Change</button>
+          </div>
+          <p id="scHint" class="muted">
+            Select text, then press this to read it aloud. Click ✕ or press Esc to stop.
+          </p>
+        </div>
+
+        <p class="muted small">
+          Everything else — speed, appearance, more voices — lives in the
+          <strong>menu-bar icon ▸ Preferences</strong>.
+        </p>
+
+        <button id="btnDone" class="primary wide">Start using Tristr Flow</button>
+      </section>
+    </div>
+    <script src="onboarding-renderer.js"></script>
+  </body>
+</html>

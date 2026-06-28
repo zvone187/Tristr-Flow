@@ -29,6 +29,7 @@ const mediaCtl = require('./media');
 let tray = null;
 let overlayWin = null;
 let settingsWin = null;
+let onboardingWin = null;
 let config = null;
 let state = null; // mutable, persisted: { voiceId, voiceName, speed }
 let busy = false;
@@ -273,6 +274,35 @@ function openSettings() {
   if (app.focus) app.focus({ steal: true });
   settingsWin.show();
   settingsWin.focus();
+}
+
+// First-run welcome / setup. Also reachable from the tray ("Setup…").
+function openOnboarding() {
+  if (onboardingWin && !onboardingWin.isDestroyed()) {
+    onboardingWin.show();
+    onboardingWin.focus();
+    return;
+  }
+  onboardingWin = new BrowserWindow({
+    width: 500,
+    height: 660,
+    title: 'Welcome to Tristr Flow',
+    resizable: false,
+    minimizable: true,
+    maximizable: false,
+    fullscreenable: false,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#211d1a' : '#faf9f6',
+    webPreferences: {
+      preload: path.join(__dirname, 'onboarding-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  onboardingWin.loadFile(path.join(__dirname, 'onboarding.html'));
+  onboardingWin.on('closed', () => { onboardingWin = null; });
+  if (app.focus) app.focus({ steal: true });
+  onboardingWin.show();
+  onboardingWin.focus();
 }
 
 // ---- speak pipeline ------------------------------------------------------
@@ -544,6 +574,7 @@ function updateTrayMenu() {
   template.push(
     { type: 'separator' },
     { label: 'Preferences — Voice, Shortcuts…', click: openSettings, accelerator: 'Command+,' },
+    { label: 'Setup — Account…', click: openOnboarding },
     { label: `Voice:  ${state.voiceName}`, submenu: voiceItems },
     { label: 'Stability', submenu: stabilityItems },
     {
@@ -568,7 +599,12 @@ function updateTrayMenu() {
       },
     },
     {
-      label: config.apiKey ? '✓ ElevenLabs key loaded' : '⚠️  No API key found',
+      label:
+        accountMode() === 'direct'
+          ? '✓ Using your ElevenLabs key'
+          : accountMode() === 'service'
+            ? `✓ Signed in${state.serviceEmail ? ' — ' + state.serviceEmail : ''}`
+            : '⚠️  Not set up — open Setup',
       enabled: false,
     },
     { label: 'Read clipboard text aloud', click: speakFromClipboard },
@@ -668,6 +704,17 @@ ipcMain.handle('account:logout', () => {
   persist();
   updateTrayMenu();
   return { ok: true };
+});
+
+// Static curated voice list for onboarding (works with or without a key/login,
+// unlike settings:listVoices which queries the ElevenLabs library).
+ipcMain.handle('voices:curated', () => CURATED);
+
+ipcMain.on('onboarding:finish', () => {
+  state.onboarded = true;
+  persist();
+  updateTrayMenu();
+  if (onboardingWin && !onboardingWin.isDestroyed()) onboardingWin.close();
 });
 
 // Lets a user run in direct mode with their own ElevenLabs key (no login),
@@ -788,7 +835,10 @@ app.whenReady().then(() => {
     serviceToken: saved.serviceToken || '',
     serviceEmail: saved.serviceEmail || '',
     ownKey: saved.ownKey || '',
-    onboarded: saved.onboarded || false,
+    // Existing users who already have a key/login are implicitly onboarded.
+    onboarded:
+      saved.onboarded ||
+      !!(config.apiKey || saved.serviceToken || saved.ownKey),
   };
   nativeTheme.themeSource = state.theme; // 'system' follows macOS; else force light/dark
 
@@ -818,10 +868,14 @@ app.whenReady().then(() => {
     notify('Second hotkey failed', `Could not register ${hotkeyLabel(state.hotkey2)}.`);
   }
 
-  if (!config.apiKey) {
+  // First run: welcome + setup. Existing users (env key / saved login / own key)
+  // are already marked onboarded above and skip straight in.
+  if (!state.onboarded) {
+    openOnboarding();
+  } else if (!effectiveKey() && !state.serviceToken) {
     notify(
-      'Missing ElevenLabs API key',
-      'No ELEVENLABS_API_KEY found. Add one to ~/Development/pazi/api/.env or the app .env.'
+      'Tristr Flow needs setup',
+      'Open the menu-bar icon ▸ Setup to sign in or add your ElevenLabs key.'
     );
   }
   if (!hasAccessibility()) {
