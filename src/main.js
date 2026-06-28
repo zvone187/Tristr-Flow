@@ -656,6 +656,8 @@ ipcMain.handle('account:get', async () => {
     serviceUrl: config.serviceBaseUrl,
     creditsMicros: null,
     creditsDollars: null,
+    minutesLeft: null,
+    plan: null,
   };
   if (state.serviceToken) {
     try {
@@ -663,11 +665,19 @@ ipcMain.handle('account:get', async () => {
       out.email = me.email;
       out.creditsMicros = me.creditsMicros;
       out.creditsDollars = me.creditsDollars;
+      out.minutesLeft = me.minutesLeft;
+      out.plan = me.plan;
     } catch (e) {
       out.error = String(e.message || e);
     }
   }
   return out;
+});
+
+// Opens the hosted account/billing page in the browser (upgrade / manage Pro).
+ipcMain.handle('account:openBilling', () => {
+  shell.openExternal(`${config.serviceBaseUrl || 'https://tristr-flow.onrender.com'}/account`);
+  return { ok: true };
 });
 
 ipcMain.handle('account:login', async (_e, { email, password }) => {

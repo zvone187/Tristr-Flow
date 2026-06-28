@@ -343,6 +343,8 @@ const btnSignup = document.getElementById('btnsignup');
 const btnLogout = document.getElementById('btnlogout');
 const btnOwnKey = document.getElementById('btnownkey');
 const btnClearKey = document.getElementById('btnclearkey');
+const btnUpgrade = document.getElementById('btnupgrade');
+const btnBilling = document.getElementById('btnbilling');
 
 function acctMsg(text, isErr) {
   if (!acctMsgEl) return;
@@ -356,16 +358,23 @@ function renderAccount(a) {
   acctSignedOutEl.hidden = signedIn || ownKey;
   acctSignedInEl.hidden = !(signedIn || ownKey);
   if (signedIn) {
-    const credits = a.creditsDollars != null ? ` · $${a.creditsDollars} left` : '';
-    acctInfoEl.textContent = `Signed in as ${a.email}${credits}`;
+    const left = a.minutesLeft != null
+      ? ` · ~${a.minutesLeft} min left`
+      : (a.creditsDollars != null ? ` · $${a.creditsDollars} left` : '');
+    const planTag = a.plan === 'pro' ? ' · Pro' : '';
+    acctInfoEl.textContent = `Signed in as ${a.email}${planTag}${left}`;
     btnLogout.hidden = false;
     btnClearKey.hidden = true;
+    btnUpgrade.hidden = a.plan === 'pro';  // offer upgrade only on the free plan
+    btnBilling.hidden = a.plan !== 'pro';  // manage only when subscribed
   } else if (ownKey) {
     acctInfoEl.textContent = a.ownKeyFromEnv
       ? 'Using your ElevenLabs key (from .env)'
       : 'Using your own ElevenLabs key';
     btnLogout.hidden = true;
     btnClearKey.hidden = a.ownKeyFromEnv; // an env-provided key can't be cleared in-app
+    btnUpgrade.hidden = true;
+    btnBilling.hidden = true;
   } else {
     acctInfoEl.textContent = 'Sign in for $2 of free reading — or use your own key.';
   }
@@ -403,6 +412,8 @@ if (btnOwnKey) btnOwnKey.addEventListener('click', async () => {
   await loadAccount();
 });
 if (btnClearKey) btnClearKey.addEventListener('click', async () => { await window.prefs.setOwnKey(''); await loadAccount(); });
+if (btnUpgrade) btnUpgrade.addEventListener('click', () => window.prefs.openBilling());
+if (btnBilling) btnBilling.addEventListener('click', () => window.prefs.openBilling());
 [acctEmailEl, acctPassEl].forEach((el) => el && el.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); doAuth(window.prefs.login); }
 }));

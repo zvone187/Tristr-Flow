@@ -21,4 +21,5 @@ contextBridge.exposeInMainWorld('prefs', {
   signup: (email, password) => ipcRenderer.invoke('account:signup', { email, password }),
   logout: () => ipcRenderer.invoke('account:logout'),
   setOwnKey: (key) => ipcRenderer.invoke('account:setOwnKey', { key }),
+  openBilling: () => ipcRenderer.invoke('account:openBilling'),
 });
