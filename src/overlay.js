@@ -24,8 +24,11 @@ let raf = null;
 let charStart = []; // absolute seconds, accumulated across chunks/segments
 let charEnd = [];
 let charToWord = []; // char index -> word index (-1 for whitespace)
-let words = []; // { el, first, last, start }
+let words = []; // { el, first, last, sent }
 let currentWord = -1;
+let currentSentence = -1;
+let curSentIdx = 0; // sentence counter while building words
+let sentStartWord = 0; // first word index of the sentence being built
 let timeOffset = 0; // added to a segment's relative timestamps (multi-request)
 let richMode = false; // true when formatted (HTML) text was rendered up-front
 let loadGen = 0; // gen id from main, echoed back in richReady
@@ -66,6 +69,9 @@ function teardown() {
   charToWord = [];
   words = [];
   currentWord = -1;
+  currentSentence = -1;
+  curSentIdx = 0;
+  sentStartWord = 0;
   timeOffset = 0;
   richMode = false;
   curWordEl = null;
@@ -144,9 +150,17 @@ function pump() {
 }
 
 // ---- incremental alignment -> word DOM ----------------------------------
+function endsSentence(text) {
+  return /[.!?…]["'”’)\]]?$/.test(text);
+}
+
 function flushWord() {
   if (curWordEl) {
-    words.push({ el: curWordEl, first: curWordFirst, last: curWordLast, start: charStart[curWordFirst] });
+    const w = { el: curWordEl, first: curWordFirst, last: curWordLast, sent: curSentIdx };
+    words.push(w);
+    // Highlight this word as part of the sentence if it's the active one (streaming).
+    if (w.sent === currentSentence) curWordEl.classList.add('cur-sent');
+    if (endsSentence(curWordEl.textContent)) curSentIdx++; // next word begins a new sentence
     curWordEl = null;
     curWordFirst = -1;
     curWordLast = -1;
@@ -208,7 +222,7 @@ function frame() {
     if (charStart[mid] <= t) { idx = mid; lo = mid + 1; } else hi = mid - 1;
   }
   const wi = idx >= 0 ? charToWord[idx] : -1;
-  if (wi >= 0 && wi !== currentWord) setActiveWord(wi);
+  if (wi >= 0 && wi !== currentWord) setActive(wi);
 
   const dur = charEnd.length ? charEnd[charEnd.length - 1] : (audio.duration || 0);
   if (dur && isFinite(dur)) fillEl.style.width = Math.min(100, (t / dur) * 100) + '%';
@@ -217,19 +231,22 @@ function frame() {
   else raf = null;
 }
 
-function setActiveWord(wi) {
+// Medium-style: the current sentence gets a soft highlight, the current word the
+// strong one on top. Moving forward/back just moves both highlights.
+function setActive(wi) {
+  if (!words[wi]) return;
   if (currentWord >= 0 && words[currentWord]) words[currentWord].el.classList.remove('active');
-  if (wi > currentWord) {
-    for (let k = Math.max(currentWord, 0); k < wi; k++) if (words[k]) words[k].el.classList.add('read');
-  } else {
-    // backward (seek): clear highlight from wi..currentWord
-    for (let k = wi; k <= currentWord; k++) if (words[k]) { words[k].el.classList.remove('read', 'active'); }
+
+  const si = words[wi].sent;
+  if (si !== currentSentence) {
+    for (const w of words) {
+      if (w.sent === currentSentence) w.el.classList.remove('cur-sent');
+      if (w.sent === si) w.el.classList.add('cur-sent');
+    }
+    currentSentence = si;
   }
-  if (words[wi]) {
-    words[wi].el.classList.add('active');
-    words[wi].el.classList.remove('read');
-    scrollToWord(words[wi].el);
-  }
+  words[wi].el.classList.add('active');
+  scrollToWord(words[wi].el);
   currentWord = wi;
 }
 
@@ -277,7 +294,6 @@ function updatePlayBtn() {
 }
 
 function onPlaybackEnded() {
-  words.forEach((w) => { w.el.classList.add('read'); w.el.classList.remove('active'); });
   fillEl.style.width = '100%';
   setStatus('Finished — click any word to replay');
   dotEl.classList.remove('live');
@@ -304,9 +320,10 @@ document.addEventListener('keydown', (e) => {
 });
 
 if (window.speak) {
-  window.speak.onLoading(({ gen, voice, html }) => {
+  window.speak.onLoading(({ gen, voice, html, fontSize }) => {
     resetForNew(voice);
     loadGen = gen || 0;
+    if (fontSize) textEl.style.fontSize = fontSize + 'px';
     if (html && window.SpeakRich) {
       let built = null;
       try { built = window.SpeakRich.build(html); } catch { built = null; }
@@ -314,6 +331,9 @@ if (window.speak) {
         richMode = true;
         words = built.words;
         charToWord = built.charToWord; // full canonical index space, pre-built
+        // assign sentence index to each pre-built word
+        let sIdx = 0;
+        for (const w of words) { w.sent = sIdx; if (endsSentence(w.el.textContent)) sIdx++; }
         textEl.appendChild(built.fragment);
         window.speak.richReady(loadGen, built.text, true);
         return;
@@ -340,6 +360,8 @@ if (window.speak) {
   window.speak.onAllDone(() => { flushWord(); allReceived = true; pump(); });
 
   window.speak.onError(({ message }) => showError(message));
+
+  window.speak.onFontSize(({ fontSize }) => { if (fontSize) textEl.style.fontSize = fontSize + 'px'; });
 
   window.speak.onStop(() => { teardown(); });
 }

@@ -17,10 +17,11 @@
 
   // alignment / words
   let charStart = [], charEnd = [], charToWord = [], words = [], currentWord = -1, timeOffset = 0;
+  let sentences = [], currentSentence = -1; // [{first,last}] word indices
   let selMap = null; // { text, map:[{node,offset}] }
 
   // highlights + UI
-  let hlCur = null, hlRead = null, pill = null, statusEl = null, playBtn = null;
+  let hlCur = null, hlSent = null, pill = null, statusEl = null, playBtn = null;
 
   function b64ToBytes(b64) {
     const bin = atob(b64), out = new Uint8Array(bin.length);
@@ -53,26 +54,33 @@
 
   function buildWords() {
     words = [];
+    sentences = [];
     charToWord = new Array(selMap.text.length).fill(-1);
     const t = selMap.text;
-    let i = 0;
+    let i = 0, sentStart = 0;
     while (i < t.length) {
       if (/\s/.test(t[i])) { i++; continue; }
       const first = i;
       while (i < t.length && !/\s/.test(t[i])) { charToWord[i] = words.length; i++; }
-      words.push({ first, last: i - 1 });
+      const wi = words.length;
+      words.push({ first, last: i - 1, sent: sentences.length });
+      if (/[.!?…]["'”’)\]]?$/.test(t.slice(first, i))) {
+        sentences.push({ first: sentStart, last: wi });
+        sentStart = wi + 1;
+      }
     }
+    if (sentStart < words.length) sentences.push({ first: sentStart, last: words.length - 1 });
   }
 
-  function rangeForWord(wi) {
-    const w = words[wi];
-    if (!w) return null;
-    const a = selMap.map[w.first], b = selMap.map[w.last];
+  function rangeFromTo(firstWord, lastWord) {
+    const a = words[firstWord] && selMap.map[words[firstWord].first];
+    const b = words[lastWord] && selMap.map[words[lastWord].last];
     if (!a || !b) return null;
     const r = document.createRange();
     try { r.setStart(a.node, a.offset); r.setEnd(b.node, b.offset + 1); } catch { return null; }
     return r;
   }
+  function rangeForWord(wi) { return rangeFromTo(wi, wi); }
 
   // ---- alignment timing -------------------------------------------------
   function appendTimings(a) {
@@ -81,13 +89,18 @@
   }
 
   function setHighlight(wi) {
-    if (wi === currentWord || !supported) return;
+    if (wi === currentWord || !supported || !words[wi]) return;
     currentWord = wi;
     hlCur.clear();
     const r = rangeForWord(wi);
     if (r) hlCur.add(r);
-    hlRead.clear();
-    for (let k = 0; k < wi; k++) { const rr = rangeForWord(k); if (rr) hlRead.add(rr); }
+    const si = words[wi].sent;
+    if (si !== currentSentence) {
+      currentSentence = si;
+      hlSent.clear();
+      const s = sentences[si];
+      if (s) { const sr = rangeFromTo(s.first, s.last); if (sr) hlSent.add(sr); }
+    }
   }
 
   function frame() {
@@ -159,12 +172,12 @@
     if (!supported) { flash('This browser lacks the CSS Highlight API'); return; }
     active = true;
     selMap = m;
-    charStart = []; charEnd = []; currentWord = -1; timeOffset = 0;
+    charStart = []; charEnd = []; currentWord = -1; currentSentence = -1; timeOffset = 0;
     appendQueue = []; allReceived = false; endedStream = false; playRequested = false;
     buildWords();
-    hlCur = new Highlight(); hlRead = new Highlight();
+    hlCur = new Highlight(); hlSent = new Highlight();
+    CSS.highlights.set('ss-sentence', hlSent);
     CSS.highlights.set('ss-current', hlCur);
-    CSS.highlights.set('ss-read', hlRead);
     setupMedia();
     showPill();
     setStatus('Preparing…');
@@ -184,7 +197,7 @@
     if (audio) { try { audio.pause(); } catch {} try { if (audio.src) URL.revokeObjectURL(audio.src); } catch {} audio = null; }
     mediaSource = null; sb = null; appendQueue = [];
     if (port) { try { port.disconnect(); } catch {} port = null; }
-    if (CSS && CSS.highlights) { CSS.highlights.delete('ss-current'); CSS.highlights.delete('ss-read'); }
+    if (CSS && CSS.highlights) { CSS.highlights.delete('ss-current'); CSS.highlights.delete('ss-sentence'); }
     hidePill();
   }
 

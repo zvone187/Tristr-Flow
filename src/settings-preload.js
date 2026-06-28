@@ -12,5 +12,6 @@ contextBridge.exposeInMainWorld('prefs', {
   setStability: (stability) => ipcRenderer.send('settings:setStability', { stability }),
   setHotkey: (which, accel) => ipcRenderer.invoke('settings:setHotkey', { which, accel }),
   setPauseMusic: (value) => ipcRenderer.send('settings:setPauseMusic', { value }),
+  setFontSize: (fontSize) => ipcRenderer.send('settings:setFontSize', { fontSize }),
   close: () => ipcRenderer.send('settings:close'),
 });

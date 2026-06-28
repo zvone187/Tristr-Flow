@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('speak', {
   onChunk: (cb) => ipcRenderer.on('overlay:chunk', (_e, d) => cb(d)),
   onAllDone: (cb) => ipcRenderer.on('overlay:all-done', (_e, d) => cb(d)),
   onError: (cb) => ipcRenderer.on('overlay:error', (_e, d) => cb(d)),
+  onFontSize: (cb) => ipcRenderer.on('overlay:fontSize', (_e, d) => cb(d)),
   onStop: (cb) => ipcRenderer.on('overlay:stop', () => cb()),
   // renderer -> main
   richReady: (gen, text, ok) => ipcRenderer.send('overlay:rich-ready', { gen, text, ok }),

@@ -1,12 +1,27 @@
 :root {
-  --bg: #16161c;
-  --panel: #1e1e26;
-  --panel-hi: #262633;
-  --text: #e8e8ef;
-  --muted: #8b8b98;
-  --accent: #6d8bff;
-  --accent2: #a06bff;
+  /* dark = warm minimal */
+  --bg: #211d1a;
+  --panel: #2a2421;
+  --panel-hi: #332c27;
+  --text: #ddd0c2;
+  --muted: #8a7d6f;
+  --accent: #d2693f;
+  --accent2: #d2693f;
   --border: rgba(255, 255, 255, 0.08);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    /* light = paper reader */
+    --bg: #faf9f6;
+    --panel: #ffffff;
+    --panel-hi: #f1efe9;
+    --text: #23221f;
+    --muted: #8a8880;
+    --accent: #c25a32;
+    --accent2: #c25a32;
+    --border: #e7e5df;
+  }
 }
 
 * {
@@ -274,6 +289,23 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+#textsizerow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+#textsizerow label {
+  font-weight: 600;
+  width: 64px;
+}
+#textsizeval {
+  color: var(--muted);
+  width: 56px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 #pausemusicrow {

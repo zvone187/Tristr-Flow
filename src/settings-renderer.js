@@ -7,6 +7,8 @@ const speedValEl = document.getElementById('speedval');
 const keyStateEl = document.getElementById('keystate');
 const stabilityEl = document.getElementById('stability');
 const pauseMusicEl = document.getElementById('pausemusic');
+const fontSizeEl = document.getElementById('fontsize');
+const fontSizeValEl = document.getElementById('fontsizeval');
 const combo1El = document.getElementById('combo1');
 const combo2El = document.getElementById('combo2');
 const scHintEl = document.getElementById('schint');
@@ -155,6 +157,10 @@ async function init() {
   selectedId = cfg.voiceId;
   renderCombos(cfg.hotkey, cfg.hotkey2);
   if (pauseMusicEl) pauseMusicEl.checked = cfg.pauseMusic !== false;
+  if (fontSizeEl && cfg.fontSize) {
+    fontSizeEl.value = cfg.fontSize;
+    fontSizeValEl.textContent = cfg.fontSize + ' px';
+  }
   setActiveStability(cfg.stability);
   speedEl.value = cfg.speed;
   speedValEl.textContent = speedLabel(cfg.speed);
@@ -200,6 +206,10 @@ searchEl.addEventListener('input', () => render(searchEl.value));
 
 if (pauseMusicEl) {
   pauseMusicEl.addEventListener('change', () => window.prefs.setPauseMusic(pauseMusicEl.checked));
+}
+if (fontSizeEl) {
+  fontSizeEl.addEventListener('input', () => { fontSizeValEl.textContent = fontSizeEl.value + ' px'; });
+  fontSizeEl.addEventListener('change', () => window.prefs.setFontSize(Number(fontSizeEl.value)));
 }
 
 // ---- shortcuts ----------------------------------------------------------
@@ -249,7 +259,7 @@ function stopRecording() {
 }
 
 document.querySelectorAll('.rec').forEach((b) =>
-  b.addEventListener('click', () => startRecording(Number(b.dataset.which)))
+  b.addEventListener('click', () => { b.blur(); startRecording(Number(b.dataset.which)); })
 );
 document.querySelectorAll('.clr').forEach((b) =>
   b.addEventListener('click', async () => {

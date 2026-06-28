@@ -8,6 +8,7 @@ const {
   globalShortcut,
   ipcMain,
   nativeImage,
+  nativeTheme,
   screen,
   systemPreferences,
   clipboard,
@@ -79,6 +80,12 @@ function registerHotkeys() {
   return { h1, h2 };
 }
 
+function clampFont(n) {
+  const v = parseInt(n, 10);
+  if (!Number.isFinite(v)) return 20;
+  return Math.min(34, Math.max(13, v));
+}
+
 function notify(title, body) {
   try {
     new Notification({ title, body, silent: true }).show();
@@ -102,6 +109,7 @@ function persist() {
     hotkey: state.hotkey,
     hotkey2: state.hotkey2,
     pauseMusic: state.pauseMusic,
+    fontSize: state.fontSize,
   });
 }
 
@@ -239,7 +247,7 @@ function openSettings() {
     minimizable: true,
     maximizable: false,
     fullscreenable: false,
-    backgroundColor: '#16161c',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#211d1a' : '#faf9f6',
     webPreferences: {
       preload: path.join(__dirname, 'settings-preload.js'),
       contextIsolation: true,
@@ -342,6 +350,7 @@ async function speakText(rawText, html) {
     gen: myGen,
     voice: state.voiceName,
     html: hasHtml ? html : null,
+    fontSize: state.fontSize,
   });
 
   // If the selection was formatted, let the overlay render + extract the exact
@@ -547,7 +556,17 @@ ipcMain.handle('settings:get', () => ({
   hotkey: state.hotkey,
   hotkey2: state.hotkey2 || '',
   pauseMusic: state.pauseMusic,
+  fontSize: state.fontSize,
 }));
+
+ipcMain.on('settings:setFontSize', (_e, { fontSize }) => {
+  state.fontSize = clampFont(fontSize);
+  persist();
+  // live-apply to an open overlay
+  if (overlayWin && !overlayWin.isDestroyed()) {
+    overlayWin.webContents.send('overlay:fontSize', { fontSize: state.fontSize });
+  }
+});
 
 ipcMain.on('settings:setPauseMusic', (_e, { value }) => {
   state.pauseMusic = !!value;
@@ -640,6 +659,7 @@ app.whenReady().then(() => {
     hotkey: saved.hotkey || config.hotkey,
     hotkey2: saved.hotkey2 != null ? saved.hotkey2 : config.hotkey2,
     pauseMusic: saved.pauseMusic != null ? saved.pauseMusic : config.pauseMusic,
+    fontSize: clampFont(saved.fontSize != null ? saved.fontSize : config.fontSize),
   };
 
   if (app.dock) app.dock.hide();
