@@ -33,7 +33,7 @@
         "NSAppleEventsUsageDescription": "Tristr Flow sends a Copy command to the active app so it can read your highlighted text aloud.",
         "NSMicrophoneUsageDescription": "Not used."
       },
-      "icon": "build/icon.png"
+      "icon": "build/icon.icns"
     },
     "dmg": {
       "title": "Tristr Flow"
