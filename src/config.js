@@ -43,6 +43,12 @@ function loadConfig() {
 
   return {
     apiKey: merged.ELEVENLABS_API_KEY || merged.ELEVEN_API_KEY || '',
+    // Hosted Tristr Flow service. Used in "service mode" (no own ElevenLabs key):
+    // the app logs in and routes TTS through the credit-metered proxy.
+    serviceBaseUrl: merged.SPEAK_SERVICE_URL || 'https://tristr-flow.onrender.com',
+    // Force routing through the hosted service even when a local key exists
+    // (for testing the service path on a dev machine that has its own key).
+    forceService: (merged.SPEAK_FORCE_SERVICE || 'false') === 'true',
     // Default: ElevenLabs "Hope — Clear, Relatable & Charismatic".
     voiceId: merged.SPEAK_VOICE_ID || 'zGjIP4SZlMnY9m93k97r',
     voiceName: merged.SPEAK_VOICE_NAME || 'Hope — Clear, Relatable & Charismatic',

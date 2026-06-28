@@ -20,6 +20,7 @@ const path = require('path');
 const { loadConfig } = require('./config');
 const { getSelectedText } = require('./selection');
 const { synthesize, synthesizeStream, clampSpeed, clampStability } = require('./elevenlabs');
+const svc = require('./service');
 const { listVoices, CURATED } = require('./voices');
 const settingsStore = require('./settings');
 const localserver = require('./localserver');
@@ -115,6 +116,12 @@ function persist() {
     pauseMusic: state.pauseMusic,
     fontSize: state.fontSize,
     theme: state.theme,
+    // Account (service mode). ownKey lets a user run in direct mode with their
+    // own ElevenLabs key without editing .env.
+    serviceToken: state.serviceToken || '',
+    serviceEmail: state.serviceEmail || '',
+    ownKey: state.ownKey || '',
+    onboarded: state.onboarded || false,
   });
 }
 
@@ -295,29 +302,56 @@ function segmentText(text) {
   return segs;
 }
 
+// The ElevenLabs key actually in effect: a key the user pasted in Preferences
+// wins over one found in the environment / pazi .env.
+function effectiveKey() {
+  return (state && state.ownKey) || config.apiKey || '';
+}
+
+// Whether to route through the hosted service instead of calling ElevenLabs
+// directly: forced for testing, otherwise whenever there's no own key but the
+// user is signed in. (No key + not signed in => onboarding handles it.)
+function useService() {
+  if (config.forceService) return !!(state && state.serviceToken);
+  return !effectiveKey() && !!(state && state.serviceToken);
+}
+
 function streamSegment(text, gen, index) {
   return new Promise((resolve, reject) => {
     if (gen !== speakGen || !overlayWin || overlayWin.isDestroyed()) return resolve();
     overlayWin.webContents.send('overlay:segment', { gen, index });
-    activeStream = synthesizeStream({
-      apiKey: config.apiKey,
-      voiceId: state.voiceId,
-      modelId: config.modelId,
-      text,
-      stability: state.stability,
-      onLine: (line) => {
-        if (gen !== speakGen) { if (activeStream) activeStream.abort(); return; }
-        if (overlayWin && !overlayWin.isDestroyed()) {
-          overlayWin.webContents.send('overlay:chunk', {
-            gen,
-            audioBase64: line.audio_base64 || null,
-            alignment: line.alignment || null,
-          });
-        }
-      },
-      onEnd: () => { activeStream = null; resolve(); },
-      onError: (err) => { activeStream = null; reject(err); },
-    });
+    const onLine = (line) => {
+      if (gen !== speakGen) { if (activeStream) activeStream.abort(); return; }
+      if (overlayWin && !overlayWin.isDestroyed()) {
+        overlayWin.webContents.send('overlay:chunk', {
+          gen,
+          audioBase64: line.audio_base64 || null,
+          alignment: line.alignment || null,
+        });
+      }
+    };
+    const onEnd = () => { activeStream = null; resolve(); };
+    const onError = (err) => { activeStream = null; reject(err); };
+
+    if (useService()) {
+      activeStream = svc.serviceStream({
+        baseUrl: config.serviceBaseUrl,
+        token: state.serviceToken,
+        voiceId: state.voiceId,
+        stability: state.stability,
+        text,
+        onLine, onEnd, onError,
+      });
+    } else {
+      activeStream = synthesizeStream({
+        apiKey: effectiveKey(),
+        voiceId: state.voiceId,
+        modelId: config.modelId,
+        text,
+        stability: state.stability,
+        onLine, onEnd, onError,
+      });
+    }
   });
 }
 
@@ -672,6 +706,11 @@ app.whenReady().then(() => {
     pauseMusic: saved.pauseMusic != null ? saved.pauseMusic : config.pauseMusic,
     fontSize: clampFont(saved.fontSize != null ? saved.fontSize : config.fontSize),
     theme: cleanTheme(saved.theme || config.theme),
+    // Account (service mode).
+    serviceToken: saved.serviceToken || '',
+    serviceEmail: saved.serviceEmail || '',
+    ownKey: saved.ownKey || '',
+    onboarded: saved.onboarded || false,
   };
   nativeTheme.themeSource = state.theme; // 'system' follows macOS; else force light/dark
 
