@@ -33,7 +33,9 @@ let activeStream = null; // current in-flight ElevenLabs stream handle (abortabl
 
 const OVERLAY_W = 820;
 const OVERLAY_H = 440;
-const SEGMENT_CHARS = 9000; // split longer text into back-to-back streamed requests
+// v3's /stream/with-timestamps caps a request at 5000 chars; split below that
+// (with margin) and stream the segments back-to-back into one continuous timeline.
+const SEGMENT_CHARS = 4500;
 
 function hotkeyLabel(accel) {
   return (accel || config.hotkey)
