@@ -1,15 +1,15 @@
-# Speak Selection — In-page (Chrome extension)
+# Tristr Flow — In-page (Chrome extension)
 
 Highlights the **actual text on the page**, karaoke-style, as it's read aloud —
 and the highlight stays glued to the words as you scroll (it uses Chrome's CSS
 Custom Highlight API, so there's no DOM rewriting).
 
-It talks to the **Speak Selection app** over `127.0.0.1:8757` (the app holds your
+It talks to the **Tristr Flow app** over `127.0.0.1:8757` (the app holds your
 ElevenLabs key and does the streaming), so the key never lives in the browser.
 
 ## Requirements
 
-- The **Speak Selection app must be running** (it provides the local bridge).
+- The **Tristr Flow app must be running** (it provides the local bridge).
 - Chrome/Edge 105+ (for the CSS Custom Highlight API). Chrome 128+ recommended.
 
 ## Install (load unpacked)

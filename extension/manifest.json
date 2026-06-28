@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Speak Selection — In-page",
+  "name": "Tristr Flow — In-page",
   "version": "0.1.0",
   "description": "Read the selected text aloud with karaoke highlighting painted on the page itself (follows scroll).",
   "permissions": ["activeTab", "scripting"],
@@ -16,7 +16,7 @@
   ],
   "action": { "default_title": "Speak selected text (in-page)" },
   "commands": {
-    "speak-selection": {
+    "tristr-flow": {
       "suggested_key": { "default": "Ctrl+Shift+Y", "mac": "MacCtrl+Shift+Y" },
       "description": "Read the selected text aloud with in-page highlighting"
     }

@@ -9,7 +9,7 @@ const http = require('http');
 const { synthesizeStream } = require('./elevenlabs');
 
 const PORT = 8757;
-const TOKEN = 'speak-selection-local-7c4e9a1b2f8d'; // shared with the extension
+const TOKEN = 'tristr-flow-local-7c4e9a1b2f8d'; // shared with the extension
 
 const SEGMENT_CHARS = 4500; // keep each request under v3's 5000-char limit
 function segmentText(text) {
@@ -44,7 +44,7 @@ function start({ getConfig, getState }) {
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
     if (req.method === 'GET' && req.url === '/ping') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, app: 'speak-selection' }));
+      res.end(JSON.stringify({ ok: true, app: 'tristr-flow' }));
       return;
     }
     if (req.method !== 'POST' || req.url !== '/tts') { res.writeHead(404); res.end(); return; }

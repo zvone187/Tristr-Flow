@@ -1,4 +1,4 @@
-# Speak Selection 🔊
+# Tristr Flow 🔊
 
 A tiny macOS menu-bar app. Select text **anywhere** — a browser, your terminal,
 Claude Code, a PDF — press the hotkey, and it reads the selection aloud with an
@@ -114,7 +114,7 @@ permission:
   (or "Terminal"/"Electron" when running from source).
 
 > **After each rebuild** the unsigned app gets a new identity, so macOS forgets
-> the grant — remove the old "Speak Selection" entry and re-add the new one if
+> the grant — remove the old "Tristr Flow" entry and re-add the new one if
 > capture suddenly stops working.
 
 The menu-bar menu shows whether the permission and API key are detected, and has

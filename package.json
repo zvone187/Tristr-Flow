@@ -1,5 +1,5 @@
 {
-  "name": "speak-selection",
+  "name": "tristr-flow",
   "version": "0.1.0",
   "description": "Press a hotkey to read your selected text aloud with ElevenLabs, with a karaoke-style overlay.",
   "main": "src/main.js",
@@ -15,8 +15,8 @@
     "electron-builder": "^26.15.3"
   },
   "build": {
-    "appId": "ai.pazi.speakselection",
-    "productName": "Speak Selection",
+    "appId": "ai.pazi.tristrflow",
+    "productName": "Tristr Flow",
     "files": [
       "src/**/*",
       "package.json"
@@ -30,12 +30,12 @@
       "hardenedRuntime": false,
       "extendInfo": {
         "LSUIElement": true,
-        "NSAppleEventsUsageDescription": "Speak Selection sends a Copy command to the active app so it can read your highlighted text aloud.",
+        "NSAppleEventsUsageDescription": "Tristr Flow sends a Copy command to the active app so it can read your highlighted text aloud.",
         "NSMicrophoneUsageDescription": "Not used."
       }
     },
     "dmg": {
-      "title": "Speak Selection"
+      "title": "Tristr Flow"
     }
   }
 }

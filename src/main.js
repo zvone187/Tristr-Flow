@@ -242,7 +242,7 @@ function openSettings() {
   settingsWin = new BrowserWindow({
     width: 640,
     height: 680,
-    title: 'Speak Selection — Preferences',
+    title: 'Tristr Flow — Preferences',
     resizable: true,
     minimizable: true,
     maximizable: false,
@@ -395,7 +395,7 @@ async function onHotkey() {
       systemPreferences.isTrustedAccessibilityClient(true);
       notify(
         'Accessibility permission needed',
-        'Enable Speak Selection under System Settings → Privacy & Security → Accessibility, then try again.'
+        'Enable Tristr Flow under System Settings → Privacy & Security → Accessibility, then try again.'
       );
       updateTrayMenu();
       return;
@@ -406,7 +406,7 @@ async function onHotkey() {
         systemPreferences.isTrustedAccessibilityClient(true);
         notify(
           'Accessibility permission needed',
-          'Enable Speak Selection under System Settings → Privacy & Security → Accessibility, then try again.'
+          'Enable Tristr Flow under System Settings → Privacy & Security → Accessibility, then try again.'
         );
       } else if (reason === 'secure-input') {
         notify(
@@ -423,7 +423,7 @@ async function onHotkey() {
     await speakText(text, html);
   } catch (err) {
     console.error('[speak] hotkey error:', err);
-    notify('Speak Selection error', String(err.message || err));
+    notify('Tristr Flow error', String(err.message || err));
   } finally {
     busy = false;
   }
@@ -493,7 +493,7 @@ function updateTrayMenu() {
   const speedSupported = config.modelId !== 'eleven_v3'; // v3 ignores speed
 
   const template = [
-    { label: 'Speak Selection', enabled: false },
+    { label: 'Tristr Flow', enabled: false },
     { label: `Hotkey:  ${hotkeyLabel(state.hotkey)}`, enabled: false },
   ];
   if (state.hotkey2) template.push({ label: `Also:  ${hotkeyLabel(state.hotkey2)}`, enabled: false });
@@ -531,7 +531,7 @@ function updateTrayMenu() {
     },
     { label: 'Read clipboard text aloud', click: speakFromClipboard },
     { type: 'separator' },
-    { label: 'Quit Speak Selection', click: () => app.quit() }
+    { label: 'Quit Tristr Flow', click: () => app.quit() }
   );
   tray.setContextMenu(Menu.buildFromTemplate(template));
 }
@@ -539,7 +539,7 @@ function updateTrayMenu() {
 function createTray() {
   tray = new Tray(nativeImage.createEmpty());
   setTrayState('idle');
-  tray.setToolTip('Speak Selection');
+  tray.setToolTip('Tristr Flow');
   updateTrayMenu();
 }
 

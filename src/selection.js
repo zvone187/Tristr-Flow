@@ -204,7 +204,7 @@ function run() {
 `;
 
 // Materialize the JXA script to a stable temp path (rewrite if missing).
-const SCRIPT_DIR = path.join(os.tmpdir(), 'speak-selection-jxa');
+const SCRIPT_DIR = path.join(os.tmpdir(), 'tristr-flow-jxa');
 const SCRIPT_PATH = path.join(SCRIPT_DIR, 'capture.js');
 function ensureScript() {
   try {

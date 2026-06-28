@@ -5,10 +5,10 @@
 // runs HERE (extension origin) with the shared token, so the page can't reach it.
 
 const BRIDGE = 'http://127.0.0.1:8757/tts';
-const TOKEN = 'speak-selection-local-7c4e9a1b2f8d';
+const TOKEN = 'tristr-flow-local-7c4e9a1b2f8d';
 
 chrome.commands.onCommand.addListener((cmd) => {
-  if (cmd !== 'speak-selection') return;
+  if (cmd !== 'tristr-flow') return;
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const tab = tabs[0];
     if (tab && tab.id != null) chrome.tabs.sendMessage(tab.id, { type: 'speak-start' });
@@ -30,7 +30,7 @@ chrome.runtime.onConnect.addListener((port) => {
         body: JSON.stringify({ text: msg.text }),
       });
       if (!res.ok || !res.body) {
-        port.postMessage({ type: 'error', message: `Bridge error ${res.status}. Is the Speak Selection app running?` });
+        port.postMessage({ type: 'error', message: `Bridge error ${res.status}. Is the Tristr Flow app running?` });
         return;
       }
       const reader = res.body.getReader();
@@ -53,7 +53,7 @@ chrome.runtime.onConnect.addListener((port) => {
     } catch (e) {
       port.postMessage({
         type: 'error',
-        message: `Can't reach the Speak Selection app (${e.message}). Make sure it's running.`,
+        message: `Can't reach the Tristr Flow app (${e.message}). Make sure it's running.`,
       });
     }
   });
