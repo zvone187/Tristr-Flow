@@ -48,6 +48,24 @@ function hotkeyLabel(accel) {
     .replace(/\+/g, ' ');
 }
 
+function tryRegister(accel) {
+  if (!accel) return false;
+  try {
+    return globalShortcut.register(accel, onHotkey);
+  } catch {
+    return false; // invalid accelerator string
+  }
+}
+
+// (Re)register both triggers from the current state. Returns which succeeded.
+function registerHotkeys() {
+  globalShortcut.unregisterAll();
+  const h1 = tryRegister(state.hotkey);
+  let h2 = false;
+  if (state.hotkey2 && state.hotkey2 !== state.hotkey) h2 = tryRegister(state.hotkey2);
+  return { h1, h2 };
+}
+
 function notify(title, body) {
   try {
     new Notification({ title, body, silent: true }).show();
@@ -68,6 +86,8 @@ function persist() {
     speed: state.speed,
     stability: state.stability,
     overlayBounds: state.overlayBounds || null,
+    hotkey: state.hotkey,
+    hotkey2: state.hotkey2,
   });
 }
 
@@ -198,7 +218,7 @@ function openSettings() {
   }
   settingsWin = new BrowserWindow({
     width: 640,
-    height: 600,
+    height: 680,
     title: 'Speak Selection — Preferences',
     resizable: true,
     minimizable: true,
@@ -448,13 +468,15 @@ function updateTrayMenu() {
 
   const template = [
     { label: 'Speak Selection', enabled: false },
-    { label: `Hotkey:  ${hotkeyLabel()}`, enabled: false },
-    { label: `Also:  ${hotkeyLabel(config.hotkey2)}`, enabled: false },
-    { type: 'separator' },
-    { label: 'Preferences — Voice & Stability…', click: openSettings, accelerator: 'Command+,' },
-    { label: `Voice:  ${state.voiceName}`, submenu: voiceItems },
-    { label: 'Stability', submenu: stabilityItems },
+    { label: `Hotkey:  ${hotkeyLabel(state.hotkey)}`, enabled: false },
   ];
+  if (state.hotkey2) template.push({ label: `Also:  ${hotkeyLabel(state.hotkey2)}`, enabled: false });
+  template.push(
+    { type: 'separator' },
+    { label: 'Preferences — Voice, Shortcuts…', click: openSettings, accelerator: 'Command+,' },
+    { label: `Voice:  ${state.voiceName}`, submenu: voiceItems },
+    { label: 'Stability', submenu: stabilityItems }
+  );
   if (speedSupported) {
     template.push({ label: 'Speed', submenu: speedItems });
   }
@@ -499,7 +521,30 @@ ipcMain.handle('settings:get', () => ({
   apiKeyPresent: !!config.apiKey,
   model: config.modelId,
   speedSupported: config.modelId !== 'eleven_v3', // v3 ignores the speed setting
+  hotkey: state.hotkey,
+  hotkey2: state.hotkey2 || '',
 }));
+
+// Set/clear a global trigger (which = 1 primary, 2 secondary). Validates by
+// actually registering; reverts and reports on conflict/invalid combo.
+ipcMain.handle('settings:setHotkey', (_e, { which, accel }) => {
+  const oldH1 = state.hotkey;
+  const oldH2 = state.hotkey2;
+  if (which === 2) state.hotkey2 = accel || '';
+  else state.hotkey = accel || '';
+
+  const reg = registerHotkeys();
+  const ok = which === 2 ? (!state.hotkey2 || reg.h2) : reg.h1;
+  if (!ok) {
+    state.hotkey = oldH1;
+    state.hotkey2 = oldH2;
+    registerHotkeys();
+    return { ok: false, hotkey: state.hotkey, hotkey2: state.hotkey2 || '', error: `“${hotkeyLabel(accel)}” is unavailable (in use or invalid).` };
+  }
+  persist();
+  updateTrayMenu();
+  return { ok: true, hotkey: state.hotkey, hotkey2: state.hotkey2 || '' };
+});
 
 ipcMain.handle('settings:listVoices', () => listVoices(config.apiKey));
 
@@ -562,6 +607,8 @@ app.whenReady().then(() => {
       saved.stability != null ? saved.stability : config.stability
     ),
     overlayBounds: saved.overlayBounds || null,
+    hotkey: saved.hotkey || config.hotkey,
+    hotkey2: saved.hotkey2 != null ? saved.hotkey2 : config.hotkey2,
   };
 
   if (app.dock) app.dock.hide();
@@ -569,18 +616,12 @@ app.whenReady().then(() => {
   createOverlay();
   createTray();
 
-  const registered = globalShortcut.register(config.hotkey, onHotkey);
-  if (!registered) {
-    notify(
-      'Hotkey registration failed',
-      `Could not register ${hotkeyLabel()}. It may be in use by another app.`
-    );
+  const reg = registerHotkeys();
+  if (!reg.h1) {
+    notify('Hotkey registration failed', `Could not register ${hotkeyLabel(state.hotkey)}. It may be in use by another app.`);
   }
-  if (config.hotkey2) {
-    const reg2 = globalShortcut.register(config.hotkey2, onHotkey);
-    if (!reg2) {
-      notify('Second hotkey failed', `Could not register ${hotkeyLabel(config.hotkey2)}.`);
-    }
+  if (state.hotkey2 && !reg.h2) {
+    notify('Second hotkey failed', `Could not register ${hotkeyLabel(state.hotkey2)}.`);
   }
 
   if (!config.apiKey) {

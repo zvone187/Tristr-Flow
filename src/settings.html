@@ -25,6 +25,21 @@
     <div id="list" aria-label="Voices"></div>
 
     <footer id="foot">
+      <div id="shortcuts">
+        <div class="sc-row">
+          <label>Shortcut</label>
+          <kbd class="combo" id="combo1">…</kbd>
+          <button class="rec" data-which="1">Change</button>
+        </div>
+        <div class="sc-row">
+          <label>Also</label>
+          <kbd class="combo" id="combo2">…</kbd>
+          <button class="rec" data-which="2">Change</button>
+          <button class="clr" data-which="2" title="Remove this shortcut">✕</button>
+        </div>
+        <p id="schint">Click Change, then press your key combo (needs a modifier, e.g. ⌃⇧Space).</p>
+      </div>
+
       <div id="stabilityrow">
         <label>Voice</label>
         <div id="stability" class="segmented" role="group" aria-label="Voice stability">

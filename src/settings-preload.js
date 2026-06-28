@@ -10,5 +10,6 @@ contextBridge.exposeInMainWorld('prefs', {
     ipcRenderer.send('settings:setVoice', { voiceId, voiceName }),
   setSpeed: (speed) => ipcRenderer.send('settings:setSpeed', { speed }),
   setStability: (stability) => ipcRenderer.send('settings:setStability', { stability }),
+  setHotkey: (which, accel) => ipcRenderer.invoke('settings:setHotkey', { which, accel }),
   close: () => ipcRenderer.send('settings:close'),
 });

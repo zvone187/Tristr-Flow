@@ -6,6 +6,11 @@ const speedEl = document.getElementById('speed');
 const speedValEl = document.getElementById('speedval');
 const keyStateEl = document.getElementById('keystate');
 const stabilityEl = document.getElementById('stability');
+const combo1El = document.getElementById('combo1');
+const combo2El = document.getElementById('combo2');
+const scHintEl = document.getElementById('schint');
+const DEFAULT_SC_HINT = scHintEl ? scHintEl.textContent : '';
+let recordingWhich = 0;
 
 let voices = [];
 let selectedId = null;
@@ -147,6 +152,7 @@ function render(filter) {
 async function init() {
   const cfg = await window.prefs.get();
   selectedId = cfg.voiceId;
+  renderCombos(cfg.hotkey, cfg.hotkey2);
   setActiveStability(cfg.stability);
   speedEl.value = cfg.speed;
   speedValEl.textContent = speedLabel(cfg.speed);
@@ -189,8 +195,86 @@ stabilityEl.addEventListener('click', (e) => {
 });
 
 searchEl.addEventListener('input', () => render(searchEl.value));
-document.addEventListener('keydown', (e) => {
+
+// ---- shortcuts ----------------------------------------------------------
+function accelToSymbols(accel) {
+  if (!accel) return '—';
+  return accel
+    .replace('CommandOrControl', '⌘').replace('Command', '⌘')
+    .replace('Control', '⌃').replace('Alt', '⌥').replace('Option', '⌥')
+    .replace('Shift', '⇧').replace(/\+/g, ' ');
+}
+function renderCombos(hotkey, hotkey2) {
+  if (combo1El) combo1El.textContent = accelToSymbols(hotkey);
+  if (combo2El) combo2El.textContent = accelToSymbols(hotkey2);
+}
+function eventToAccel(e) {
+  const mods = [];
+  if (e.metaKey) mods.push('Command');
+  if (e.ctrlKey) mods.push('Control');
+  if (e.altKey) mods.push('Alt');
+  if (e.shiftKey) mods.push('Shift');
+  const code = e.code;
+  let key = null;
+  if (code === 'Space') key = 'Space';
+  else if (/^Key[A-Z]$/.test(code)) key = code.slice(3);
+  else if (/^Digit[0-9]$/.test(code)) key = code.slice(5);
+  else if (/^F([1-9]|1[0-9]|2[0-4])$/.test(code)) key = code;
+  else {
+    const m = { Comma: ',', Period: '.', Slash: '/', Backslash: '\\', Semicolon: ';',
+      Quote: "'", Minus: '-', Equal: '=', Backquote: '`', BracketLeft: '[', BracketRight: ']',
+      ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right', Enter: 'Return', Tab: 'Tab' };
+    key = m[code] || null;
+  }
+  return { mods, key };
+}
+function startRecording(which) {
+  recordingWhich = which;
+  const el = which === 2 ? combo2El : combo1El;
+  if (el) { el.classList.add('recording'); el.textContent = 'Press keys…'; }
+  scHintEl.textContent = 'Listening… press a modifier + key, or Esc to cancel.';
+}
+function stopRecording() {
+  recordingWhich = 0;
+  if (combo1El) combo1El.classList.remove('recording');
+  if (combo2El) combo2El.classList.remove('recording');
+}
+
+document.querySelectorAll('.rec').forEach((b) =>
+  b.addEventListener('click', () => startRecording(Number(b.dataset.which)))
+);
+document.querySelectorAll('.clr').forEach((b) =>
+  b.addEventListener('click', async () => {
+    const res = await window.prefs.setHotkey(2, '');
+    renderCombos(res.hotkey, res.hotkey2);
+    scHintEl.textContent = 'Removed.';
+  })
+);
+
+// Capture phase so Esc cancels recording instead of closing the window.
+document.addEventListener('keydown', async (e) => {
+  if (recordingWhich) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === 'Escape') {
+      const c = await window.prefs.get();
+      stopRecording();
+      renderCombos(c.hotkey, c.hotkey2);
+      scHintEl.textContent = DEFAULT_SC_HINT;
+      return;
+    }
+    if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return; // wait for a real key
+    const { mods, key } = eventToAccel(e);
+    if (!key) { scHintEl.textContent = 'That key isn’t supported — try another.'; return; }
+    if (mods.length === 0) { scHintEl.textContent = 'Add a modifier (⌃ ⌥ ⌘ or ⇧).'; return; }
+    const which = recordingWhich;
+    stopRecording();
+    const res = await window.prefs.setHotkey(which, mods.concat(key).join('+'));
+    renderCombos(res.hotkey, res.hotkey2);
+    scHintEl.textContent = res.ok ? 'Saved ✓' : (res.error || 'Could not set that shortcut.');
+    return;
+  }
   if (e.key === 'Escape') window.prefs.close();
-});
+}, true);
 
 init();
