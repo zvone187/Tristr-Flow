@@ -65,6 +65,7 @@ function persist() {
     voiceName: state.voiceName,
     speed: state.speed,
     stability: state.stability,
+    overlayBounds: state.overlayBounds || null,
   });
 }
 
@@ -77,7 +78,7 @@ function createOverlay() {
     show: false,
     frame: false,
     transparent: true,
-    resizable: false,
+    resizable: true, // user can resize; size is persisted (see saveBounds)
     movable: true,
     alwaysOnTop: true,
     skipTaskbar: true,
@@ -88,14 +89,64 @@ function createOverlay() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true, // extra isolation for the renderer that shows untrusted clipboard HTML
     },
   });
+  overlayWin.setMinimumSize(360, 200);
   overlayWin.setAlwaysOnTop(true, 'screen-saver');
   overlayWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlayWin.loadFile(path.join(__dirname, 'overlay.html'));
+
+  // Never let rendered clipboard HTML navigate or open windows (defense-in-depth
+  // on top of the renderer CSP, which cannot stop main-process navigation).
+  overlayWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  overlayWin.webContents.on('will-navigate', (e) => e.preventDefault());
+
+  // Persist the user's chosen size/position (drag-end events; debounced).
+  let boundsTimer = null;
+  const saveBounds = () => {
+    if (boundsTimer) clearTimeout(boundsTimer);
+    boundsTimer = setTimeout(() => {
+      if (overlayWin && !overlayWin.isDestroyed()) {
+        state.overlayBounds = overlayWin.getBounds();
+        persist();
+      }
+    }, 400);
+  };
+  overlayWin.on('resized', saveBounds);
+  overlayWin.on('moved', saveBounds);
+
   overlayWin.on('closed', () => {
     overlayWin = null;
   });
+}
+
+// Restore the user's saved size/position if it is still on a visible display;
+// otherwise fall back to the default bottom-center placement.
+function showOverlayPositioned() {
+  if (!overlayWin) return;
+  const b = state.overlayBounds;
+  if (
+    b &&
+    Number.isFinite(b.x) && Number.isFinite(b.y) &&
+    Number.isFinite(b.width) && Number.isFinite(b.height) &&
+    b.width >= 300 && b.height >= 160
+  ) {
+    const wa = screen.getDisplayMatching(b).workArea;
+    const onScreen =
+      b.x < wa.x + wa.width && b.x + b.width > wa.x &&
+      b.y < wa.y + wa.height && b.y + b.height > wa.y;
+    if (onScreen) {
+      overlayWin.setBounds({
+        x: b.x,
+        y: b.y,
+        width: Math.min(b.width, wa.width),
+        height: Math.min(b.height, wa.height),
+      });
+      return;
+    }
+  }
+  positionOverlay();
 }
 
 function positionOverlay() {
@@ -220,9 +271,22 @@ function streamSegment(text, gen, index) {
   });
 }
 
-async function speakText(rawText) {
+// Resolves when the overlay reports back the canonical text it built from rich
+// HTML (single source of truth: spoken == shown == aligned). Times out to plain.
+let pendingRich = null;
+function waitRichReady(gen) {
+  return new Promise((resolve) => {
+    pendingRich = { gen, resolve };
+    setTimeout(() => {
+      if (pendingRich && pendingRich.gen === gen) { pendingRich.resolve(null); pendingRich = null; }
+    }, 4000);
+  });
+}
+
+async function speakText(rawText, html) {
   const text = (rawText || '').trim();
-  if (!text) {
+  const hasHtml = !!(html && html.trim());
+  if (!text && !hasHtml) {
     notify('Nothing to read', 'No text was found to read aloud.');
     return;
   }
@@ -230,15 +294,29 @@ async function speakText(rawText) {
   const myGen = ++speakGen; // claim this request; a later stop/request invalidates it
 
   if (!overlayWin) createOverlay();
-  positionOverlay();
+  showOverlayPositioned();
   overlayWin.webContents.setAudioMuted(false);
   if (app.focus) app.focus({ steal: true }); // accessory app: activate so keys reach the overlay
   overlayWin.show();
   overlayWin.focus(); // so Space/Esc reach the overlay (capture already happened)
   setTrayState('loading');
-  overlayWin.webContents.send('overlay:loading', { voice: state.voiceName });
+  overlayWin.webContents.send('overlay:loading', {
+    gen: myGen,
+    voice: state.voiceName,
+    html: hasHtml ? html : null,
+  });
 
-  const segments = segmentText(text);
+  // If the selection was formatted, let the overlay render + extract the exact
+  // text it shows, and speak THAT (keeps the highlight from drifting).
+  let ttsText = text;
+  if (hasHtml) {
+    const rr = await waitRichReady(myGen);
+    if (myGen !== speakGen) return;
+    if (rr && rr.ok && rr.text && rr.text.trim()) ttsText = rr.text;
+  }
+  if (!ttsText.trim()) { setTrayState('idle'); return; }
+
+  const segments = segmentText(ttsText);
   try {
     for (let i = 0; i < segments.length; i++) {
       if (myGen !== speakGen) return;
@@ -274,7 +352,7 @@ async function onHotkey() {
       updateTrayMenu();
       return;
     }
-    const { text, reason } = await getSelectedText();
+    const { text, html, reason } = await getSelectedText();
     if (!text) {
       if (reason === 'not-trusted') {
         systemPreferences.isTrustedAccessibilityClient(true);
@@ -294,7 +372,7 @@ async function onHotkey() {
       }
       return;
     }
-    await speakText(text);
+    await speakText(text, html);
   } catch (err) {
     console.error('[speak] hotkey error:', err);
     notify('Speak Selection error', String(err.message || err));
@@ -459,6 +537,12 @@ ipcMain.on('settings:close', () => {
   if (settingsWin && !settingsWin.isDestroyed()) settingsWin.close();
 });
 
+ipcMain.on('overlay:rich-ready', (_e, { gen, text, ok }) => {
+  if (pendingRich && pendingRich.gen === gen) {
+    pendingRich.resolve({ text, ok });
+    pendingRich = null;
+  }
+});
 ipcMain.on('overlay:started', () => setTrayState('playing'));
 ipcMain.on('overlay:ended', () => setTrayState('idle'));
 ipcMain.on('overlay:close', () => stopEverything());
@@ -475,6 +559,7 @@ app.whenReady().then(() => {
     stability: clampStability(
       saved.stability != null ? saved.stability : config.stability
     ),
+    overlayBounds: saved.overlayBounds || null,
   };
 
   if (app.dock) app.dock.hide();

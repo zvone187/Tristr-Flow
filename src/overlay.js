@@ -27,6 +27,8 @@ let charToWord = []; // char index -> word index (-1 for whitespace)
 let words = []; // { el, first, last, start }
 let currentWord = -1;
 let timeOffset = 0; // added to a segment's relative timestamps (multi-request)
+let richMode = false; // true when formatted (HTML) text was rendered up-front
+let loadGen = 0; // gen id from main, echoed back in richReady
 // incremental word builder
 let curWordEl = null;
 let curWordFirst = -1;
@@ -65,6 +67,7 @@ function teardown() {
   words = [];
   currentWord = -1;
   timeOffset = 0;
+  richMode = false;
   curWordEl = null;
   curWordFirst = -1;
   curWordLast = -1;
@@ -147,6 +150,17 @@ function flushWord() {
     curWordEl = null;
     curWordFirst = -1;
     curWordLast = -1;
+  }
+}
+
+// Rich mode: words + charToWord are pre-built from the HTML, so streamed
+// alignment only fills in the per-character timings (same canonical index space).
+function appendAlignmentTimings(a) {
+  const s = a.character_start_times_seconds || [];
+  const e = a.character_end_times_seconds || [];
+  for (let k = 0; k < s.length; k++) {
+    charStart.push((s[k] || 0) + timeOffset);
+    charEnd.push((e[k] || 0) + timeOffset);
   }
 }
 
@@ -234,8 +248,8 @@ textEl.addEventListener('click', (e) => {
   if (!w || !audio) return;
   const wi = words.findIndex((x) => x.el === w);
   if (wi < 0) return;
-  const t = words[wi].start;
-  if (t > bufferedEnd() - 0.05) { flashStatus('Not generated yet…'); return; }
+  const t = charStart[words[wi].first]; // timing for this word's first char
+  if (t == null || t > bufferedEnd() - 0.05) { flashStatus('Not generated yet…'); return; }
   audio.currentTime = Math.max(0, t);
   currentWord = -1; // force re-highlight from the new position
   if (audio.paused) audio.play().catch(() => {});
@@ -290,7 +304,24 @@ document.addEventListener('keydown', (e) => {
 });
 
 if (window.speak) {
-  window.speak.onLoading(({ voice }) => resetForNew(voice));
+  window.speak.onLoading(({ gen, voice, html }) => {
+    resetForNew(voice);
+    loadGen = gen || 0;
+    if (html && window.SpeakRich) {
+      let built = null;
+      try { built = window.SpeakRich.build(html); } catch { built = null; }
+      if (built && built.text && built.text.trim()) {
+        richMode = true;
+        words = built.words;
+        charToWord = built.charToWord; // full canonical index space, pre-built
+        textEl.appendChild(built.fragment);
+        window.speak.richReady(loadGen, built.text, true);
+        return;
+      }
+    }
+    // plain mode: words/timings are built incrementally from the stream
+    if (html) window.speak.richReady(loadGen, null, false);
+  });
 
   window.speak.onSegment(({ index }) => {
     // New request segment: continue the same audio timeline. Offset this
@@ -303,7 +334,7 @@ if (window.speak) {
 
   window.speak.onChunk(({ audioBase64, alignment }) => {
     if (audioBase64) { appendQueue.push(b64ToBytes(audioBase64)); pump(); }
-    if (alignment) appendAlignment(alignment);
+    if (alignment) { if (richMode) appendAlignmentTimings(alignment); else appendAlignment(alignment); }
   });
 
   window.speak.onAllDone(() => { flushWord(); allReceived = true; pump(); });

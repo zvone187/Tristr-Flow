@@ -152,6 +152,54 @@ body {
   box-shadow: 0 4px 14px rgba(109, 139, 255, 0.4);
 }
 
+/* rich (formatted) clipboard text */
+.word.b { font-weight: 700; }
+.word.i { font-style: italic; }
+.word.u { text-decoration: underline; }
+.word.strike { text-decoration: line-through; }
+.word.mark { background: rgba(255, 221, 87, 0.28); }
+.word.small { font-size: 0.85em; }
+.word.sup { vertical-align: super; font-size: 0.8em; }
+.word.sub { vertical-align: sub; font-size: 0.8em; }
+.word.link { color: #8ab4ff; text-decoration: underline; }
+.word.code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+.rich h1, .rich h2, .rich h3, .rich h4, .rich h5, .rich h6 {
+  font-weight: 700;
+  margin: 0.4em 0 0.2em;
+  line-height: 1.25;
+}
+.rich h1 { font-size: 1.5em; }
+.rich h2 { font-size: 1.32em; }
+.rich h3 { font-size: 1.16em; }
+.rich h4, .rich h5, .rich h6 { font-size: 1.04em; }
+.rich p { margin: 0.45em 0; }
+.rich ul, .rich ol { margin: 0.35em 0; padding-left: 1.5em; }
+.rich li { margin: 0.15em 0; }
+.rich ul { list-style: disc; }
+.rich ol { list-style: decimal; }
+.rich blockquote {
+  margin: 0.4em 0;
+  padding: 0.1em 0 0.1em 0.9em;
+  border-left: 3px solid rgba(109, 139, 255, 0.6);
+  color: #c2c2cf;
+}
+.rich pre {
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin: 0.4em 0;
+}
+.rich .word { display: inline; }
+
 #text.loading {
   color: var(--read);
   font-style: italic;

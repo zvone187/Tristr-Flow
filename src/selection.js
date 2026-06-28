@@ -158,7 +158,7 @@ function postCleanCmdC() {
 
 function run() {
   var pb = $.NSPasteboard.generalPasteboard;
-  var res = { ok: true, changed: false, text: '', source: 'none', reason: '' };
+  var res = { ok: true, changed: false, text: '', html: '', source: 'none', reason: '' };
 
   if ($.IsSecureEventInputEnabled()) { res.reason = 'secure-input'; return JSON.stringify(res); }
   if (!$.AXIsProcessTrusted()) { res.reason = 'not-trusted'; return JSON.stringify(res); }
@@ -187,6 +187,12 @@ function run() {
     var copyCount = Number(pb.changeCount);
     var s = pb.stringForType($.NSPasteboardTypeString);
     if (s && !s.isNil()) res.text = ObjC.unwrap(s);
+    // Also grab the rich (HTML) flavor if the app provided one, for formatted display.
+    var h = pb.dataForType($.NSPasteboardTypeHTML);
+    if (h && !h.isNil()) {
+      var hs = $.NSString.alloc.initWithDataEncoding(h, $.NSUTF8StringEncoding);
+      if (hs && !hs.isNil()) res.html = ObjC.unwrap(hs) || '';
+    }
     res.changed = true;
     // Restore only if nobody else wrote the clipboard after our copy.
     if (Number(pb.changeCount) === copyCount) restore(pb, saved);
@@ -245,9 +251,9 @@ function getSelectedText() {
         }
         try {
           const r = JSON.parse(String(stdout).trim());
-          resolve({ text: (r.text || '').trim(), reason: r.reason || '' });
+          resolve({ text: (r.text || '').trim(), html: r.html || '', reason: r.reason || '' });
         } catch {
-          resolve({ text: '', reason: 'capture-failed' });
+          resolve({ text: '', html: '', reason: 'capture-failed' });
         }
       }
     );

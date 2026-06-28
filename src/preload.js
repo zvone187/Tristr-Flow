@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('speak', {
   onError: (cb) => ipcRenderer.on('overlay:error', (_e, d) => cb(d)),
   onStop: (cb) => ipcRenderer.on('overlay:stop', () => cb()),
   // renderer -> main
+  richReady: (gen, text, ok) => ipcRenderer.send('overlay:rich-ready', { gen, text, ok }),
   started: () => ipcRenderer.send('overlay:started'),
   ended: () => ipcRenderer.send('overlay:ended'),
   close: () => ipcRenderer.send('overlay:close'),
