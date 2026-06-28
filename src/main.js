@@ -22,6 +22,7 @@ const { synthesize, synthesizeStream, clampSpeed, clampStability } = require('./
 const { listVoices, CURATED } = require('./voices');
 const settingsStore = require('./settings');
 const localserver = require('./localserver');
+const mediaCtl = require('./media');
 
 let tray = null;
 let overlayWin = null;
@@ -31,6 +32,17 @@ let state = null; // mutable, persisted: { voiceId, voiceName, speed }
 let busy = false;
 let speakGen = 0; // bumped on every new request / stop, to cancel stale in-flight synthesis
 let activeStream = null; // current in-flight ElevenLabs stream handle (abortable)
+let musicPausePromise = null; // resolves to the apps we paused; null when not paused
+
+function maybePauseMusic() {
+  if (state.pauseMusic && !musicPausePromise) musicPausePromise = mediaCtl.pauseMusic();
+}
+function resumeMusicIfNeeded() {
+  if (!musicPausePromise) return;
+  const p = musicPausePromise;
+  musicPausePromise = null;
+  p.then((apps) => mediaCtl.resumeMusic(apps)).catch(() => {});
+}
 
 const OVERLAY_W = 820;
 const OVERLAY_H = 440;
@@ -89,6 +101,7 @@ function persist() {
     overlayBounds: state.overlayBounds || null,
     hotkey: state.hotkey,
     hotkey2: state.hotkey2,
+    pauseMusic: state.pauseMusic,
   });
 }
 
@@ -207,6 +220,7 @@ function stopEverything() {
     overlayWin.hide();
   }
   setTrayState('idle');
+  resumeMusicIfNeeded();
 }
 
 // ---- settings window -----------------------------------------------------
@@ -323,6 +337,7 @@ async function speakText(rawText, html) {
   overlayWin.show();
   overlayWin.focus(); // so Space/Esc reach the overlay (capture already happened)
   setTrayState('loading');
+  maybePauseMusic(); // pause Spotify/Apple Music while we read (resumed on end/stop)
   overlayWin.webContents.send('overlay:loading', {
     gen: myGen,
     voice: state.voiceName,
@@ -337,7 +352,7 @@ async function speakText(rawText, html) {
     if (myGen !== speakGen) return;
     if (rr && rr.ok && rr.text && rr.text.trim()) ttsText = rr.text;
   }
-  if (!ttsText.trim()) { setTrayState('idle'); return; }
+  if (!ttsText.trim()) { setTrayState('idle'); resumeMusicIfNeeded(); return; }
 
   const segments = segmentText(ttsText);
   try {
@@ -354,6 +369,7 @@ async function speakText(rawText, html) {
       overlayWin.webContents.send('overlay:error', { message: String(err.message || err) });
       setTrayState('idle');
     }
+    resumeMusicIfNeeded();
   }
 }
 
@@ -476,7 +492,13 @@ function updateTrayMenu() {
     { type: 'separator' },
     { label: 'Preferences — Voice, Shortcuts…', click: openSettings, accelerator: 'Command+,' },
     { label: `Voice:  ${state.voiceName}`, submenu: voiceItems },
-    { label: 'Stability', submenu: stabilityItems }
+    { label: 'Stability', submenu: stabilityItems },
+    {
+      label: 'Pause music while reading',
+      type: 'checkbox',
+      checked: !!state.pauseMusic,
+      click: () => { state.pauseMusic = !state.pauseMusic; persist(); },
+    }
   );
   if (speedSupported) {
     template.push({ label: 'Speed', submenu: speedItems });
@@ -524,7 +546,14 @@ ipcMain.handle('settings:get', () => ({
   speedSupported: config.modelId !== 'eleven_v3', // v3 ignores the speed setting
   hotkey: state.hotkey,
   hotkey2: state.hotkey2 || '',
+  pauseMusic: state.pauseMusic,
 }));
+
+ipcMain.on('settings:setPauseMusic', (_e, { value }) => {
+  state.pauseMusic = !!value;
+  persist();
+  updateTrayMenu();
+});
 
 // Set/clear a global trigger (which = 1 primary, 2 secondary). Validates by
 // actually registering; reverts and reports on conflict/invalid combo.
@@ -592,7 +621,7 @@ ipcMain.on('overlay:rich-ready', (_e, { gen, text, ok }) => {
   }
 });
 ipcMain.on('overlay:started', () => setTrayState('playing'));
-ipcMain.on('overlay:ended', () => setTrayState('idle'));
+ipcMain.on('overlay:ended', () => { setTrayState('idle'); resumeMusicIfNeeded(); });
 ipcMain.on('overlay:close', () => stopEverything());
 
 // ---- lifecycle -----------------------------------------------------------
@@ -610,6 +639,7 @@ app.whenReady().then(() => {
     overlayBounds: saved.overlayBounds || null,
     hotkey: saved.hotkey || config.hotkey,
     hotkey2: saved.hotkey2 != null ? saved.hotkey2 : config.hotkey2,
+    pauseMusic: saved.pauseMusic != null ? saved.pauseMusic : config.pauseMusic,
   };
 
   if (app.dock) app.dock.hide();

@@ -275,6 +275,23 @@ body {
   align-items: center;
   gap: 12px;
 }
+
+#pausemusicrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  cursor: pointer;
+}
+#pausemusicrow input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
 #speedrow label {
   font-weight: 600;
   width: 44px;

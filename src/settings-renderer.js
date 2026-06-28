@@ -6,6 +6,7 @@ const speedEl = document.getElementById('speed');
 const speedValEl = document.getElementById('speedval');
 const keyStateEl = document.getElementById('keystate');
 const stabilityEl = document.getElementById('stability');
+const pauseMusicEl = document.getElementById('pausemusic');
 const combo1El = document.getElementById('combo1');
 const combo2El = document.getElementById('combo2');
 const scHintEl = document.getElementById('schint');
@@ -153,6 +154,7 @@ async function init() {
   const cfg = await window.prefs.get();
   selectedId = cfg.voiceId;
   renderCombos(cfg.hotkey, cfg.hotkey2);
+  if (pauseMusicEl) pauseMusicEl.checked = cfg.pauseMusic !== false;
   setActiveStability(cfg.stability);
   speedEl.value = cfg.speed;
   speedValEl.textContent = speedLabel(cfg.speed);
@@ -195,6 +197,10 @@ stabilityEl.addEventListener('click', (e) => {
 });
 
 searchEl.addEventListener('input', () => render(searchEl.value));
+
+if (pauseMusicEl) {
+  pauseMusicEl.addEventListener('change', () => window.prefs.setPauseMusic(pauseMusicEl.checked));
+}
 
 // ---- shortcuts ----------------------------------------------------------
 function accelToSymbols(accel) {

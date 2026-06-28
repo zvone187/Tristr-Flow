@@ -54,6 +54,7 @@ function loadConfig() {
     // Higher = steadier (fixes "sounds weird"); lower = more expressive.
     stability: parseFloat(merged.SPEAK_STABILITY || '0.5'),
     maxChars: parseInt(merged.SPEAK_MAX_CHARS || '5000', 10),
+    pauseMusic: (merged.SPEAK_PAUSE_MUSIC || 'true') !== 'false',
     hotkey: merged.SPEAK_HOTKEY || 'Control+Shift+Space',
     // Second trigger. Bare "W+D" is intentionally NOT used (it would misfire
     // constantly while typing/gaming); a modifier-anchored "D" combo is safe.
