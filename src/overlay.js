@@ -20,6 +20,8 @@ let endedStream = false;
 let playRequested = false;
 let raf = null;
 let playbackSpeed = 1; // client-side playback rate (works on every model)
+let following = true; // auto-scroll follows the current word; paused while the user scrolls
+let followResumeTimer = null;
 
 // ---- karaoke / alignment state ------------------------------------------
 let charStart = []; // absolute seconds, accumulated across chunks/segments
@@ -88,6 +90,8 @@ function teardown() {
   curSentIdx = 0;
   timeOffset = 0;
   richMode = false;
+  following = true;
+  if (followResumeTimer) { clearTimeout(followResumeTimer); followResumeTimer = null; }
   if (hlSupported) { hlSentence.clear(); hlWord.clear(); }
   curWordEl = null;
   curWordFirst = -1;
@@ -293,10 +297,30 @@ function setActive(wi) {
   currentSentence = si;
 }
 
-function scrollToWord(el) {
-  const target = el.offsetTop - wrapEl.clientHeight / 2 + el.offsetHeight / 2;
-  wrapEl.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+// Pause auto-follow while the user is scrolling; resume after they settle.
+function pauseFollow() {
+  following = false;
+  if (followResumeTimer) clearTimeout(followResumeTimer);
+  followResumeTimer = setTimeout(() => { following = true; }, 4000);
 }
+function resumeFollow() {
+  if (followResumeTimer) { clearTimeout(followResumeTimer); followResumeTimer = null; }
+  following = true;
+}
+
+function scrollToWord(el) {
+  if (!following) return; // don't fight a user who's scrolling/reading elsewhere
+  const wr = wrapEl.getBoundingClientRect();
+  const er = el.getBoundingClientRect();
+  const margin = wr.height * 0.2;
+  // already in the comfortable middle band — leave the scroll where it is
+  if (er.top >= wr.top + margin && er.bottom <= wr.bottom - margin) return;
+  const delta = er.top - wr.top - wr.height / 2 + er.height / 2;
+  wrapEl.scrollTo({ top: wrapEl.scrollTop + delta, behavior: 'smooth' });
+}
+
+wrapEl.addEventListener('wheel', pauseFollow, { passive: true });
+wrapEl.addEventListener('touchmove', pauseFollow, { passive: true });
 
 // ---- click-to-seek -------------------------------------------------------
 function bufferedEnd() {
@@ -312,6 +336,7 @@ textEl.addEventListener('click', (e) => {
   if (t == null || t > bufferedEnd() - 0.05) { flashStatus('Not generated yet…'); return; }
   audio.currentTime = Math.max(0, t);
   currentWord = -1; // force re-highlight from the new position
+  resumeFollow(); // clicking a word means "follow from here"
   if (audio.paused) audio.play().catch(() => {});
   startRaf();
 });
@@ -357,9 +382,11 @@ function showError(message) {
 playBtn.addEventListener('click', togglePause);
 closeBtn.addEventListener('click', () => { teardown(); if (window.speak) window.speak.close(); });
 
+const SCROLL_KEYS = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'];
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space' || e.key === ' ') { e.preventDefault(); togglePause(); }
   else if (e.key === 'Escape') { teardown(); if (window.speak) window.speak.close(); }
+  else if (SCROLL_KEYS.includes(e.key)) { pauseFollow(); } // user is scrolling with the keyboard
 });
 
 if (window.speak) {
