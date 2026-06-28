@@ -6,6 +6,7 @@ const speedEl = document.getElementById('speed');
 const speedValEl = document.getElementById('speedval');
 const keyStateEl = document.getElementById('keystate');
 const stabilityEl = document.getElementById('stability');
+const themeEl = document.getElementById('theme');
 const pauseMusicEl = document.getElementById('pausemusic');
 const fontSizeEl = document.getElementById('fontsize');
 const fontSizeValEl = document.getElementById('fontsizeval');
@@ -29,6 +30,12 @@ function speedLabel(v) {
 function setActiveStability(val) {
   stabilityEl.querySelectorAll('button').forEach((b) => {
     b.classList.toggle('active', Math.abs(Number(b.dataset.val) - Number(val)) < 0.001);
+  });
+}
+
+function setActiveTheme(val) {
+  themeEl.querySelectorAll('button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.val === val);
   });
 }
 
@@ -153,6 +160,7 @@ async function init() {
   const cfg = await window.prefs.get();
   selectedId = cfg.voiceId;
   renderCombos(cfg.hotkey, cfg.hotkey2);
+  setActiveTheme(cfg.theme || 'system');
   if (pauseMusicEl) pauseMusicEl.checked = cfg.pauseMusic !== false;
   if (fontSizeEl && cfg.fontSize) {
     fontSizeEl.value = cfg.fontSize;
@@ -192,6 +200,13 @@ stabilityEl.addEventListener('click', (e) => {
   const val = Number(btn.dataset.val);
   setActiveStability(val);
   window.prefs.setStability(val);
+});
+
+themeEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-val]');
+  if (!btn) return;
+  setActiveTheme(btn.dataset.val);
+  window.prefs.setTheme(btn.dataset.val);
 });
 
 searchEl.addEventListener('input', () => render(searchEl.value));

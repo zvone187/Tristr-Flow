@@ -13,5 +13,6 @@ contextBridge.exposeInMainWorld('prefs', {
   setHotkey: (which, accel) => ipcRenderer.invoke('settings:setHotkey', { which, accel }),
   setPauseMusic: (value) => ipcRenderer.send('settings:setPauseMusic', { value }),
   setFontSize: (fontSize) => ipcRenderer.send('settings:setFontSize', { fontSize }),
+  setTheme: (theme) => ipcRenderer.send('settings:setTheme', { theme }),
   close: () => ipcRenderer.send('settings:close'),
 });

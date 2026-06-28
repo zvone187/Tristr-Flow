@@ -55,6 +55,7 @@ function loadConfig() {
     stability: parseFloat(merged.SPEAK_STABILITY || '0.5'),
     maxChars: parseInt(merged.SPEAK_MAX_CHARS || '5000', 10),
     fontSize: parseInt(merged.SPEAK_FONT_SIZE || '20', 10),
+    theme: merged.SPEAK_THEME || 'system', // system | light | dark
     pauseMusic: (merged.SPEAK_PAUSE_MUSIC || 'true') !== 'false',
     hotkey: merged.SPEAK_HOTKEY || 'Control+Shift+Space',
     // Second trigger. Bare "W+D" is intentionally NOT used (it would misfire

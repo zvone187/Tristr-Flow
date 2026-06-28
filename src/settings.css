@@ -242,7 +242,8 @@ body {
   margin: 4px 0 0 74px;
 }
 
-#stabilityrow {
+#stabilityrow,
+#themerow {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -251,6 +252,13 @@ body {
 #stabilityrow label {
   font-weight: 600;
   width: 44px;
+}
+#themerow {
+  margin-bottom: 12px;
+}
+#themerow label {
+  font-weight: 600;
+  width: 80px;
 }
 .segmented {
   display: flex;

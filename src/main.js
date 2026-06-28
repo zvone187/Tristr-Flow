@@ -86,6 +86,10 @@ function clampFont(n) {
   return Math.min(34, Math.max(13, v));
 }
 
+function cleanTheme(t) {
+  return t === 'light' || t === 'dark' ? t : 'system';
+}
+
 function notify(title, body) {
   try {
     new Notification({ title, body, silent: true }).show();
@@ -110,6 +114,7 @@ function persist() {
     hotkey2: state.hotkey2,
     pauseMusic: state.pauseMusic,
     fontSize: state.fontSize,
+    theme: state.theme,
   });
 }
 
@@ -560,7 +565,14 @@ ipcMain.handle('settings:get', () => ({
   hotkey2: state.hotkey2 || '',
   pauseMusic: state.pauseMusic,
   fontSize: state.fontSize,
+  theme: state.theme,
 }));
+
+ipcMain.on('settings:setTheme', (_e, { theme }) => {
+  state.theme = cleanTheme(theme);
+  persist();
+  nativeTheme.themeSource = state.theme; // live-updates overlay + settings prefers-color-scheme
+});
 
 ipcMain.on('settings:setFontSize', (_e, { fontSize }) => {
   state.fontSize = clampFont(fontSize);
@@ -646,7 +658,6 @@ ipcMain.on('overlay:close', () => stopEverything());
 
 app.whenReady().then(() => {
   config = loadConfig();
-  nativeTheme.themeSource = 'system'; // overlay + settings follow the macOS appearance
   const saved = settingsStore.load();
   state = {
     voiceId: saved.voiceId || config.voiceId,
@@ -660,7 +671,16 @@ app.whenReady().then(() => {
     hotkey2: saved.hotkey2 != null ? saved.hotkey2 : config.hotkey2,
     pauseMusic: saved.pauseMusic != null ? saved.pauseMusic : config.pauseMusic,
     fontSize: clampFont(saved.fontSize != null ? saved.fontSize : config.fontSize),
+    theme: cleanTheme(saved.theme || config.theme),
   };
+  nativeTheme.themeSource = state.theme; // 'system' follows macOS; else force light/dark
+
+  // Keep the settings window chrome in sync when the appearance changes.
+  nativeTheme.on('updated', () => {
+    if (settingsWin && !settingsWin.isDestroyed()) {
+      settingsWin.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#211d1a' : '#faf9f6');
+    }
+  });
 
   if (app.dock) app.dock.hide();
 
