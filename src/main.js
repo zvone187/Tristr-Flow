@@ -351,6 +351,7 @@ async function speakText(rawText, html) {
     voice: state.voiceName,
     html: hasHtml ? html : null,
     fontSize: state.fontSize,
+    speed: state.speed,
   });
 
   // If the selection was formatted, let the overlay render + extract the exact
@@ -445,6 +446,15 @@ function setVoice(voiceId, voiceName) {
   updateTrayMenu();
 }
 
+function setSpeedValue(val) {
+  state.speed = clampSpeed(val);
+  persist();
+  updateTrayMenu();
+  if (overlayWin && !overlayWin.isDestroyed()) {
+    overlayWin.webContents.send('overlay:speed', { speed: state.speed });
+  }
+}
+
 // ---- tray ----------------------------------------------------------------
 
 function updateTrayMenu() {
@@ -459,20 +469,17 @@ function updateTrayMenu() {
   }));
 
   const speedOptions = [
-    ['Slowest (0.7×)', 0.7],
-    ['Slower (0.85×)', 0.85],
+    ['0.75×', 0.75],
     ['Normal (1.0×)', 1.0],
-    ['Faster (1.15×)', 1.15],
-    ['Fastest (1.2×)', 1.2],
+    ['1.25×', 1.25],
+    ['1.5×', 1.5],
+    ['2.0×', 2.0],
   ];
   const speedItems = speedOptions.map(([label, val]) => ({
     label,
     type: 'radio',
     checked: Math.abs(state.speed - val) < 0.001,
-    click: () => {
-      state.speed = val;
-      persist();
-    },
+    click: () => setSpeedValue(val),
   }));
 
   const stabilityOptions = [
@@ -490,8 +497,6 @@ function updateTrayMenu() {
     },
   }));
 
-  const speedSupported = config.modelId !== 'eleven_v3'; // v3 ignores speed
-
   const template = [
     { label: 'Tristr Flow', enabled: false },
     { label: `Hotkey:  ${hotkeyLabel(state.hotkey)}`, enabled: false },
@@ -507,11 +512,9 @@ function updateTrayMenu() {
       type: 'checkbox',
       checked: !!state.pauseMusic,
       click: () => { state.pauseMusic = !state.pauseMusic; persist(); },
-    }
+    },
+    { label: 'Speed', submenu: speedItems }
   );
-  if (speedSupported) {
-    template.push({ label: 'Speed', submenu: speedItems });
-  }
   template.push(
     { type: 'separator' },
     {
@@ -552,7 +555,7 @@ ipcMain.handle('settings:get', () => ({
   stability: state.stability,
   apiKeyPresent: !!config.apiKey,
   model: config.modelId,
-  speedSupported: config.modelId !== 'eleven_v3', // v3 ignores the speed setting
+  speedSupported: true, // speed is now client-side playbackRate — works on every model
   hotkey: state.hotkey,
   hotkey2: state.hotkey2 || '',
   pauseMusic: state.pauseMusic,
@@ -617,11 +620,7 @@ ipcMain.on('settings:setVoice', (_e, { voiceId, voiceName }) => {
   setVoice(voiceId, voiceName);
 });
 
-ipcMain.on('settings:setSpeed', (_e, { speed }) => {
-  state.speed = clampSpeed(speed);
-  persist();
-  updateTrayMenu();
-});
+ipcMain.on('settings:setSpeed', (_e, { speed }) => setSpeedValue(speed));
 
 ipcMain.on('settings:setStability', (_e, { stability }) => {
   state.stability = clampStability(stability);

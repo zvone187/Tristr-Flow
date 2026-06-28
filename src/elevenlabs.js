@@ -3,10 +3,12 @@
 const https = require('https');
 
 // ElevenLabs allows speed in [0.7, 1.2]; 1.0 is normal.
+// Speed is applied client-side via the audio element's playbackRate (works on
+// every model, unlike the API's speed param which v3 ignores).
 function clampSpeed(s) {
   const n = Number(s);
   if (!Number.isFinite(n)) return 1.0;
-  return Math.min(1.2, Math.max(0.7, n));
+  return Math.min(3.0, Math.max(0.5, n));
 }
 
 function clampStability(s) {
@@ -28,10 +30,8 @@ function synthesize({ apiKey, voiceId, modelId, text, speed = 1.0, stability = 0
     // Stability is the one setting v3 honors. similarity_boost / speed are no-ops
     // on v3 (verified), so only send them for older models that actually use them.
     const voiceSettings = { stability: clampStability(stability) };
-    if (modelId !== 'eleven_v3') {
-      voiceSettings.similarity_boost = 0.75;
-      voiceSettings.speed = clampSpeed(speed);
-    }
+    if (modelId !== 'eleven_v3') voiceSettings.similarity_boost = 0.75;
+    // Note: speed is NOT sent to the API — playback speed is handled client-side.
 
     const payload = JSON.stringify({
       text,

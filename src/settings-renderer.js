@@ -22,13 +22,8 @@ let previewGen = 0; // invalidates in-flight previews when a newer one starts / 
 
 function speedLabel(v) {
   const n = Number(v);
-  let word = 'Normal';
-  if (n <= 0.75) word = 'Slowest';
-  else if (n < 0.95) word = 'Slower';
-  else if (n <= 1.05) word = 'Normal';
-  else if (n < 1.2) word = 'Faster';
-  else word = 'Fastest';
-  return `${n.toFixed(2)}× · ${word}`;
+  const tag = Math.abs(n - 1) < 0.001 ? ' · normal' : n < 1 ? ' · slower' : ' · faster';
+  return n.toFixed(2) + '×' + tag;
 }
 
 function setActiveStability(val) {
@@ -68,6 +63,8 @@ async function doPreview(v, btn) {
     if (myGen !== previewGen) return; // superseded by a newer preview or a stop
     if (res && res.audioBase64) {
       previewAudio = new Audio('data:audio/mpeg;base64,' + res.audioBase64);
+      previewAudio.preservesPitch = true;
+      previewAudio.playbackRate = Number(speedEl.value);
       previewAudio.addEventListener('ended', stopPreview);
       btn.disabled = false;
       btn.textContent = '■ Stop';
@@ -164,11 +161,6 @@ async function init() {
   setActiveStability(cfg.stability);
   speedEl.value = cfg.speed;
   speedValEl.textContent = speedLabel(cfg.speed);
-  if (cfg.speedSupported === false) {
-    speedEl.disabled = true;
-    speedValEl.textContent = 'Not supported by Eleven v3';
-    document.getElementById('speedrow').classList.add('disabled');
-  }
   if (cfg.apiKeyPresent) {
     keyStateEl.textContent = '✓ ElevenLabs connected';
   } else {

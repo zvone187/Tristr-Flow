@@ -19,6 +19,7 @@ let allReceived = false;
 let endedStream = false;
 let playRequested = false;
 let raf = null;
+let playbackSpeed = 1; // client-side playback rate (works on every model)
 
 // ---- karaoke / alignment state ------------------------------------------
 let charStart = []; // absolute seconds, accumulated across chunks/segments
@@ -106,6 +107,10 @@ function resetForNew(voice) {
   updatePlayBtn();
 
   audio = new Audio();
+  audio.preservesPitch = true; // speed up without chipmunk pitch
+  // defaultPlaybackRate survives the load (assigning src resets playbackRate to it)
+  audio.defaultPlaybackRate = playbackSpeed;
+  audio.playbackRate = playbackSpeed;
   mediaSource = new MediaSource();
   audio.src = URL.createObjectURL(mediaSource);
 
@@ -122,6 +127,7 @@ function resetForNew(voice) {
   });
 
   audio.addEventListener('playing', () => {
+    if (audio.playbackRate !== playbackSpeed) audio.playbackRate = playbackSpeed;
     dotEl.classList.add('live');
     setStatus('Reading aloud…');
     if (window.speak) window.speak.started();
@@ -357,7 +363,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 if (window.speak) {
-  window.speak.onLoading(({ gen, voice, html, fontSize }) => {
+  window.speak.onLoading(({ gen, voice, html, fontSize, speed }) => {
+    if (speed) playbackSpeed = speed;
     resetForNew(voice);
     loadGen = gen || 0;
     if (fontSize) textEl.style.fontSize = fontSize + 'px';
@@ -405,6 +412,8 @@ if (window.speak) {
   window.speak.onError(({ message }) => showError(message));
 
   window.speak.onFontSize(({ fontSize }) => { if (fontSize) textEl.style.fontSize = fontSize + 'px'; });
+
+  window.speak.onSpeed(({ speed }) => { if (speed) { playbackSpeed = speed; if (audio) audio.playbackRate = speed; } });
 
   window.speak.onStop(() => { teardown(); });
 }
