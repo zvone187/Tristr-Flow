@@ -33,6 +33,20 @@ There's no 5000-character limit. Long selections are split into back-to-back
 streamed requests, stitched into one continuous audio timeline with the
 highlight kept in sync — read whole articles.
 
+### Formatted text & resizable window
+
+If the selection is **formatted** (bold, italics, bullet/numbered lists, headings,
+code), the overlay shows it **with that formatting** — and the karaoke highlight
+maps onto the styled words. It reads the clipboard's HTML flavor, then renders it
+through a strict **allowlist sanitizer** (rebuilds the DOM from a safe tag list,
+drops all attributes, scripts, styles, images; links become plain text) with
+navigation guards and a sandboxed renderer — so HTML you copied from any page is
+shown safely. The spoken text is derived from the sanitized rendering, so what's
+read always matches what's shown.
+
+**Resize** the overlay by dragging its edges; the size and position are
+**remembered** and restored next time it opens.
+
 ### Two triggers
 
 `Control+Shift+Space` and `Control+Option+D` both work. (You asked for "W+D" —
