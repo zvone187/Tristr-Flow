@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; media-src data:; style-src 'self' 'unsafe-inline'; script-src 'self';"
+    />
+    <link rel="stylesheet" href="settings.css" />
+    <title>Speak Selection — Preferences</title>
+  </head>
+  <body>
+    <header id="head">
+      <div>
+        <h1>Speak Selection</h1>
+        <p id="sub">Choose a voice and reading speed</p>
+      </div>
+      <span id="keystate" class="badge"></span>
+    </header>
+
+    <div id="searchwrap">
+      <input id="search" type="text" placeholder="Search voices…" autocomplete="off" />
+    </div>
+
+    <div id="list" aria-label="Voices"></div>
+
+    <footer id="foot">
+      <div id="stabilityrow">
+        <label>Voice</label>
+        <div id="stability" class="segmented" role="group" aria-label="Voice stability">
+          <button type="button" data-val="0">Creative</button>
+          <button type="button" data-val="0.5">Natural</button>
+          <button type="button" data-val="1">Robust</button>
+        </div>
+      </div>
+      <p id="stabilityhint">Lower = more expressive · Higher = steadier (fixes weird/unstable audio)</p>
+
+      <div id="speedrow">
+        <label for="speed">Speed</label>
+        <input id="speed" type="range" min="0.7" max="1.2" step="0.05" value="1.0" />
+        <span id="speedval">1.0× · Normal</span>
+      </div>
+    </footer>
+
+    <script src="settings-renderer.js"></script>
+  </body>
+</html>

@@ -1,0 +1,175 @@
+:root {
+  --bg: rgba(22, 22, 28, 0.96);
+  --upcoming: #b9b9c6;
+  --read: #5a5a66;
+  --active-bg: linear-gradient(90deg, #6d8bff, #a06bff);
+  --active-fg: #ffffff;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+html,
+body {
+  background: transparent;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+#card {
+  position: fixed;
+  inset: 10px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+#bar {
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+#left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#playpause {
+  -webkit-app-region: no-drag;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  min-width: 30px;
+  height: 28px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#playpause:hover {
+  background: rgba(109, 139, 255, 0.35);
+}
+
+#dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #6d8bff;
+  box-shadow: 0 0 0 0 rgba(109, 139, 255, 0.6);
+}
+
+#dot.live {
+  animation: pulse 1.4s ease-out infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(109, 139, 255, 0.55); }
+  100% { box-shadow: 0 0 0 11px rgba(109, 139, 255, 0); }
+}
+
+#voice {
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+}
+
+#status {
+  color: #8b8b98;
+  font-size: 12px;
+}
+
+#close {
+  -webkit-app-region: no-drag;
+  background: rgba(255, 255, 255, 0.06);
+  color: #c9c9d4;
+  border: none;
+  border-radius: 8px;
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+  cursor: pointer;
+}
+#close:hover {
+  background: rgba(255, 90, 90, 0.25);
+  color: #fff;
+}
+
+#textwrap {
+  flex: 1;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  padding: 18px 20px;
+}
+#textwrap::-webkit-scrollbar {
+  width: 8px;
+}
+#textwrap::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+#text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 22px;
+  line-height: 1.55;
+  color: var(--upcoming);
+}
+
+.word {
+  border-radius: 6px;
+  padding: 1px 1px;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.word:hover {
+  background: rgba(109, 139, 255, 0.18);
+}
+.word.read {
+  color: var(--read);
+}
+.word.active {
+  background: var(--active-bg);
+  color: var(--active-fg);
+  padding: 1px 5px;
+  margin: 0 -4px;
+  box-shadow: 0 4px 14px rgba(109, 139, 255, 0.4);
+}
+
+#text.loading {
+  color: var(--read);
+  font-style: italic;
+}
+
+#progress {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+#bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--active-bg);
+  transition: width 0.1s linear;
+}
+
+.error #text {
+  color: #ff8a8a;
+  font-style: normal;
+  font-size: 16px;
+}

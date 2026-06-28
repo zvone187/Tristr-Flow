@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; media-src blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self';" />
+    <link rel="stylesheet" href="overlay.css" />
+    <title>Speak Selection</title>
+  </head>
+  <body>
+    <div id="card">
+      <header id="bar">
+        <div id="left">
+          <button id="playpause" title="Play / Pause (Space)">❚❚</button>
+          <span id="dot"></span>
+          <span id="voice">Voice</span>
+          <span id="status">Preparing…</span>
+        </div>
+        <button id="close" title="Stop &amp; close (Esc)">✕</button>
+      </header>
+
+      <div id="textwrap">
+        <div id="text"></div>
+      </div>
+
+      <div id="progress"><div id="bar-fill"></div></div>
+    </div>
+    <script src="overlay.js"></script>
+  </body>
+</html>
