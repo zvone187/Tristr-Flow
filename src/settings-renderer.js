@@ -229,7 +229,9 @@ function eventToAccel(e) {
   else {
     const m = { Comma: ',', Period: '.', Slash: '/', Backslash: '\\', Semicolon: ';',
       Quote: "'", Minus: '-', Equal: '=', Backquote: '`', BracketLeft: '[', BracketRight: ']',
-      ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right', Enter: 'Return', Tab: 'Tab' };
+      ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right', Enter: 'Return', Tab: 'Tab',
+      Delete: 'Delete', Backspace: 'Backspace', Home: 'Home', End: 'End',
+      PageUp: 'PageUp', PageDown: 'PageDown', Insert: 'Insert' };
     key = m[code] || null;
   }
   return { mods, key };
@@ -238,7 +240,7 @@ function startRecording(which) {
   recordingWhich = which;
   const el = which === 2 ? combo2El : combo1El;
   if (el) { el.classList.add('recording'); el.textContent = 'Press keys…'; }
-  scHintEl.textContent = 'Listening… press a modifier + key, or Esc to cancel.';
+  scHintEl.textContent = 'Listening… press a ⌃⌥⌘⇧ combo or a function key (F1–F12). Esc to cancel.';
 }
 function stopRecording() {
   recordingWhich = 0;
@@ -269,10 +271,27 @@ document.addEventListener('keydown', async (e) => {
       scHintEl.textContent = DEFAULT_SC_HINT;
       return;
     }
-    if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return; // wait for a real key
+    if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) {
+      scHintEl.textContent = 'Modifiers held — now press a key (a letter, number, or F-key)…';
+      return;
+    }
     const { mods, key } = eventToAccel(e);
-    if (!key) { scHintEl.textContent = 'That key isn’t supported — try another.'; return; }
-    if (mods.length === 0) { scHintEl.textContent = 'Add a modifier (⌃ ⌥ ⌘ or ⇧).'; return; }
+    if (!key) {
+      if (e.key === 'Fn' || e.key === 'Globe' || e.code === 'Fn') {
+        scHintEl.textContent = 'The Fn/Globe key can’t be a shortcut. Try a function key like F6, or a ⌃⌥⌘⇧ combo.';
+      } else if (/^(AudioVolume|Media|Browser|Brightness|Launch|Eject)/.test(e.code || '')) {
+        scHintEl.textContent = 'That media key isn’t available. For F-keys, hold Fn (top-row keys are media keys by default).';
+      } else {
+        scHintEl.textContent = 'That key isn’t supported — try another.';
+      }
+      return;
+    }
+    // Function keys are valid as standalone shortcuts; everything else needs a modifier.
+    const isFunctionKey = /^F([1-9]|1[0-9]|2[0-4])$/.test(key);
+    if (mods.length === 0 && !isFunctionKey) {
+      scHintEl.textContent = 'Add a modifier (⌃ ⌥ ⌘ or ⇧), or use a function key (F1–F12).';
+      return;
+    }
     const which = recordingWhich;
     stopRecording();
     const res = await window.prefs.setHotkey(which, mods.concat(key).join('+'));
@@ -282,5 +301,15 @@ document.addEventListener('keydown', async (e) => {
   }
   if (e.key === 'Escape') window.prefs.close();
 }, true);
+
+// If the window loses focus mid-recording, cancel cleanly (keys won't arrive).
+window.addEventListener('blur', () => {
+  if (!recordingWhich) return;
+  stopRecording();
+  window.prefs.get().then((c) => {
+    renderCombos(c.hotkey, c.hotkey2);
+    scHintEl.textContent = DEFAULT_SC_HINT;
+  });
+});
 
 init();
