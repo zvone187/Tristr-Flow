@@ -360,3 +360,66 @@ body {
   text-align: center;
   padding: 28px;
 }
+
+/* ---- account / service mode ---- */
+#accountrow {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.acct-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.acct-head label { font-weight: 600; width: 64px; }
+.acct-info { color: var(--muted); font-size: 12px; flex: 1; }
+.acct-fields { display: flex; gap: 8px; margin-bottom: 8px; }
+.acct-fields input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 11px;
+  color: var(--text);
+  font-size: 13px;
+}
+.acct-fields input:focus { outline: none; border-color: var(--accent); }
+.acct-btns { display: flex; gap: 8px; margin-bottom: 6px; }
+.acct-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.acct-primary:hover { filter: brightness(1.08); }
+.acct-primary:disabled { opacity: 0.5; cursor: default; }
+.acct-ghost {
+  background: var(--panel-hi);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.acct-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.acct-msg { color: var(--muted); font-size: 11px; margin: 4px 0 0; min-height: 13px; }
+.acct-msg.err { color: #e06a4f; }
+#ownkeywrap { margin-top: 2px; }
+#ownkeywrap summary {
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  margin-bottom: 8px;
+  list-style: none;
+}
+#ownkeywrap summary::-webkit-details-marker { display: none; }
+#ownkeywrap summary:hover { color: var(--text); }
+#acctsignedin { display: flex; gap: 8px; }

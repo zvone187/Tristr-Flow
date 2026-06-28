@@ -15,4 +15,10 @@ contextBridge.exposeInMainWorld('prefs', {
   setFontSize: (fontSize) => ipcRenderer.send('settings:setFontSize', { fontSize }),
   setTheme: (theme) => ipcRenderer.send('settings:setTheme', { theme }),
   close: () => ipcRenderer.send('settings:close'),
+  // Account / service mode
+  account: () => ipcRenderer.invoke('account:get'),
+  login: (email, password) => ipcRenderer.invoke('account:login', { email, password }),
+  signup: (email, password) => ipcRenderer.invoke('account:signup', { email, password }),
+  logout: () => ipcRenderer.invoke('account:logout'),
+  setOwnKey: (key) => ipcRenderer.invoke('account:setOwnKey', { key }),
 });

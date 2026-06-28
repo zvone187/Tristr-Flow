@@ -602,6 +602,84 @@ ipcMain.handle('settings:get', () => ({
   theme: state.theme,
 }));
 
+// ---- IPC: account / service mode ----------------------------------------
+
+function accountMode() {
+  if (effectiveKey() && !config.forceService) return 'direct'; // own key -> ElevenLabs directly
+  if (state.serviceToken) return 'service';                    // signed in -> hosted proxy
+  return 'unconfigured';                                       // needs onboarding
+}
+
+ipcMain.handle('account:get', async () => {
+  const out = {
+    mode: accountMode(),
+    signedIn: !!state.serviceToken,
+    email: state.serviceEmail || '',
+    hasOwnKey: !!effectiveKey(),
+    ownKeyFromEnv: !!config.apiKey, // key came from env/.env (can't be cleared in-app)
+    serviceUrl: config.serviceBaseUrl,
+    creditsMicros: null,
+    creditsDollars: null,
+  };
+  if (state.serviceToken) {
+    try {
+      const me = await svc.me({ baseUrl: config.serviceBaseUrl, token: state.serviceToken });
+      out.email = me.email;
+      out.creditsMicros = me.creditsMicros;
+      out.creditsDollars = me.creditsDollars;
+    } catch (e) {
+      out.error = String(e.message || e);
+    }
+  }
+  return out;
+});
+
+ipcMain.handle('account:login', async (_e, { email, password }) => {
+  try {
+    const r = await svc.login({ baseUrl: config.serviceBaseUrl, email, password });
+    state.serviceToken = r.apiToken;
+    state.serviceEmail = r.email;
+    state.onboarded = true;
+    persist();
+    updateTrayMenu();
+    return { ok: true, email: r.email, creditsMicros: r.creditsMicros };
+  } catch (e) {
+    return { ok: false, error: String(e.message || e) };
+  }
+});
+
+ipcMain.handle('account:signup', async (_e, { email, password }) => {
+  try {
+    const r = await svc.signup({ baseUrl: config.serviceBaseUrl, email, password });
+    state.serviceToken = r.apiToken;
+    state.serviceEmail = r.email;
+    state.onboarded = true;
+    persist();
+    updateTrayMenu();
+    return { ok: true, email: r.email, creditsMicros: r.creditsMicros };
+  } catch (e) {
+    return { ok: false, error: String(e.message || e) };
+  }
+});
+
+ipcMain.handle('account:logout', () => {
+  state.serviceToken = '';
+  state.serviceEmail = '';
+  persist();
+  updateTrayMenu();
+  return { ok: true };
+});
+
+// Lets a user run in direct mode with their own ElevenLabs key (no login),
+// without editing .env. Empty string clears it (falls back to env key if any).
+ipcMain.handle('account:setOwnKey', (_e, { key }) => {
+  state.ownKey = (key || '').trim();
+  state.onboarded = true;
+  persist();
+  updateTrayMenu();
+  return { ok: true, hasOwnKey: !!effectiveKey(), mode: accountMode() };
+});
+
 ipcMain.on('settings:setTheme', (_e, { theme }) => {
   state.theme = cleanTheme(theme);
   persist();

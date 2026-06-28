@@ -25,6 +25,35 @@
     <div id="list" aria-label="Voices"></div>
 
     <footer id="foot">
+      <div id="accountrow">
+        <div class="acct-head">
+          <label>Account</label>
+          <span id="acctinfo" class="acct-info">Checking…</span>
+        </div>
+        <div id="acctsignedout" hidden>
+          <div class="acct-fields">
+            <input id="acctemail" type="email" placeholder="you@email.com" autocomplete="username" />
+            <input id="acctpass" type="password" placeholder="Password (8+ characters)" autocomplete="current-password" />
+          </div>
+          <div class="acct-btns">
+            <button id="btnlogin" class="acct-primary">Sign in</button>
+            <button id="btnsignup" class="acct-ghost">Create account</button>
+          </div>
+          <details id="ownkeywrap">
+            <summary>Use my own ElevenLabs key instead (no account)</summary>
+            <div class="acct-fields">
+              <input id="ownkey" type="password" placeholder="sk_…" autocomplete="off" />
+              <button id="btnownkey" class="acct-ghost">Save key</button>
+            </div>
+          </details>
+          <p id="acctmsg" class="acct-msg"></p>
+        </div>
+        <div id="acctsignedin" hidden>
+          <button id="btnlogout" class="acct-ghost">Sign out</button>
+          <button id="btnclearkey" class="acct-ghost" hidden>Remove my key</button>
+        </div>
+      </div>
+
       <div id="shortcuts">
         <div class="sc-row">
           <label>Shortcut</label>

@@ -186,6 +186,7 @@ async function init() {
     });
   }
   render('');
+  loadAccount();
 }
 
 speedEl.addEventListener('input', () => {
@@ -328,5 +329,82 @@ window.addEventListener('blur', () => {
     scHintEl.textContent = DEFAULT_SC_HINT;
   });
 });
+
+// ---- account / service mode ---------------------------------------------
+const acctInfoEl = document.getElementById('acctinfo');
+const acctSignedOutEl = document.getElementById('acctsignedout');
+const acctSignedInEl = document.getElementById('acctsignedin');
+const acctEmailEl = document.getElementById('acctemail');
+const acctPassEl = document.getElementById('acctpass');
+const acctMsgEl = document.getElementById('acctmsg');
+const ownKeyEl = document.getElementById('ownkey');
+const btnLogin = document.getElementById('btnlogin');
+const btnSignup = document.getElementById('btnsignup');
+const btnLogout = document.getElementById('btnlogout');
+const btnOwnKey = document.getElementById('btnownkey');
+const btnClearKey = document.getElementById('btnclearkey');
+
+function acctMsg(text, isErr) {
+  if (!acctMsgEl) return;
+  acctMsgEl.textContent = text || '';
+  acctMsgEl.classList.toggle('err', !!isErr);
+}
+
+function renderAccount(a) {
+  const signedIn = a.mode === 'service';
+  const ownKey = a.mode === 'direct';
+  acctSignedOutEl.hidden = signedIn || ownKey;
+  acctSignedInEl.hidden = !(signedIn || ownKey);
+  if (signedIn) {
+    const credits = a.creditsDollars != null ? ` · $${a.creditsDollars} left` : '';
+    acctInfoEl.textContent = `Signed in as ${a.email}${credits}`;
+    btnLogout.hidden = false;
+    btnClearKey.hidden = true;
+  } else if (ownKey) {
+    acctInfoEl.textContent = a.ownKeyFromEnv
+      ? 'Using your ElevenLabs key (from .env)'
+      : 'Using your own ElevenLabs key';
+    btnLogout.hidden = true;
+    btnClearKey.hidden = a.ownKeyFromEnv; // an env-provided key can't be cleared in-app
+  } else {
+    acctInfoEl.textContent = 'Sign in for $2 of free reading — or use your own key.';
+  }
+  if (a.error) acctMsg(a.error, true);
+}
+
+async function loadAccount() {
+  try {
+    renderAccount(await window.prefs.account());
+  } catch {
+    if (acctInfoEl) acctInfoEl.textContent = 'Account unavailable.';
+  }
+}
+
+async function doAuth(fn) {
+  const email = (acctEmailEl.value || '').trim();
+  const pass = acctPassEl.value || '';
+  if (!email || !pass) { acctMsg('Enter your email and password.', true); return; }
+  acctMsg('Working…');
+  btnLogin.disabled = btnSignup.disabled = true;
+  const r = await fn(email, pass);
+  btnLogin.disabled = btnSignup.disabled = false;
+  if (r && r.ok) { acctPassEl.value = ''; acctMsg(''); await loadAccount(); }
+  else { acctMsg((r && r.error) || 'Could not sign in.', true); }
+}
+
+if (btnLogin) btnLogin.addEventListener('click', () => doAuth(window.prefs.login));
+if (btnSignup) btnSignup.addEventListener('click', () => doAuth(window.prefs.signup));
+if (btnLogout) btnLogout.addEventListener('click', async () => { await window.prefs.logout(); await loadAccount(); });
+if (btnOwnKey) btnOwnKey.addEventListener('click', async () => {
+  const key = (ownKeyEl.value || '').trim();
+  if (!key) { acctMsg('Paste your ElevenLabs key (starts with sk_).', true); return; }
+  await window.prefs.setOwnKey(key);
+  ownKeyEl.value = '';
+  await loadAccount();
+});
+if (btnClearKey) btnClearKey.addEventListener('click', async () => { await window.prefs.setOwnKey(''); await loadAccount(); });
+[acctEmailEl, acctPassEl].forEach((el) => el && el.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); doAuth(window.prefs.login); }
+}));
 
 init();
