@@ -863,6 +863,7 @@ ipcMain.on('overlay:rich-ready', (_e, { gen, text, ok }) => {
 ipcMain.on('overlay:started', () => setTrayState('playing'));
 ipcMain.on('overlay:ended', () => { setTrayState('idle'); resumeMusicIfNeeded(); });
 ipcMain.on('overlay:close', () => stopEverything());
+ipcMain.on('overlay:openSettings', () => openSettings());
 
 // ---- lifecycle -----------------------------------------------------------
 

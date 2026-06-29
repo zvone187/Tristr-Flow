@@ -9,6 +9,7 @@ const dotEl = document.getElementById('dot');
 const fillEl = document.getElementById('bar-fill');
 const closeBtn = document.getElementById('close');
 const playBtn = document.getElementById('playpause');
+const settingsBtn = document.getElementById('settings');
 
 // ---- media (MediaSource progressive MP3 playback) -----------------------
 let audio = null;
@@ -357,7 +358,7 @@ function togglePause() {
 }
 
 function updatePlayBtn() {
-  if (!audio || audio.paused) { playBtn.textContent = '▶'; playBtn.title = 'Play (Space)'; dotEl.classList.remove('live'); }
+  if (!audio || audio.paused) { playBtn.textContent = '▶︎'; playBtn.title = 'Play (Space)'; dotEl.classList.remove('live'); }
   else { playBtn.textContent = '❚❚'; playBtn.title = 'Pause (Space)'; dotEl.classList.add('live'); }
 }
 
@@ -381,6 +382,7 @@ function showError(message) {
 // ---- wiring --------------------------------------------------------------
 playBtn.addEventListener('click', togglePause);
 closeBtn.addEventListener('click', () => { teardown(); if (window.speak) window.speak.close(); });
+settingsBtn.addEventListener('click', () => { if (window.speak && window.speak.openSettings) window.speak.openSettings(); });
 
 const SCROLL_KEYS = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'];
 document.addEventListener('keydown', (e) => {

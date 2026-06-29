@@ -58,36 +58,82 @@ html, body {
 
 #bar {
   -webkit-app-region: drag;
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 11px 14px;
+  justify-content: center;
+  padding: 14px 16px;
+  min-height: 96px; /* ~2x the old header */
   border-bottom: 0.5px solid var(--border);
 }
 
-#left { display: flex; align-items: center; gap: 10px; }
-
-#playpause {
+/* Corner controls — large, easy targets, vertically centered. */
+#settings, #close {
   -webkit-app-region: no-drag;
-  background: var(--control);
-  color: var(--text);
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 42px;
+  height: 42px;
   border: none;
-  border-radius: 8px;
-  min-width: 30px;
-  height: 28px;
-  font-size: 12px;
+  border-radius: 13px;
+  background: var(--control);
+  color: var(--muted);
+  font-size: 19px;
+  line-height: 1;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
 }
-#playpause:hover { background: var(--control-hover); }
+#settings { left: 16px; }
+#close { right: 16px; }
+#settings:hover { background: var(--control-hover); color: var(--text); }
+#close:hover { background: var(--close-hover); color: #fff; }
+#settings:active, #close:active { transform: translateY(-50%) scale(0.92); }
 
+/* Center: the big primary Play/Pause button + a small caption. */
+#center {
+  -webkit-app-region: no-drag;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+#playpause {
+  -webkit-app-region: no-drag;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 23px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.28);
+  transition: filter 0.12s, transform 0.1s;
+}
+#playpause:hover { filter: brightness(1.08); }
+#playpause:active { transform: scale(0.94); }
+
+#meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 78%;
+}
 #dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--accent);
+  flex: none;
 }
 #dot.live { animation: pulse 1.5s ease-out infinite; }
 @keyframes pulse {
@@ -98,23 +144,17 @@ html, body {
 
 #voice {
   color: var(--text);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 13px;
+  white-space: nowrap;
 }
-#status { color: var(--muted); font-size: 12px; }
-
-#close {
-  -webkit-app-region: no-drag;
-  background: var(--control);
+#status {
   color: var(--muted);
-  border: none;
-  border-radius: 8px;
-  width: 26px;
-  height: 26px;
-  font-size: 13px;
-  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-#close:hover { background: var(--close-hover); color: #fff; }
 
 #textwrap {
   flex: 1;

@@ -17,4 +17,5 @@ contextBridge.exposeInMainWorld('speak', {
   started: () => ipcRenderer.send('overlay:started'),
   ended: () => ipcRenderer.send('overlay:ended'),
   close: () => ipcRenderer.send('overlay:close'),
+  openSettings: () => ipcRenderer.send('overlay:openSettings'),
 });

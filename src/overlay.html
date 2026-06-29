@@ -9,13 +9,16 @@
   <body>
     <div id="card">
       <header id="bar">
-        <div id="left">
+        <button id="settings" title="Settings (Preferences)" aria-label="Settings">&#9881;&#xFE0E;</button>
+        <div id="center">
           <button id="playpause" title="Play / Pause (Space)">❚❚</button>
-          <span id="dot"></span>
-          <span id="voice">Voice</span>
-          <span id="status">Preparing…</span>
+          <div id="meta">
+            <span id="dot"></span>
+            <span id="voice">Voice</span>
+            <span id="status">Preparing…</span>
+          </div>
         </div>
-        <button id="close" title="Stop &amp; close (Esc)">✕</button>
+        <button id="close" title="Stop &amp; close (Esc)" aria-label="Close">✕</button>
       </header>
 
       <div id="textwrap">
