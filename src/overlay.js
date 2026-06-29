@@ -7,6 +7,8 @@ const statusEl = document.getElementById('status');
 const voiceEl = document.getElementById('voice');
 const dotEl = document.getElementById('dot');
 const fillEl = document.getElementById('bar-fill');
+const tcurEl = document.getElementById('tcur');
+const tdurEl = document.getElementById('tdur');
 const closeBtn = document.getElementById('close');
 const playBtn = document.getElementById('playpause');
 const settingsBtn = document.getElementById('settings');
@@ -114,6 +116,8 @@ function resetForNew(voice) {
   card.classList.remove('error');
   textEl.innerHTML = '';
   fillEl.style.width = '0%';
+  if (tcurEl) tcurEl.textContent = '0:00';
+  if (tdurEl) tdurEl.textContent = '0:00';
   wrapEl.scrollTop = 0;
   if (voice) voiceEl.textContent = voice;
   setStatus('Preparing voice…');
@@ -121,6 +125,8 @@ function resetForNew(voice) {
   updatePlayBtn();
 
   audio = new Audio();
+  audio.addEventListener('timeupdate', updateTimes);   // live during playback + after seeks
+  audio.addEventListener('durationchange', updateTimes); // total grows as the stream buffers
   audio.preservesPitch = true; // speed up without chipmunk pitch
   // defaultPlaybackRate survives the load (assigning src resets playbackRate to it)
   audio.defaultPlaybackRate = playbackSpeed;
@@ -247,6 +253,20 @@ function startRaf() {
   raf = requestAnimationFrame(frame);
 }
 
+function fmtTime(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function totalDur() {
+  if (charEnd.length) return charEnd[charEnd.length - 1];
+  if (audio && isFinite(audio.duration)) return audio.duration;
+  return bufferedEnd();
+}
+function updateTimes() {
+  if (tcurEl) tcurEl.textContent = fmtTime(audio ? audio.currentTime : 0);
+  if (tdurEl) tdurEl.textContent = fmtTime(totalDur());
+}
+
 function frame() {
   if (!audio) return;
   const t = audio.currentTime;
@@ -261,6 +281,7 @@ function frame() {
 
   const dur = charEnd.length ? charEnd[charEnd.length - 1] : (audio.duration || 0);
   if (dur && isFinite(dur)) fillEl.style.width = Math.min(100, (t / dur) * 100) + '%';
+  updateTimes();
 
   if (!audio.paused && !audio.ended) raf = requestAnimationFrame(frame);
   else raf = null;

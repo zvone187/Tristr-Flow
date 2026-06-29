@@ -293,6 +293,14 @@ html, body {
 
 #text.loading { color: var(--muted); font-style: italic; }
 
+#timerow {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 16px 5px;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 #progress { height: 3px; background: var(--soft); }
 #bar-fill {
   height: 100%;
