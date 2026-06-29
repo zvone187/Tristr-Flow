@@ -18,4 +18,5 @@ contextBridge.exposeInMainWorld('speak', {
   ended: () => ipcRenderer.send('overlay:ended'),
   close: () => ipcRenderer.send('overlay:close'),
   openSettings: () => ipcRenderer.send('overlay:openSettings'),
+  setSpeed: (speed) => ipcRenderer.send('overlay:setSpeed', { speed }),
 });

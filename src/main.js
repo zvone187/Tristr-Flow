@@ -867,6 +867,7 @@ ipcMain.on('settings:setVoice', (_e, { voiceId, voiceName }) => {
 });
 
 ipcMain.on('settings:setSpeed', (_e, { speed }) => setSpeedValue(speed));
+ipcMain.on('overlay:setSpeed', (_e, { speed }) => setSpeedValue(speed)); // speed control on the reading overlay
 
 ipcMain.on('settings:setStability', (_e, { stability }) => {
   state.stability = clampStability(stability);

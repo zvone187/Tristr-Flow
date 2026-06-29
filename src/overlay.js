@@ -10,6 +10,15 @@ const fillEl = document.getElementById('bar-fill');
 const closeBtn = document.getElementById('close');
 const playBtn = document.getElementById('playpause');
 const settingsBtn = document.getElementById('settings');
+const speedValEl = document.getElementById('speedval');
+const speedDownBtn = document.getElementById('speeddown');
+const speedUpBtn = document.getElementById('speedup');
+
+// Discrete speed steps for the overlay's ‹ 1× › control.
+const SPEED_STEPS = [0.75, 1, 1.25, 1.5, 1.75, 2, 2.5];
+function fmtSpeed(v) {
+  return (Math.round(v * 100) / 100).toString().replace(/\.0+$/, '') + '×';
+}
 
 // ---- media (MediaSource progressive MP3 playback) -----------------------
 let audio = null;
@@ -362,6 +371,23 @@ function updatePlayBtn() {
   else { playBtn.textContent = '❚❚'; playBtn.title = 'Pause (Space)'; dotEl.classList.add('live'); }
 }
 
+// ---- speed ---------------------------------------------------------------
+function renderSpeed() {
+  if (speedValEl) speedValEl.textContent = fmtSpeed(playbackSpeed);
+}
+function applySpeed(v) {
+  playbackSpeed = Math.min(2.5, Math.max(0.75, v));
+  if (audio) { audio.defaultPlaybackRate = playbackSpeed; audio.playbackRate = playbackSpeed; }
+  renderSpeed();
+  if (window.speak && window.speak.setSpeed) window.speak.setSpeed(playbackSpeed); // persist + sync Preferences
+}
+function stepSpeed(dir) {
+  let idx = 0, best = Infinity;
+  SPEED_STEPS.forEach((s, i) => { const d = Math.abs(s - playbackSpeed); if (d < best) { best = d; idx = i; } });
+  idx = Math.min(SPEED_STEPS.length - 1, Math.max(0, idx + dir));
+  applySpeed(SPEED_STEPS[idx]);
+}
+
 function onPlaybackEnded() {
   fillEl.style.width = '100%';
   setStatus('Finished — click any word to replay');
@@ -383,17 +409,22 @@ function showError(message) {
 playBtn.addEventListener('click', togglePause);
 closeBtn.addEventListener('click', () => { teardown(); if (window.speak) window.speak.close(); });
 settingsBtn.addEventListener('click', () => { if (window.speak && window.speak.openSettings) window.speak.openSettings(); });
+if (speedDownBtn) speedDownBtn.addEventListener('click', () => stepSpeed(-1));
+if (speedUpBtn) speedUpBtn.addEventListener('click', () => stepSpeed(1));
 
 const SCROLL_KEYS = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'];
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space' || e.key === ' ') { e.preventDefault(); togglePause(); }
   else if (e.key === 'Escape') { teardown(); if (window.speak) window.speak.close(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); stepSpeed(-1); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); stepSpeed(1); }
   else if (SCROLL_KEYS.includes(e.key)) { pauseFollow(); } // user is scrolling with the keyboard
 });
 
 if (window.speak) {
   window.speak.onLoading(({ gen, voice, html, fontSize, speed }) => {
     if (speed) playbackSpeed = speed;
+    renderSpeed();
     resetForNew(voice);
     loadGen = gen || 0;
     if (fontSize) textEl.style.fontSize = fontSize + 'px';
@@ -442,7 +473,7 @@ if (window.speak) {
 
   window.speak.onFontSize(({ fontSize }) => { if (fontSize) textEl.style.fontSize = fontSize + 'px'; });
 
-  window.speak.onSpeed(({ speed }) => { if (speed) { playbackSpeed = speed; if (audio) audio.playbackRate = speed; } });
+  window.speak.onSpeed(({ speed }) => { if (speed) { playbackSpeed = speed; if (audio) { audio.defaultPlaybackRate = speed; audio.playbackRate = speed; } renderSpeed(); } });
 
   window.speak.onStop(() => { teardown(); });
 }

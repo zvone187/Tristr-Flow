@@ -67,12 +67,74 @@ html, body {
   border-bottom: 0.5px solid var(--border);
 }
 
-/* Corner controls — large, easy targets, vertically centered. */
-#settings, #close {
+/* Settings (left) — large, easy target. */
+#settings {
   -webkit-app-region: no-drag;
   position: absolute;
+  left: 16px;
   top: 50%;
   transform: translateY(-50%);
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 15px;
+  background: var(--control);
+  color: var(--muted);
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+#settings:hover { background: var(--control-hover); color: var(--text); }
+#settings:active { transform: translateY(-50%) scale(0.92); }
+
+/* Right side: speed stepper + close. */
+#rightctl {
+  -webkit-app-region: no-drag;
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#speedctl {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--control);
+  border-radius: 11px;
+  padding: 2px;
+}
+#speeddown, #speedup {
+  width: 26px;
+  height: 30px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#speeddown:hover, #speedup:hover { background: var(--control-hover); }
+#speedval {
+  min-width: 44px;
+  text-align: center;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+#close {
+  -webkit-app-region: no-drag;
   width: 42px;
   height: 42px;
   border: none;
@@ -87,11 +149,8 @@ html, body {
   justify-content: center;
   transition: background 0.15s, color 0.15s, transform 0.1s;
 }
-#settings { left: 16px; }
-#close { right: 16px; }
-#settings:hover { background: var(--control-hover); color: var(--text); }
 #close:hover { background: var(--close-hover); color: #fff; }
-#settings:active, #close:active { transform: translateY(-50%) scale(0.92); }
+#close:active { transform: scale(0.92); }
 
 /* Center: the big primary Play/Pause button + a small caption. */
 #center {
