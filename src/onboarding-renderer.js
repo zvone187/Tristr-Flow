@@ -21,6 +21,7 @@ const btnRec = $('btnRec');
 const scHintEl = $('scHint');
 const DEFAULT_SC_HINT = scHintEl.textContent;
 const btnDone = $('btnDone');
+const openAtLoginEl = $('openAtLogin');
 
 let recording = false;
 
@@ -149,6 +150,13 @@ document.addEventListener('keydown', async (e) => {
   scHintEl.textContent = res.ok ? 'Saved ✓ — ' + DEFAULT_SC_HINT : (res.error || 'That combo is unavailable.');
 }, true);
 
-btnDone.addEventListener('click', () => window.onb.finish());
+if (openAtLoginEl) {
+  openAtLoginEl.addEventListener('change', () => window.onb.setOpenAtLogin(openAtLoginEl.checked));
+}
+
+btnDone.addEventListener('click', async () => {
+  if (openAtLoginEl) await window.onb.setOpenAtLogin(openAtLoginEl.checked); // apply the (default-on) choice
+  window.onb.finish();
+});
 
 loadStep2Data();

@@ -223,9 +223,13 @@ function positionOverlay() {
 
 function setTrayState(s) {
   if (!tray) return;
-  if (s === 'loading') tray.setTitle(' ⏳');
-  else if (s === 'playing') tray.setTitle(' 🔈');
-  else tray.setTitle(' 🔊');
+  // Logo (template) is the menu-bar icon; reflect state in the tooltip only.
+  tray.setTitle('');
+  tray.setToolTip(
+    s === 'loading' ? 'Tristr Flow — Preparing…' :
+    s === 'playing' ? 'Tristr Flow — Reading aloud' :
+    'Tristr Flow'
+  );
 }
 
 // Hard stop: silence audio, cancel any in-flight synthesis, hide the overlay.
@@ -655,10 +659,19 @@ function updateTrayMenu() {
   tray.setContextMenu(Menu.buildFromTemplate(template));
 }
 
+function trayIcon() {
+  // Monochrome logo as a macOS "template" image (auto-adapts to light/dark menu
+  // bars). @2x is picked up automatically from the sibling file.
+  try {
+    const img = nativeImage.createFromPath(path.join(__dirname, '..', 'assets', 'trayTemplate.png'));
+    if (!img.isEmpty()) { img.setTemplateImage(true); return img; }
+  } catch { /* fall through */ }
+  return nativeImage.createEmpty();
+}
+
 function createTray() {
-  tray = new Tray(nativeImage.createEmpty());
+  tray = new Tray(trayIcon());
   setTrayState('idle');
-  tray.setToolTip('Tristr Flow');
   updateTrayMenu();
 }
 
@@ -677,7 +690,18 @@ ipcMain.handle('settings:get', () => ({
   pauseMusic: state.pauseMusic,
   fontSize: state.fontSize,
   theme: state.theme,
+  openAtLogin: getOpenAtLogin(),
 }));
+
+// ---- launch at login -----------------------------------------------------
+function getOpenAtLogin() {
+  try { return !!app.getLoginItemSettings().openAtLogin; } catch { return false; }
+}
+function setOpenAtLogin(value) {
+  try { app.setLoginItemSettings({ openAtLogin: !!value }); } catch { /* ignore */ }
+  return getOpenAtLogin();
+}
+ipcMain.handle('settings:setOpenAtLogin', (_e, { value }) => ({ openAtLogin: setOpenAtLogin(value) }));
 
 // ---- IPC: account / service mode ----------------------------------------
 

@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('onb', {
   setOwnKey: (key) => ipcRenderer.invoke('account:setOwnKey', { key }),
   curatedVoices: () => ipcRenderer.invoke('voices:curated'),
   setVoice: (voiceId, voiceName) => ipcRenderer.send('settings:setVoice', { voiceId, voiceName }),
+  setOpenAtLogin: (value) => ipcRenderer.invoke('settings:setOpenAtLogin', { value }),
   get: () => ipcRenderer.invoke('settings:get'),
   setHotkey: (which, accel) => ipcRenderer.invoke('settings:setHotkey', { which, accel }),
   finish: () => ipcRenderer.send('onboarding:finish'),

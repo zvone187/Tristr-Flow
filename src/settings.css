@@ -316,7 +316,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-#pausemusicrow {
+#pausemusicrow, #loginrow {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -326,7 +326,8 @@ body {
   font-size: 13px;
   cursor: pointer;
 }
-#pausemusicrow input {
+#loginrow { margin-top: 10px; padding-top: 10px; border-top: none; }
+#pausemusicrow input, #loginrow input {
   width: 16px;
   height: 16px;
   accent-color: var(--accent);

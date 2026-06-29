@@ -20,6 +20,8 @@
     "productName": "Tristr Flow",
     "files": [
       "src/**/*",
+      "assets/trayTemplate.png",
+      "assets/trayTemplate@2x.png",
       "package.json"
     ],
     "extraResources": [

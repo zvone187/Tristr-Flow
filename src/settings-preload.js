@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('prefs', {
   setStability: (stability) => ipcRenderer.send('settings:setStability', { stability }),
   setHotkey: (which, accel) => ipcRenderer.invoke('settings:setHotkey', { which, accel }),
   setPauseMusic: (value) => ipcRenderer.send('settings:setPauseMusic', { value }),
+  setOpenAtLogin: (value) => ipcRenderer.invoke('settings:setOpenAtLogin', { value }),
   setFontSize: (fontSize) => ipcRenderer.send('settings:setFontSize', { fontSize }),
   setTheme: (theme) => ipcRenderer.send('settings:setTheme', { theme }),
   close: () => ipcRenderer.send('settings:close'),

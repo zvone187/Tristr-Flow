@@ -133,3 +133,14 @@ kbd#combo {
 kbd#combo.recording { border-color: var(--accent); color: var(--accent); animation: blink 1s ease-in-out infinite; }
 @keyframes blink { 50% { opacity: 0.5; } }
 #who { color: var(--accent); }
+
+#loginrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  margin: 2px 0 6px;
+}
+#loginrow input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; flex: none; }

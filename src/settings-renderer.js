@@ -8,6 +8,7 @@ const keyStateEl = document.getElementById('keystate');
 const stabilityEl = document.getElementById('stability');
 const themeEl = document.getElementById('theme');
 const pauseMusicEl = document.getElementById('pausemusic');
+const openAtLoginEl = document.getElementById('openatlogin');
 const fontSizeEl = document.getElementById('fontsize');
 const fontSizeValEl = document.getElementById('fontsizeval');
 const combo1El = document.getElementById('combo1');
@@ -162,6 +163,7 @@ async function init() {
   renderCombos(cfg.hotkey, cfg.hotkey2);
   setActiveTheme(cfg.theme || 'system');
   if (pauseMusicEl) pauseMusicEl.checked = cfg.pauseMusic !== false;
+  if (openAtLoginEl) openAtLoginEl.checked = !!cfg.openAtLogin;
   if (fontSizeEl && cfg.fontSize) {
     fontSizeEl.value = cfg.fontSize;
     fontSizeValEl.textContent = cfg.fontSize + ' px';
@@ -214,6 +216,12 @@ searchEl.addEventListener('input', () => render(searchEl.value));
 
 if (pauseMusicEl) {
   pauseMusicEl.addEventListener('change', () => window.prefs.setPauseMusic(pauseMusicEl.checked));
+}
+if (openAtLoginEl) {
+  openAtLoginEl.addEventListener('change', async () => {
+    const r = await window.prefs.setOpenAtLogin(openAtLoginEl.checked);
+    if (r && typeof r.openAtLogin === 'boolean') openAtLoginEl.checked = r.openAtLogin;
+  });
 }
 if (fontSizeEl) {
   fontSizeEl.addEventListener('input', () => { fontSizeValEl.textContent = fontSizeEl.value + ' px'; });
