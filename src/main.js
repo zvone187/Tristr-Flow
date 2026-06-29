@@ -21,6 +21,7 @@ const { loadConfig } = require('./config');
 const { getSelectedText } = require('./selection');
 const { synthesize, synthesizeStream, clampSpeed, clampStability } = require('./elevenlabs');
 const svc = require('./service');
+const updater = require('./update');
 const { listVoices, CURATED } = require('./voices');
 const settingsStore = require('./settings');
 const localserver = require('./localserver');
@@ -36,6 +37,7 @@ let busy = false;
 let speakGen = 0; // bumped on every new request / stop, to cancel stale in-flight synthesis
 let activeStream = null; // current in-flight ElevenLabs stream handle (abortable)
 let musicPausePromise = null; // resolves to the apps we paused; null when not paused
+let pendingUpdate = null; // { version, url } when a newer GitHub release exists
 
 function maybePauseMusic() {
   if (state.pauseMusic && !musicPausePromise) musicPausePromise = mediaCtl.pauseMusic();
@@ -526,6 +528,37 @@ function setSpeedValue(val) {
 
 // ---- tray ----------------------------------------------------------------
 
+// Lightweight update check: compares the running version to the latest GitHub
+// release. If newer, surfaces a clickable notification + a tray "download" item.
+// No silent install (the app is unsigned) — one click opens the .dmg download.
+async function checkUpdates({ manual = false } = {}) {
+  try {
+    const res = await updater.checkForUpdate(app.getVersion());
+    if (res && res.available) {
+      const isNewlyFound = !pendingUpdate || pendingUpdate.version !== res.version;
+      pendingUpdate = { version: res.version, url: res.url };
+      updateTrayMenu();
+      if (isNewlyFound || manual) {
+        try {
+          const n = new Notification({
+            title: `Tristr Flow ${res.version} is available`,
+            body: 'Click to download the update.',
+            silent: false,
+          });
+          n.on('click', () => shell.openExternal(res.url));
+          n.show();
+        } catch { /* ignore */ }
+      }
+    } else {
+      pendingUpdate = null;
+      updateTrayMenu();
+      if (manual) notify('You’re up to date', `Tristr Flow ${app.getVersion()} is the latest version.`);
+    }
+  } catch (e) {
+    if (manual) notify('Update check failed', String(e.message || e));
+  }
+}
+
 function updateTrayMenu() {
   if (!tray) return;
   const ok = hasAccessibility();
@@ -566,10 +599,17 @@ function updateTrayMenu() {
     },
   }));
 
-  const template = [
+  const template = [];
+  if (pendingUpdate) {
+    template.push(
+      { label: `⬆︎  Update available — get ${pendingUpdate.version}…`, click: () => shell.openExternal(pendingUpdate.url) },
+      { type: 'separator' }
+    );
+  }
+  template.push(
     { label: 'Tristr Flow', enabled: false },
-    { label: `Hotkey:  ${hotkeyLabel(state.hotkey)}`, enabled: false },
-  ];
+    { label: `Hotkey:  ${hotkeyLabel(state.hotkey)}`, enabled: false }
+  );
   if (state.hotkey2) template.push({ label: `Also:  ${hotkeyLabel(state.hotkey2)}`, enabled: false });
   template.push(
     { type: 'separator' },
@@ -609,6 +649,7 @@ function updateTrayMenu() {
     },
     { label: 'Read clipboard text aloud', click: speakFromClipboard },
     { type: 'separator' },
+    { label: 'Check for Updates…', click: () => checkUpdates({ manual: true }) },
     { label: 'Quit Tristr Flow', click: () => app.quit() }
   );
   tray.setContextMenu(Menu.buildFromTemplate(template));
@@ -891,6 +932,10 @@ app.whenReady().then(() => {
   if (!hasAccessibility()) {
     systemPreferences.isTrustedAccessibilityClient(true);
   }
+
+  // Check for a newer release shortly after launch, then periodically.
+  setTimeout(() => checkUpdates(), 8000);
+  setInterval(() => checkUpdates(), 6 * 60 * 60 * 1000);
 });
 
 app.on('will-quit', () => globalShortcut.unregisterAll());
