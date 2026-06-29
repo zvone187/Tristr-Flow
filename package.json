@@ -7,6 +7,7 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
+    "build:helper": "swiftc -O native/mediactl.swift -o bin/mediactl",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"
   },
@@ -20,6 +21,9 @@
     "files": [
       "src/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      { "from": "bin/mediactl", "to": "bin/mediactl" }
     ],
     "mac": {
       "category": "public.app-category.productivity",

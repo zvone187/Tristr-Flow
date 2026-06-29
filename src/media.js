@@ -1,61 +1,90 @@
 'use strict';
 
-// Pauses currently-playing music (Spotify / Apple Music) while the app reads,
-// and resumes exactly what we paused afterward. We pause per-app by checking
-// player state (rather than the media Play/Pause key, which is a toggle that
-// would *start* music if nothing was playing).
+// Pauses whatever is playing while the app reads, then resumes it — WITHOUT
+// muting system output (that would mute our own speech) and WITHOUT starting
+// music that wasn't already playing.
 //
-// IMPORTANT: AppleScript compiles every `tell application "X"` block up front,
-// so referencing an app that isn't installed fails the whole script. We avoid
-// that by first listing running processes, then issuing a SEPARATE osascript
-// per running app — so an uninstalled app's terms are never compiled.
+// Primary: the bundled `mediactl` helper drives macOS "Now Playing"
+// (MediaRemote) — the same thing the physical play/pause key controls. It
+// covers Spotify, Apple Music, browser tabs (YouTube, etc.) and any other
+// source, and pauses/resumes precisely (not a blind toggle). If the helper is
+// missing it falls back to per-app AppleScript for Spotify/Apple Music.
 
 const { execFile } = require('child_process');
+const path = require('path');
+const fs = require('fs');
 
+function helperPath() {
+  const candidates = [];
+  if (process.resourcesPath) candidates.push(path.join(process.resourcesPath, 'bin', 'mediactl'));
+  candidates.push(path.join(__dirname, '..', 'bin', 'mediactl'));
+  for (const p of candidates) {
+    try { if (fs.existsSync(p)) return p; } catch { /* ignore */ }
+  }
+  return null;
+}
+
+// Returns the helper's stdout (trimmed) or null if it's unavailable / errored.
+function runHelper(arg, timeout = 3000) {
+  return new Promise((resolve) => {
+    const bin = helperPath();
+    if (!bin) return resolve(null);
+    execFile(bin, [arg], { timeout }, (err, out) => resolve(err ? null : String(out).trim()));
+  });
+}
+
+// ---- AppleScript fallback (Spotify / Apple Music only) -------------------
 const MEDIA_APPS = ['Spotify', 'Music'];
-
-function osa(script, cb) {
-  execFile('/usr/bin/osascript', ['-e', script], { timeout: 2500 }, cb);
-}
-
-function runningMediaApps() {
+function osa(script) {
   return new Promise((resolve) => {
-    osa('tell application "System Events" to return name of every process', (err, out) => {
-      if (err) return resolve([]);
-      const procs = String(out).split(',').map((s) => s.trim());
-      resolve(MEDIA_APPS.filter((a) => procs.includes(a)));
-    });
+    execFile('/usr/bin/osascript', ['-e', script], { timeout: 2500 }, (err, out) =>
+      resolve(err ? '' : String(out).trim())
+    );
   });
 }
-
-function pauseIfPlaying(app) {
-  return new Promise((resolve) => {
-    const script = `tell application "${app}"
-  if player state is playing then
-    pause
-    return "yes"
-  end if
-end tell
-return "no"`;
-    osa(script, (err, out) => resolve(!err && String(out).trim() === 'yes'));
-  });
+async function runningMediaApps() {
+  const out = await osa('tell application "System Events" to return name of every process');
+  const procs = out.split(',').map((s) => s.trim());
+  return MEDIA_APPS.filter((a) => procs.includes(a));
 }
-
-// Returns Promise<string[]> of the apps we actually paused.
-async function pauseMusic() {
-  if (process.platform !== 'darwin') return [];
-  const running = await runningMediaApps();
+async function pauseAppsIfPlaying() {
   const paused = [];
-  for (const app of running) {
-    try { if (await pauseIfPlaying(app)) paused.push(app); } catch { /* ignore */ }
+  for (const app of await runningMediaApps()) {
+    const r = await osa(
+      `tell application "${app}"\n  if player state is playing then\n    pause\n    return "yes"\n  end if\nend tell\nreturn "no"`
+    );
+    if (r === 'yes') paused.push(app);
   }
   return paused;
 }
 
-function resumeMusic(apps) {
-  if (process.platform !== 'darwin' || !apps || !apps.length) return;
-  for (const app of apps) {
-    osa(`tell application "${app}" to play`, () => {});
+// Pause; returns an opaque token describing what we paused (or null if nothing
+// was playing). Pass the token to resumeMusic() to undo exactly that.
+async function pauseMusic() {
+  if (process.platform !== 'darwin') return null;
+
+  const status = await runHelper('status');
+  if (status === 'playing') {
+    const ok = await runHelper('pause');
+    return ok === 'ok' ? { via: 'nowplaying' } : null;
+  }
+  if (status === 'paused') {
+    return null; // Now-Playing reports nothing is playing — nothing to do.
+  }
+
+  // Helper unavailable or errored (null / "unknown" / "nosym") — fall back.
+  const apps = await pauseAppsIfPlaying();
+  return apps.length ? { via: 'apps', apps } : null;
+}
+
+async function resumeMusic(token) {
+  if (process.platform !== 'darwin' || !token) return;
+  if (token.via === 'nowplaying') {
+    await runHelper('play');
+    return;
+  }
+  if (token.via === 'apps') {
+    for (const app of token.apps) osa(`tell application "${app}" to play`);
   }
 }
 
