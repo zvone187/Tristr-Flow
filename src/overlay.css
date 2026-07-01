@@ -93,7 +93,6 @@ html, body {
 
 /* Right side: speed stepper + close. */
 #rightctl {
-  -webkit-app-region: no-drag;
   position: absolute;
   right: 16px;
   top: 50%;
@@ -111,6 +110,7 @@ html, body {
   padding: 2px;
 }
 #speeddown, #speedup {
+  -webkit-app-region: no-drag;
   width: 26px;
   height: 30px;
   border: none;
@@ -154,7 +154,6 @@ html, body {
 
 /* Center: the big primary Play/Pause button + a small caption. */
 #center {
-  -webkit-app-region: no-drag;
   display: flex;
   flex-direction: column;
   align-items: center;
