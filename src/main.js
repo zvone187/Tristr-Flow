@@ -152,7 +152,10 @@ function createOverlay() {
     },
   });
   overlayWin.setMinimumSize(360, 200);
-  overlayWin.setAlwaysOnTop(true, 'screen-saver');
+  // 'floating' keeps the overlay above all normal app windows but BELOW the
+  // Command-Tab switcher (which sits at a higher system level). 'screen-saver'
+  // would sit above the switcher and cover it.
+  overlayWin.setAlwaysOnTop(true, 'floating');
   overlayWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlayWin.loadFile(path.join(__dirname, 'overlay.html'));
 
