@@ -359,6 +359,9 @@ function bufferedEnd() {
 }
 
 textEl.addEventListener('click', (e) => {
+  // If the user dragged a text selection, treat it as select (not seek).
+  const sel = window.getSelection();
+  if (sel && !sel.isCollapsed) return;
   const w = e.target.closest('.word');
   if (!w || !audio) return;
   const wi = words.findIndex((x) => x.el === w);

@@ -931,6 +931,10 @@ app.whenReady().then(() => {
 
   if (app.dock) app.dock.hide();
 
+  // Standard Edit menu so ⌘C / ⌘A / ⌘V / ⌘X work in every window (needed for
+  // selecting + copying the read-aloud text in the overlay).
+  Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }]));
+
   createOverlay();
   createTray();
   // Localhost bridge for the Chrome extension's in-page highlighting.

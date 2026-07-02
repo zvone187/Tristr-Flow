@@ -229,7 +229,13 @@ html, body {
   font-size: 20px;
   line-height: 1.6;
   color: var(--text);
+  /* The read-aloud text is selectable/copyable (the rest of the UI isn't). */
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: auto;
 }
+#text *, #textwrap { -webkit-user-select: text; user-select: text; }
+#text ::selection { background: rgba(210, 105, 63, 0.38); color: inherit; }
 
 .word { cursor: pointer; }
 .word:hover { background: var(--soft); }
