@@ -14,6 +14,7 @@ const {
   clipboard,
   Notification,
   shell,
+  dialog,
 } = require('electron');
 const path = require('path');
 
@@ -125,7 +126,28 @@ function persist() {
     serviceEmail: state.serviceEmail || '',
     ownKey: state.ownKey || '',
     onboarded: state.onboarded || false,
+    launchCount: state.launchCount || 0,
   });
+}
+
+// Nudge to enable "open at login" on the 1st, 3rd, and 8th launch (first open,
+// then +2, then +5), only while it's off. Stops once enabled or past the last.
+const LOGIN_NUDGE_LAUNCHES = [1, 3, 8];
+function maybePromptOpenAtLogin() {
+  if (getOpenAtLogin()) return;                              // already on — never nag
+  if (!LOGIN_NUDGE_LAUNCHES.includes(state.launchCount)) return;
+  if (app.focus) app.focus({ steal: true });                // bring the prompt forward
+  dialog
+    .showMessageBox({
+      type: 'question',
+      buttons: ['Open at Login', 'Not Now'],
+      defaultId: 0,
+      cancelId: 1,
+      message: 'Open Tristr Flow when you log in?',
+      detail: 'It stays in the menu bar, ready the moment you select text and press your shortcut.',
+    })
+    .then((r) => { if (r.response === 0) setOpenAtLogin(true); })
+    .catch(() => {});
 }
 
 // ---- overlay window ------------------------------------------------------
@@ -919,7 +941,10 @@ app.whenReady().then(() => {
     onboarded:
       saved.onboarded ||
       !!(config.apiKey || saved.serviceToken || saved.ownKey),
+    launchCount: saved.launchCount || 0,
   };
+  state.launchCount += 1; // count this launch
+  persist();
   nativeTheme.themeSource = state.theme; // 'system' follows macOS; else force light/dark
 
   // Keep the settings window chrome in sync when the appearance changes.
@@ -965,6 +990,10 @@ app.whenReady().then(() => {
   if (!hasAccessibility()) {
     systemPreferences.isTrustedAccessibilityClient(true);
   }
+
+  // Nudge to open-at-login on launches 1/3/8 (onboarding already asks new users,
+  // so only nudge those who finished it). Short delay so the app settles first.
+  if (state.onboarded) setTimeout(() => maybePromptOpenAtLogin(), 1500);
 
   // Check for a newer release shortly after launch, then periodically.
   setTimeout(() => checkUpdates(), 8000);
