@@ -19,4 +19,9 @@ contextBridge.exposeInMainWorld('speak', {
   close: () => ipcRenderer.send('overlay:close'),
   openSettings: () => ipcRenderer.send('overlay:openSettings'),
   setSpeed: (speed) => ipcRenderer.send('overlay:setSpeed', { speed }),
+  // voice picker (reuses the settings IPC)
+  listVoices: () => ipcRenderer.invoke('settings:listVoices'),
+  previewVoice: (voiceId) => ipcRenderer.invoke('settings:preview', { voiceId, speed: 1 }),
+  pickVoice: (voiceId, voiceName) => ipcRenderer.send('settings:setVoice', { voiceId, voiceName }),
+  currentVoiceId: () => ipcRenderer.invoke('settings:get').then((c) => (c && c.voiceId) || null),
 });

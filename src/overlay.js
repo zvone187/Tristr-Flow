@@ -5,6 +5,10 @@ const textEl = document.getElementById('text');
 const wrapEl = document.getElementById('textwrap');
 const statusEl = document.getElementById('status');
 const voiceEl = document.getElementById('voice');
+const voiceNameEl = document.getElementById('voicename');
+const voicePanel = document.getElementById('voicepanel');
+const voiceListEl = document.getElementById('voicelist');
+const voiceMoreBtn = document.getElementById('voicemore');
 const dotEl = document.getElementById('dot');
 const fillEl = document.getElementById('bar-fill');
 const tcurEl = document.getElementById('tcur');
@@ -119,7 +123,7 @@ function resetForNew(voice) {
   if (tcurEl) tcurEl.textContent = '0:00';
   if (tdurEl) tdurEl.textContent = '0:00';
   wrapEl.scrollTop = 0;
-  if (voice) voiceEl.textContent = voice;
+  if (voice) voiceNameEl.textContent = voice;
   setStatus('Preparing voice…');
   dotEl.classList.add('live');
   updatePlayBtn();
@@ -429,15 +433,96 @@ function showError(message) {
   dotEl.classList.remove('live');
 }
 
+// ---- voice picker --------------------------------------------------------
+let voicesCache = null;
+let vPreviewAudio = null;
+let vPreviewBtn = null;
+let mainWasPlayingForPreview = false;
+
+function stopVoicePreview() {
+  if (vPreviewAudio) { try { vPreviewAudio.pause(); } catch {} vPreviewAudio = null; }
+  if (vPreviewBtn) { vPreviewBtn.textContent = '▶'; vPreviewBtn = null; }
+}
+function closeVoicePanel() {
+  stopVoicePreview();
+  voicePanel.hidden = true;
+  if (mainWasPlayingForPreview && audio && audio.paused) { audio.play().catch(() => {}); updatePlayBtn(); }
+  mainWasPlayingForPreview = false;
+}
+async function openVoicePanel() {
+  voicePanel.hidden = false;
+  if (!voicesCache) {
+    voiceListEl.textContent = 'Loading voices…';
+    try {
+      const [voices, curId] = await Promise.all([window.speak.listVoices(), window.speak.currentVoiceId()]);
+      voicesCache = voices || [];
+      renderVoices(voicesCache, curId);
+    } catch { voiceListEl.textContent = 'Could not load voices.'; }
+  }
+}
+function renderVoices(voices, currentId) {
+  voiceListEl.innerHTML = '';
+  for (const v of voices) {
+    const row = document.createElement('div');
+    row.className = 'vrow' + (v.voice_id === currentId ? ' sel' : '');
+    const meta = document.createElement('div');
+    meta.className = 'vmeta';
+    const name = document.createElement('div');
+    name.className = 'vname';
+    name.textContent = v.name;
+    meta.appendChild(name);
+    if (v.description) {
+      const d = document.createElement('div'); d.className = 'vdesc'; d.textContent = v.description; meta.appendChild(d);
+    }
+    const play = document.createElement('button');
+    play.className = 'vplay'; play.textContent = '▶'; play.title = 'Preview';
+    play.addEventListener('click', (e) => { e.stopPropagation(); previewVoice(v.voice_id, play); });
+    row.appendChild(meta); row.appendChild(play);
+    row.addEventListener('click', () => selectVoice(v.voice_id, v.name, row));
+    voiceListEl.appendChild(row);
+  }
+}
+async function previewVoice(voiceId, btn) {
+  const same = vPreviewBtn === btn && vPreviewAudio;
+  stopVoicePreview();
+  if (same) return; // click the playing one again to stop
+  if (audio && !audio.paused) { mainWasPlayingForPreview = true; audio.pause(); updatePlayBtn(); }
+  btn.textContent = '…'; vPreviewBtn = btn;
+  try {
+    const res = await window.speak.previewVoice(voiceId);
+    if (vPreviewBtn !== btn) return;
+    if (res && res.audioBase64) {
+      vPreviewAudio = new Audio('data:audio/mpeg;base64,' + res.audioBase64);
+      vPreviewAudio.addEventListener('ended', stopVoicePreview);
+      btn.textContent = '■';
+      await vPreviewAudio.play();
+    } else { btn.textContent = '⚠︎'; vPreviewBtn = null; }
+  } catch { if (vPreviewBtn === btn) { btn.textContent = '▶'; vPreviewBtn = null; } }
+}
+function selectVoice(voiceId, name, row) {
+  window.speak.pickVoice(voiceId, name);
+  voiceNameEl.textContent = name;
+  voiceListEl.querySelectorAll('.vrow').forEach((r) => r.classList.remove('sel'));
+  if (row) row.classList.add('sel');
+  setStatus('Voice set — applies next time you read');
+  closeVoicePanel();
+}
+
 // ---- wiring --------------------------------------------------------------
 playBtn.addEventListener('click', togglePause);
 closeBtn.addEventListener('click', () => { teardown(); if (window.speak) window.speak.close(); });
 settingsBtn.addEventListener('click', () => { if (window.speak && window.speak.openSettings) window.speak.openSettings(); });
 if (speedDownBtn) speedDownBtn.addEventListener('click', () => stepSpeed(-1));
 if (speedUpBtn) speedUpBtn.addEventListener('click', () => stepSpeed(1));
+voiceEl.addEventListener('click', (e) => { e.stopPropagation(); if (voicePanel.hidden) openVoicePanel(); else closeVoicePanel(); });
+voiceMoreBtn.addEventListener('click', () => { closeVoicePanel(); if (window.speak && window.speak.openSettings) window.speak.openSettings(); });
+document.addEventListener('click', (e) => {
+  if (!voicePanel.hidden && !voicePanel.contains(e.target) && !voiceEl.contains(e.target)) closeVoicePanel();
+});
 
 const SCROLL_KEYS = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'];
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !voicePanel.hidden) { closeVoicePanel(); return; } // close the picker first
   if (e.code === 'Space' || e.key === ' ') { e.preventDefault(); togglePause(); }
   else if (e.key === 'Escape') { teardown(); if (window.speak) window.speak.close(); }
   else if (e.key === 'ArrowLeft') { e.preventDefault(); stepSpeed(-1); }
