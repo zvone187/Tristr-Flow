@@ -5,6 +5,14 @@
   "main": "src/main.js",
   "author": "Pazi",
   "license": "MIT",
+  "homepage": "https://tristr-flow.onrender.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zvone187/Tristr-Flow.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zvone187/Tristr-Flow/issues"
+  },
   "scripts": {
     "start": "electron .",
     "build:helper": "swiftc -O native/mediactl.swift -o bin/mediactl",
@@ -42,6 +50,11 @@
     },
     "dmg": {
       "title": "Tristr Flow"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "zvone187",
+      "repo": "Tristr-Flow"
     }
   }
 }
