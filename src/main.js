@@ -21,6 +21,7 @@ const path = require('path');
 const { loadConfig } = require('./config');
 const { getSelectedText } = require('./selection');
 const { synthesize, synthesizeStream, clampSpeed, clampStability } = require('./elevenlabs');
+const { isFishVoice, synthesizeFish, synthesizeFishStream } = require('./fishaudio');
 const svc = require('./service');
 const updater = require('./update');
 const { listVoices, CURATED } = require('./voices');
@@ -39,6 +40,8 @@ let speakGen = 0; // bumped on every new request / stop, to cancel stale in-flig
 let activeStream = null; // current in-flight ElevenLabs stream handle (abortable)
 let musicPausePromise = null; // resolves to the apps we paused; null when not paused
 let pendingUpdate = null; // { version, url } when a newer GitHub release exists
+let trayMenu = null; // built menu, shown on right-click (or left-click in floating mode)
+let overlayActive = false; // a reading session is in progress (menu-bar toggle is meaningful)
 
 function maybePauseMusic() {
   if (state.pauseMusic && !musicPausePromise) musicPausePromise = mediaCtl.pauseMusic();
@@ -52,9 +55,16 @@ function resumeMusicIfNeeded() {
 
 const OVERLAY_W = 820;
 const OVERLAY_H = 440;
+const OVERLAY_MIN_W = 360;
+const OVERLAY_MIN_H = 200;
 // v3's /stream/with-timestamps caps a request at 5000 chars; split below that
 // (with margin) and stream the segments back-to-back into one continuous timeline.
 const SEGMENT_CHARS = 4500;
+// Fish drops trailing text on long requests, silently and intermittently:
+// measured over repeated identical requests, 965 chars lost 21 words on 1 run in
+// 3, while 400 and 700 chars came back complete every time. Keep Fish requests
+// short and let the existing multi-segment path stitch them.
+const FISH_SEGMENT_CHARS = 700;
 
 function hotkeyLabel(accel) {
   return (accel || config.hotkey)
@@ -120,11 +130,13 @@ function persist() {
     pauseMusic: state.pauseMusic,
     fontSize: state.fontSize,
     theme: state.theme,
+    overlayMode: state.overlayMode,
     // Account (service mode). ownKey lets a user run in direct mode with their
     // own ElevenLabs key without editing .env.
     serviceToken: state.serviceToken || '',
     serviceEmail: state.serviceEmail || '',
     ownKey: state.ownKey || '',
+    fishKey: state.fishKey || '',
     onboarded: state.onboarded || false,
     launchCount: state.launchCount || 0,
   });
@@ -159,7 +171,11 @@ function createOverlay() {
     show: false,
     frame: false,
     transparent: true,
-    resizable: true, // user can resize; size is persisted (see saveBounds)
+    // Native frameless resizing is off: its grab band is invisible and spills
+    // into the transparent gutter, so drags near the edge resized by accident.
+    // Resizing runs off the handles on the card outline instead (see
+    // overlay:resizeStart). Size is persisted either way (see saveBounds).
+    resizable: false,
     movable: true,
     alwaysOnTop: true,
     skipTaskbar: true,
@@ -171,9 +187,10 @@ function createOverlay() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true, // extra isolation for the renderer that shows untrusted clipboard HTML
+      backgroundThrottling: false, // keep audio + highlight running while collapsed (menu-bar mode)
     },
   });
-  overlayWin.setMinimumSize(360, 200);
+  overlayWin.setMinimumSize(OVERLAY_MIN_W, OVERLAY_MIN_H);
   // 'floating' keeps the overlay above all normal app windows but BELOW the
   // Command-Tab switcher (which sits at a higher system level). 'screen-saver'
   // would sit above the switcher and cover it.
@@ -201,8 +218,30 @@ function createOverlay() {
   overlayWin.on('moved', saveBounds);
 
   overlayWin.on('closed', () => {
+    stopOverlayResize(); // never let a drag tick against a dead window
     overlayWin = null;
   });
+}
+
+// The window's resizable mask is normally cleared, and some macOS builds drop
+// size changes on such a window — so raise it for the duration of the call.
+function setOverlayBounds(b) {
+  if (!overlayWin || overlayWin.isDestroyed()) return;
+  const wasResizable = overlayWin.isResizable();
+  if (!wasResizable) overlayWin.setResizable(true);
+  overlayWin.setBounds(b);
+  if (!wasResizable) overlayWin.setResizable(false);
+}
+
+// Size the overlay opens at: whatever the user last resized it to, falling
+// back to the built-in default. Position varies by mode; size does not.
+function savedOverlaySize() {
+  const b = state.overlayBounds;
+  const ok = (n, min) => Number.isFinite(n) && n >= min;
+  return {
+    w: b && ok(b.width, OVERLAY_MIN_W) ? b.width : OVERLAY_W,
+    h: b && ok(b.height, OVERLAY_MIN_H) ? b.height : OVERLAY_H,
+  };
 }
 
 // Restore the user's saved size/position if it is still on a visible display;
@@ -221,7 +260,7 @@ function showOverlayPositioned() {
       b.x < wa.x + wa.width && b.x + b.width > wa.x &&
       b.y < wa.y + wa.height && b.y + b.height > wa.y;
     if (onScreen) {
-      overlayWin.setBounds({
+      setOverlayBounds({
         x: b.x,
         y: b.y,
         width: Math.min(b.width, wa.width),
@@ -238,12 +277,123 @@ function positionOverlay() {
   const pt = screen.getCursorScreenPoint();
   const disp = screen.getDisplayNearestPoint(pt);
   const { x, y, width, height } = disp.workArea;
-  overlayWin.setBounds({
-    x: Math.round(x + (width - OVERLAY_W) / 2),
-    y: Math.round(y + height - OVERLAY_H - 48),
-    width: OVERLAY_W,
-    height: OVERLAY_H,
+  // Default placement, but keep whatever size the user last resized to.
+  const { w, h } = savedOverlaySize();
+  setOverlayBounds({
+    x: Math.round(x + (width - w) / 2),
+    y: Math.round(y + height - h - 48),
+    width: w,
+    height: h,
   });
+}
+
+// Menu-bar mode: anchor the panel as a dropdown just below the tray icon.
+function positionOverlayForTray() {
+  if (!overlayWin) return;
+  // Anchored under the tray icon, but at the user's last chosen size.
+  const { w, h } = savedOverlaySize();
+  const tb = tray && tray.getBounds ? tray.getBounds() : null;
+  const anchor = tb && tb.width ? { x: tb.x + tb.width / 2, y: tb.y + tb.height } : screen.getCursorScreenPoint();
+  const wa = screen.getDisplayNearestPoint(anchor).workArea;
+  let x = Math.round(anchor.x - w / 2);
+  let y = Math.round((tb ? tb.y + tb.height : wa.y) + 6);
+  x = Math.min(Math.max(x, wa.x + 8), wa.x + wa.width - w - 8);
+  y = Math.min(Math.max(y, wa.y + 4), wa.y + wa.height - h - 8);
+  setOverlayBounds({ x, y, width: w, height: h });
+}
+
+// ---- custom overlay resize ----------------------------------------------
+// The renderer holds pointer capture on a handle and tells us which edge is
+// being dragged; we track the cursor ourselves so the drag survives the
+// pointer leaving the window, and so screen coordinates need no translation.
+let resizeDrag = null;
+let resizeTimer = null;
+
+function applyResizeTick() {
+  const d = resizeDrag;
+  if (!d || !overlayWin || overlayWin.isDestroyed()) return stopOverlayResize();
+  // Safety net: a lost pointerup must never leave the window stuck resizing.
+  if (Date.now() - d.startedAt > 30000) return stopOverlayResize();
+
+  const pt = screen.getCursorScreenPoint();
+  const dx = pt.x - d.origin.x;
+  const dy = pt.y - d.origin.y;
+  const b = d.start;
+  let { x, y, width, height } = b;
+
+  if (d.edge.includes('e')) width = b.width + dx;
+  if (d.edge.includes('s')) height = b.height + dy;
+  if (d.edge.includes('w')) { width = b.width - dx; x = b.x + dx; }
+  if (d.edge.includes('n')) { height = b.height - dy; y = b.y + dy; }
+
+  // Clamp to the minimum with the opposite edge pinned, so a fast drag past
+  // the limit stops dead instead of dragging the whole window along.
+  if (width < OVERLAY_MIN_W) {
+    if (d.edge.includes('w')) x = b.x + b.width - OVERLAY_MIN_W;
+    width = OVERLAY_MIN_W;
+  }
+  if (height < OVERLAY_MIN_H) {
+    if (d.edge.includes('n')) y = b.y + b.height - OVERLAY_MIN_H;
+    height = OVERLAY_MIN_H;
+  }
+
+  setOverlayBounds({
+    x: Math.round(x), y: Math.round(y),
+    width: Math.round(width), height: Math.round(height),
+  });
+}
+
+function stopOverlayResize() {
+  if (resizeTimer) { clearInterval(resizeTimer); resizeTimer = null; }
+  if (!resizeDrag) return;
+  resizeDrag = null;
+  // 'resized' does not fire for our programmatic setBounds, so persist here.
+  if (overlayWin && !overlayWin.isDestroyed()) {
+    overlayWin.setResizable(false); // back to handles-only
+    state.overlayBounds = overlayWin.getBounds();
+    persist();
+  }
+}
+
+const RESIZE_EDGES = new Set(['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']);
+
+ipcMain.on('overlay:resizeStart', (_e, { edge } = {}) => {
+  if (!overlayWin || overlayWin.isDestroyed()) return;
+  if (!RESIZE_EDGES.has(edge)) return;
+  stopOverlayResize(); // drop any drag that never reported its end
+  resizeDrag = {
+    edge,
+    start: overlayWin.getBounds(),
+    origin: screen.getCursorScreenPoint(),
+    startedAt: Date.now(),
+  };
+  // Held for the whole drag so setOverlayBounds isn't flipping the style mask
+  // on every frame; stopOverlayResize puts it back.
+  overlayWin.setResizable(true);
+  resizeTimer = setInterval(applyResizeTick, 16);
+});
+
+ipcMain.on('overlay:resizeEnd', () => stopOverlayResize());
+
+// Place the overlay according to the chosen mode.
+function positionOverlayForMode() {
+  if (state.overlayMode === 'menubar') positionOverlayForTray();
+  else showOverlayPositioned();
+}
+
+// Menu-bar mode: clicking the tray icon shows/hides the panel (audio keeps
+// playing while hidden). When nothing is reading, fall back to the menu.
+function toggleOverlayPanel() {
+  if (overlayActive && overlayWin && !overlayWin.isDestroyed()) {
+    if (overlayWin.isVisible()) {
+      overlayWin.hide();
+    } else {
+      positionOverlayForTray();
+      overlayWin.show();
+    }
+    return;
+  }
+  if (tray && trayMenu) tray.popUpContextMenu(trayMenu);
 }
 
 function setTrayState(s) {
@@ -260,6 +410,8 @@ function setTrayState(s) {
 // Hard stop: silence audio, cancel any in-flight synthesis, hide the overlay.
 // Routed through by every close path so "talking" can never outlive the window.
 function stopEverything() {
+  overlayActive = false; // reading ended; menu-bar toggle no longer shows the panel
+  stopOverlayResize(); // closing mid-drag must not keep resizing a hidden window
   speakGen++; // invalidate any synthesis promise that hasn't resolved yet
   if (activeStream) { try { activeStream.abort(); } catch {} activeStream = null; }
   if (overlayWin && !overlayWin.isDestroyed()) {
@@ -340,12 +492,12 @@ function openOnboarding() {
 
 // Split long text into back-to-back streamed requests at sentence/space
 // boundaries so there is effectively no length limit.
-function segmentText(text) {
-  if (text.length <= SEGMENT_CHARS) return [text];
+function segmentText(text, maxChars = SEGMENT_CHARS) {
+  if (text.length <= maxChars) return [text];
   const segs = [];
   let i = 0;
   while (i < text.length) {
-    let end = Math.min(i + SEGMENT_CHARS, text.length);
+    let end = Math.min(i + maxChars, text.length);
     if (end < text.length) {
       const slice = text.slice(i, end);
       let cut = Math.max(
@@ -377,6 +529,17 @@ function useService() {
   return !effectiveKey() && !!(state && state.serviceToken);
 }
 
+// Fish Audio is always called directly with its own key: the hosted service
+// proxies ElevenLabs only, so a Fish voice never routes through it.
+function effectiveFishKey() {
+  return (state && state.fishKey) || config.fishApiKey || '';
+}
+
+// Can we speak at all right now? Either provider being usable is enough.
+function canSpeak() {
+  return !!(effectiveKey() || (state && state.serviceToken) || effectiveFishKey());
+}
+
 function streamSegment(text, gen, index) {
   return new Promise((resolve, reject) => {
     if (gen !== speakGen || !overlayWin || overlayWin.isDestroyed()) return resolve();
@@ -394,7 +557,15 @@ function streamSegment(text, gen, index) {
     const onEnd = () => { activeStream = null; resolve(); };
     const onError = (err) => { activeStream = null; reject(err); };
 
-    if (useService()) {
+    if (isFishVoice(state.voiceId)) {
+      activeStream = synthesizeFishStream({
+        apiKey: effectiveFishKey(),
+        voiceId: state.voiceId,
+        modelId: config.fishModelId,
+        text,
+        onLine, onEnd, onError,
+      });
+    } else if (useService()) {
       activeStream = svc.serviceStream({
         baseUrl: config.serviceBaseUrl,
         token: state.serviceToken,
@@ -439,7 +610,8 @@ async function speakText(rawText, html) {
   const myGen = ++speakGen; // claim this request; a later stop/request invalidates it
 
   if (!overlayWin) createOverlay();
-  showOverlayPositioned();
+  overlayActive = true; // a reading session is live (menu-bar toggle now meaningful)
+  positionOverlayForMode();
   overlayWin.webContents.setAudioMuted(false);
   if (app.focus) app.focus({ steal: true }); // accessory app: activate so keys reach the overlay
   overlayWin.show();
@@ -464,7 +636,10 @@ async function speakText(rawText, html) {
   }
   if (!ttsText.trim()) { setTrayState('idle'); resumeMusicIfNeeded(); return; }
 
-  const segments = segmentText(ttsText);
+  const segments = segmentText(
+    ttsText,
+    isFishVoice(state.voiceId) ? FISH_SEGMENT_CHARS : SEGMENT_CHARS
+  );
   try {
     for (let i = 0; i < segments.length; i++) {
       if (myGen !== speakGen) return;
@@ -681,7 +856,7 @@ function updateTrayMenu() {
     { label: 'Check for Updates…', click: () => checkUpdates({ manual: true }) },
     { label: 'Quit Tristr Flow', click: () => app.quit() }
   );
-  tray.setContextMenu(Menu.buildFromTemplate(template));
+  trayMenu = Menu.buildFromTemplate(template); // shown via popUpContextMenu (see createTray)
 }
 
 function trayIcon() {
@@ -698,6 +873,13 @@ function createTray() {
   tray = new Tray(trayIcon());
   setTrayState('idle');
   updateTrayMenu();
+  // We drive the menu manually (not setContextMenu) so a left-click can toggle
+  // the panel in menu-bar mode instead of always opening the menu.
+  tray.on('click', () => {
+    if (state.overlayMode === 'menubar') toggleOverlayPanel();
+    else if (trayMenu) tray.popUpContextMenu(trayMenu);
+  });
+  tray.on('right-click', () => { if (trayMenu) tray.popUpContextMenu(trayMenu); });
 }
 
 // ---- IPC: settings window <-> main --------------------------------------
@@ -708,6 +890,7 @@ ipcMain.handle('settings:get', () => ({
   speed: state.speed,
   stability: state.stability,
   apiKeyPresent: !!config.apiKey,
+  fishKeyPresent: !!effectiveFishKey(),
   model: config.modelId,
   speedSupported: true, // speed is now client-side playbackRate — works on every model
   hotkey: state.hotkey,
@@ -715,8 +898,16 @@ ipcMain.handle('settings:get', () => ({
   pauseMusic: state.pauseMusic,
   fontSize: state.fontSize,
   theme: state.theme,
+  overlayMode: state.overlayMode,
   openAtLogin: getOpenAtLogin(),
 }));
+
+ipcMain.on('settings:setOverlayMode', (_e, { mode }) => {
+  state.overlayMode = mode === 'menubar' ? 'menubar' : 'floating';
+  persist();
+  // re-place an open overlay to match the new mode
+  if (overlayWin && !overlayWin.isDestroyed() && overlayWin.isVisible()) positionOverlayForMode();
+});
 
 // ---- launch at login -----------------------------------------------------
 function getOpenAtLogin() {
@@ -819,6 +1010,19 @@ ipcMain.on('onboarding:finish', () => {
 
 // Lets a user run in direct mode with their own ElevenLabs key (no login),
 // without editing .env. Empty string clears it (falls back to env key if any).
+// Fish Audio key. Kept separate from the ElevenLabs own-key: a user can have
+// one, both, or neither, and this is the only way an installed build can get a
+// Fish key at all (the dev-machine file paths in config.js never exist there).
+ipcMain.handle('account:setFishKey', (_e, { key }) => {
+  state.fishKey = String(key || '').trim();
+  if (state.fishKey) state.onboarded = true;
+  persist();
+  updateTrayMenu();
+  // voices.js keys its Fish cache on the key value, so the next listVoices()
+  // refetches on its own.
+  return { ok: true, present: !!effectiveFishKey() };
+});
+
 ipcMain.handle('account:setOwnKey', (_e, { key }) => {
   state.ownKey = (key || '').trim();
   state.onboarded = true;
@@ -869,10 +1073,19 @@ ipcMain.handle('settings:setHotkey', (_e, { which, accel }) => {
   return { ok: true, hotkey: state.hotkey, hotkey2: state.hotkey2 || '' };
 });
 
-ipcMain.handle('settings:listVoices', () => listVoices(config.apiKey));
+ipcMain.handle('settings:listVoices', () => listVoices(config.apiKey, effectiveFishKey()));
 
 ipcMain.handle('settings:preview', async (_e, { voiceId, speed }) => {
   try {
+    if (isFishVoice(voiceId)) {
+      const fr = await synthesizeFish({
+        apiKey: effectiveFishKey(),
+        voiceId,
+        modelId: config.fishModelId,
+        text: "Hey! This is how I sound. I'll read your selected text aloud, just like this.",
+      });
+      return { audioBase64: fr.audio_base64 };
+    }
     const result = await synthesize({
       apiKey: config.apiKey,
       voiceId,
@@ -933,10 +1146,12 @@ app.whenReady().then(() => {
     pauseMusic: saved.pauseMusic != null ? saved.pauseMusic : config.pauseMusic,
     fontSize: clampFont(saved.fontSize != null ? saved.fontSize : config.fontSize),
     theme: cleanTheme(saved.theme || config.theme),
+    overlayMode: saved.overlayMode === 'menubar' ? 'menubar' : (config.overlayMode || 'floating'),
     // Account (service mode).
     serviceToken: saved.serviceToken || '',
     serviceEmail: saved.serviceEmail || '',
     ownKey: saved.ownKey || '',
+    fishKey: saved.fishKey || '',
     // Existing users who already have a key/login are implicitly onboarded.
     onboarded:
       saved.onboarded ||
@@ -981,7 +1196,7 @@ app.whenReady().then(() => {
   // are already marked onboarded above and skip straight in.
   if (!state.onboarded) {
     openOnboarding();
-  } else if (!effectiveKey() && !state.serviceToken) {
+  } else if (!canSpeak()) {
     notify(
       'Tristr Flow needs setup',
       'Open the menu-bar icon ▸ Setup to sign in or add your ElevenLabs key.'

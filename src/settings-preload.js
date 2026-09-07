@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('prefs', {
   setStability: (stability) => ipcRenderer.send('settings:setStability', { stability }),
   setHotkey: (which, accel) => ipcRenderer.invoke('settings:setHotkey', { which, accel }),
   setPauseMusic: (value) => ipcRenderer.send('settings:setPauseMusic', { value }),
+  setOverlayMode: (mode) => ipcRenderer.send('settings:setOverlayMode', { mode }),
   setOpenAtLogin: (value) => ipcRenderer.invoke('settings:setOpenAtLogin', { value }),
   setFontSize: (fontSize) => ipcRenderer.send('settings:setFontSize', { fontSize }),
   setTheme: (theme) => ipcRenderer.send('settings:setTheme', { theme }),
@@ -22,5 +23,6 @@ contextBridge.exposeInMainWorld('prefs', {
   signup: (email, password) => ipcRenderer.invoke('account:signup', { email, password }),
   logout: () => ipcRenderer.invoke('account:logout'),
   setOwnKey: (key) => ipcRenderer.invoke('account:setOwnKey', { key }),
+  setFishKey: (key) => ipcRenderer.invoke('account:setFishKey', { key }),
   openBilling: () => ipcRenderer.invoke('account:openBilling'),
 });

@@ -7,6 +7,7 @@ const speedValEl = document.getElementById('speedval');
 const keyStateEl = document.getElementById('keystate');
 const stabilityEl = document.getElementById('stability');
 const themeEl = document.getElementById('theme');
+const overlayModeEl = document.getElementById('overlaymode');
 const pauseMusicEl = document.getElementById('pausemusic');
 const openAtLoginEl = document.getElementById('openatlogin');
 const fontSizeEl = document.getElementById('fontsize');
@@ -36,6 +37,13 @@ function setActiveStability(val) {
 
 function setActiveTheme(val) {
   themeEl.querySelectorAll('button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.val === val);
+  });
+}
+
+function setActiveMode(val) {
+  if (!overlayModeEl) return;
+  overlayModeEl.querySelectorAll('button').forEach((b) => {
     b.classList.toggle('active', b.dataset.val === val);
   });
 }
@@ -93,12 +101,15 @@ async function doPreview(v, btn) {
 
 function render(filter) {
   const f = (filter || '').toLowerCase().trim();
-  const shown = voices.filter(
-    (v) =>
-      !f ||
+  const shown = voices.filter((v) => {
+    if (!f) return true;
+    const provText = v.provider === 'fish' ? 'fish audio fish' : 'elevenlabs eleven 11l';
+    return (
       v.name.toLowerCase().includes(f) ||
-      (v.description || '').toLowerCase().includes(f)
-  );
+      (v.description || '').toLowerCase().includes(f) ||
+      provText.includes(f) // typing "fish" narrows to that provider
+    );
+  });
   listEl.innerHTML = '';
   if (!shown.length) {
     const d = document.createElement('div');
@@ -130,7 +141,21 @@ function render(filter) {
       chip.className = 'chip hope';
       chip.textContent = 'Hope';
       name.appendChild(chip);
+    } else if (v.tag === 'custom') {
+      const chip = document.createElement('span');
+      chip.className = 'chip mine';
+      chip.textContent = 'Yours';
+      chip.title = 'Your own voice on Fish Audio';
+      name.appendChild(chip);
     }
+    // Which engine speaks this voice — ElevenLabs and Fish Audio side by side.
+    const prov = document.createElement('span');
+    const isFish = v.provider === 'fish';
+    prov.className = 'chip prov ' + (isFish ? 'fish' : 'el');
+    prov.textContent = isFish ? 'Fish' : '11L';
+    prov.title = isFish ? 'Fish Audio' : 'ElevenLabs';
+    name.appendChild(prov);
+
     const desc = document.createElement('div');
     desc.className = 'vdesc';
     desc.textContent = v.description || '';
@@ -162,6 +187,7 @@ async function init() {
   selectedId = cfg.voiceId;
   renderCombos(cfg.hotkey, cfg.hotkey2);
   setActiveTheme(cfg.theme || 'system');
+  setActiveMode(cfg.overlayMode === 'menubar' ? 'menubar' : 'floating');
   if (pauseMusicEl) pauseMusicEl.checked = cfg.pauseMusic !== false;
   if (openAtLoginEl) openAtLoginEl.checked = !!cfg.openAtLogin;
   if (fontSizeEl && cfg.fontSize) {
@@ -171,6 +197,7 @@ async function init() {
   setActiveStability(cfg.stability);
   speedEl.value = cfg.speed;
   speedValEl.textContent = speedLabel(cfg.speed);
+  setFishState(cfg.fishKeyPresent);
   if (cfg.apiKeyPresent) {
     keyStateEl.textContent = '✓ ElevenLabs connected';
   } else {
@@ -211,6 +238,15 @@ themeEl.addEventListener('click', (e) => {
   setActiveTheme(btn.dataset.val);
   window.prefs.setTheme(btn.dataset.val);
 });
+
+if (overlayModeEl) {
+  overlayModeEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-val]');
+    if (!btn) return;
+    setActiveMode(btn.dataset.val);
+    window.prefs.setOverlayMode(btn.dataset.val);
+  });
+}
 
 searchEl.addEventListener('input', () => render(searchEl.value));
 
@@ -350,6 +386,10 @@ const btnLogin = document.getElementById('btnlogin');
 const btnSignup = document.getElementById('btnsignup');
 const btnLogout = document.getElementById('btnlogout');
 const btnOwnKey = document.getElementById('btnownkey');
+const fishKeyEl = document.getElementById('fishkey');
+const btnFishKey = document.getElementById('btnfishkey');
+const fishStateEl = document.getElementById('fishstate');
+const fishMsgEl = document.getElementById('fishmsg');
 const btnClearKey = document.getElementById('btnclearkey');
 const btnUpgrade = document.getElementById('btnupgrade');
 const btnBilling = document.getElementById('btnbilling');
@@ -419,6 +459,32 @@ if (btnOwnKey) btnOwnKey.addEventListener('click', async () => {
   ownKeyEl.value = '';
   await loadAccount();
 });
+function setFishState(present) {
+  if (fishStateEl) fishStateEl.textContent = present ? '✓ connected' : 'not connected';
+  if (fishKeyEl) fishKeyEl.placeholder = present ? 'Key saved — paste a new one to replace' : 'Fish Audio API key (sk-…)';
+}
+
+// Saving a Fish key changes which voices exist, so refresh the list in place
+// rather than making the user reopen Preferences.
+if (btnFishKey) btnFishKey.addEventListener('click', async () => {
+  const key = (fishKeyEl.value || '').trim();
+  const r = await window.prefs.setFishKey(key);
+  fishKeyEl.value = '';
+  setFishState(r && r.present);
+  if (fishMsgEl) {
+    fishMsgEl.textContent = key
+      ? (r && r.present ? 'Saved. Loading Fish Audio voices…' : 'Could not save that key.')
+      : 'Fish Audio key removed.';
+    fishMsgEl.classList.toggle('err', !!key && !(r && r.present));
+  }
+  voices = await window.prefs.listVoices();
+  render(searchEl.value || '');
+  if (fishMsgEl && key && r && r.present) {
+    const n = voices.filter((v) => v.provider === 'fish').length;
+    fishMsgEl.textContent = n ? `Saved — ${n} Fish Audio voices available.` : 'Saved, but no voices came back.';
+  }
+});
+
 if (btnClearKey) btnClearKey.addEventListener('click', async () => { await window.prefs.setOwnKey(''); await loadAccount(); });
 if (btnUpgrade) btnUpgrade.addEventListener('click', () => window.prefs.openBilling());
 if (btnBilling) btnBilling.addEventListener('click', () => window.prefs.openBilling());

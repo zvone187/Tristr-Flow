@@ -19,6 +19,9 @@ contextBridge.exposeInMainWorld('speak', {
   close: () => ipcRenderer.send('overlay:close'),
   openSettings: () => ipcRenderer.send('overlay:openSettings'),
   setSpeed: (speed) => ipcRenderer.send('overlay:setSpeed', { speed }),
+  // Custom window resize (native frameless band is off — see createOverlay).
+  resizeStart: (edge) => ipcRenderer.send('overlay:resizeStart', { edge }),
+  resizeEnd: () => ipcRenderer.send('overlay:resizeEnd'),
   // voice picker (reuses the settings IPC)
   listVoices: () => ipcRenderer.invoke('settings:listVoices'),
   previewVoice: (voiceId) => ipcRenderer.invoke('settings:preview', { voiceId, speed: 1 }),
