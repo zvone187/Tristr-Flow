@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "status": "pending",
+  "tests": [
+    {
+      "id": "E2E-01",
+      "title": "Global shortcut reads the current selection and preserves the clipboard",
+      "user_story": "As a desktop user, I can select text in another app and invoke Tristr Flow without disturbing my clipboard.",
+      "setup_instrumentation": [
+        "Run the packaged macOS app with Accessibility granted.",
+        "Put a unique non-text item or sentinel text on the clipboard.",
+        "Keep main-process logs visible for shortcut and selection diagnostics."
+      ],
+      "steps": [
+        "Select a known sentence in TextEdit or Chrome.",
+        "Press the configured primary shortcut.",
+        "Confirm the overlay opens, shows the exact selected sentence, and starts audio.",
+        "Confirm the prior clipboard value is restored.",
+        "Repeat using the secondary shortcut."
+      ],
+      "expected_results": [
+        "Both registered shortcuts invoke selection capture.",
+        "The overlay content matches the selected text.",
+        "Clipboard contents are unchanged after capture."
+      ],
+      "proof_to_capture": [
+        "Overlay screenshot",
+        "Shortcut registration/capture log lines",
+        "Before/after clipboard comparison"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "E2E-02",
+      "title": "Read selected text works from the tray menu",
+      "user_story": "As a user whose shortcut is unavailable, I can still read the current selection from the menu-bar dropdown.",
+      "setup_instrumentation": [
+        "Run the packaged macOS app with Accessibility granted.",
+        "Open a document containing a unique sentence."
+      ],
+      "steps": [
+        "Select the unique sentence.",
+        "Open the Tristr Flow tray menu without changing the document selection.",
+        "Click Read selected text.",
+        "Confirm the overlay opens with the exact sentence and audio begins."
+      ],
+      "expected_results": [
+        "The menu item is prominent near the top of the action section.",
+        "It uses selection capture rather than existing clipboard text.",
+        "The same speech workflow runs as the keyboard shortcut."
+      ],
+      "proof_to_capture": [
+        "Tray menu screenshot",
+        "Overlay screenshot with the selected sentence"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "E2E-03",
+      "title": "Broken shortcut or Accessibility state is visible and recoverable",
+      "user_story": "As a user, I receive an obvious fallback when macOS permission or shortcut registration is unhealthy.",
+      "setup_instrumentation": [
+        "Use a controlled build with Accessibility disabled, then repeat with a configured shortcut held by a helper Electron process.",
+        "Inspect the tray menu before and after restoring each condition."
+      ],
+      "steps": [
+        "Open the tray menu while Accessibility is unavailable.",
+        "Confirm Read selected text is warning-highlighted and explains the required grant.",
+        "Restore Accessibility and reopen the menu.",
+        "Hold one configured accelerator in another process, relaunch Tristr Flow, and confirm the menu warns that a shortcut is unavailable.",
+        "Release the accelerator, wait for the health repair interval or simulate resume, and confirm the warning clears."
+      ],
+      "expected_results": [
+        "Permission loss and registration failure are never presented as healthy.",
+        "The menu action opens the appropriate recovery path.",
+        "Lost registrations are retried and recover without restarting the app."
+      ],
+      "proof_to_capture": [
+        "Warning-state and healthy-state tray screenshots",
+        "Registration recovery log lines"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "E2E-04",
+      "title": "PostHog receives operational events without selected content",
+      "user_story": "As the product owner, I can measure shortcut reliability without collecting private clipboard or selected text.",
+      "setup_instrumentation": [
+        "Use the configured PostHog project token and correct regional ingestion host.",
+        "Open PostHog Live Events or query the target project after running the app."
+      ],
+      "steps": [
+        "Launch the app and invoke one successful shortcut read.",
+        "Invoke Read selected text from the menu.",
+        "Exercise an Accessibility-missing or selection-capture failure.",
+        "Inspect the resulting PostHog events and properties."
+      ],
+      "expected_results": [
+        "Operational events include trigger, registration outcome, failure reason, app version, and platform where applicable.",
+        "No selected text, clipboard content, HTML, API keys, service tokens, or email addresses are sent.",
+        "Events use an anonymous installation identifier without creating person profiles."
+      ],
+      "proof_to_capture": [
+        "PostHog Live Events screenshot or query result",
+        "Event-property privacy inspection"
+      ],
+      "status": "pending"
+    }
+  ]
+}

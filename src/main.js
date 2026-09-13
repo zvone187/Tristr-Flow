@@ -9,6 +9,7 @@ const {
   ipcMain,
   nativeImage,
   nativeTheme,
+  powerMonitor,
   screen,
   systemPreferences,
   clipboard,
@@ -16,10 +17,11 @@ const {
   shell,
   dialog,
 } = require('electron');
+const { randomUUID } = require('crypto');
 const path = require('path');
 
 const { loadConfig } = require('./config');
-const { getSelectedText } = require('./selection');
+const { getSelectedText, getFrontmostApplicationPid } = require('./selection');
 const { synthesize, synthesizeStream, clampSpeed, clampStability } = require('./elevenlabs');
 const { isFishVoice, synthesizeFish, synthesizeFishStream } = require('./fishaudio');
 const svc = require('./service');
@@ -28,6 +30,13 @@ const { listVoices, CURATED } = require('./voices');
 const settingsStore = require('./settings');
 const localserver = require('./localserver');
 const mediaCtl = require('./media');
+const { createAnalytics } = require('./analytics');
+const { createShortcutManager, selectedTextMenuPresentation } = require('./shortcut-manager');
+
+// A second background instance can silently lose both global accelerators to
+// the first one while still showing a working tray menu. Keep one owner.
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) app.quit();
 
 let tray = null;
 let overlayWin = null;
@@ -42,6 +51,13 @@ let musicPausePromise = null; // resolves to the apps we paused; null when not p
 let pendingUpdate = null; // { version, url } when a newer GitHub release exists
 let trayMenu = null; // built menu, shown on right-click (or left-click in floating mode)
 let overlayActive = false; // a reading session is in progress (menu-bar toggle is meaningful)
+let shortcutManager = null;
+let shortcutStatus = null;
+let shortcutHealthTimer = null;
+let analytics = null;
+let analyticsShutdownStarted = false;
+let analyticsShutdownComplete = false;
+let lastExternalAppPid = 0;
 
 function maybePauseMusic() {
   if (state.pauseMusic && !musicPausePromise) musicPausePromise = mediaCtl.pauseMusic();
@@ -77,22 +93,71 @@ function hotkeyLabel(accel) {
     .replace(/\+/g, ' ');
 }
 
-function tryRegister(accel) {
-  if (!accel) return false;
-  try {
-    return globalShortcut.register(accel, onHotkey);
-  } catch {
-    return false; // invalid accelerator string
-  }
-}
-
 // (Re)register both triggers from the current state. Returns which succeeded.
 function registerHotkeys() {
-  globalShortcut.unregisterAll();
-  const h1 = tryRegister(state.hotkey);
-  let h2 = false;
-  if (state.hotkey2 && state.hotkey2 !== state.hotkey) h2 = tryRegister(state.hotkey2);
-  return { h1, h2 };
+  if (!shortcutManager) {
+    shortcutManager = createShortcutManager({
+      globalShortcut,
+      onShortcut: () => onHotkey('shortcut'),
+    });
+  }
+  shortcutStatus = shortcutManager.registerAll(state.hotkey, state.hotkey2);
+  console.log('[shortcut] registration checked:', shortcutAnalyticsProperties(shortcutStatus));
+  captureAnalytics('shortcut_registration_checked', shortcutAnalyticsProperties(shortcutStatus));
+  return {
+    h1: shortcutStatus.primary.registered,
+    h2: shortcutStatus.secondary.registered,
+  };
+}
+
+function shortcutAnalyticsProperties(status, extra = {}) {
+  return {
+    primary_registered: !!(status && status.primary.registered),
+    secondary_configured: !!(status && status.secondary.configured),
+    secondary_registered: !!(status && status.secondary.registered),
+    all_registered: !!(status && status.allRegistered),
+    ...extra,
+  };
+}
+
+function captureAnalytics(event, properties) {
+  if (analytics) analytics.capture(event, properties);
+}
+
+function repairHotkeys(source = 'periodic') {
+  if (!shortcutManager) return shortcutStatus;
+  const previous = shortcutStatus || shortcutManager.status();
+  const result = shortcutManager.repair();
+  shortcutStatus = result.status;
+  const changed =
+    previous.allRegistered !== shortcutStatus.allRegistered ||
+    previous.anyRegistered !== shortcutStatus.anyRegistered ||
+    previous.primary.registered !== shortcutStatus.primary.registered ||
+    previous.secondary.registered !== shortcutStatus.secondary.registered;
+  if (result.recovered.length || changed) {
+    console.log(`[shortcut] health changed (${source}):`, shortcutAnalyticsProperties(shortcutStatus));
+    captureAnalytics(
+      result.recovered.length ? 'shortcut_registration_recovered' : 'shortcut_registration_changed',
+      shortcutAnalyticsProperties(shortcutStatus, {
+        source,
+        recovered_count: result.recovered.length,
+      })
+    );
+    updateTrayMenu();
+  }
+  return shortcutStatus;
+}
+
+function refreshHotkeys(source) {
+  if (!shortcutManager) return shortcutStatus;
+  shortcutStatus = shortcutManager.refreshAll();
+  console.log(`[shortcut] registrations refreshed (${source}):`, shortcutAnalyticsProperties(shortcutStatus));
+  captureAnalytics(
+    'shortcut_registration_refreshed',
+    shortcutAnalyticsProperties(shortcutStatus, { source })
+  );
+  updateTrayMenu();
+  return shortcutStatus;
 }
 
 function clampFont(n) {
@@ -139,6 +204,9 @@ function persist() {
     fishKey: state.fishKey || '',
     onboarded: state.onboarded || false,
     launchCount: state.launchCount || 0,
+    // Random per-install analytics identifier. It is not tied to an email or
+    // account and PostHog person-profile processing is disabled for all events.
+    analyticsId: state.analyticsId || '',
   });
 }
 
@@ -599,10 +667,11 @@ function waitRichReady(gen) {
   });
 }
 
-async function speakText(rawText, html) {
+async function speakText(rawText, html, { trigger = 'unknown' } = {}) {
   const text = (rawText || '').trim();
   const hasHtml = !!(html && html.trim());
   if (!text && !hasHtml) {
+    captureAnalytics('reading_rejected', { trigger, reason: 'empty' });
     notify('Nothing to read', 'No text was found to read aloud.');
     return;
   }
@@ -636,6 +705,13 @@ async function speakText(rawText, html) {
   }
   if (!ttsText.trim()) { setTrayState('idle'); resumeMusicIfNeeded(); return; }
 
+  captureAnalytics('reading_started', {
+    trigger,
+    provider: isFishVoice(state.voiceId) ? 'fish' : (useService() ? 'service' : 'elevenlabs'),
+    character_count: ttsText.length,
+    has_formatting: hasHtml,
+  });
+
   const segments = segmentText(
     ttsText,
     isFishVoice(state.voiceId) ? FISH_SEGMENT_CHARS : SEGMENT_CHARS
@@ -648,8 +724,19 @@ async function speakText(rawText, html) {
     if (myGen === speakGen && overlayWin && !overlayWin.isDestroyed()) {
       overlayWin.webContents.send('overlay:all-done', { gen: myGen });
     }
+    if (myGen === speakGen) {
+      captureAnalytics('reading_synthesis_completed', {
+        trigger,
+        segment_count: segments.length,
+        character_count: ttsText.length,
+      });
+    }
   } catch (err) {
     console.error('[speak] stream failed:', err);
+    captureAnalytics('reading_failed', {
+      trigger,
+      error_name: err && err.name ? err.name : 'Error',
+    });
     if (myGen === speakGen && overlayWin && !overlayWin.isDestroyed()) {
       overlayWin.webContents.send('overlay:error', { message: String(err.message || err) });
       setTrayState('idle');
@@ -658,26 +745,49 @@ async function speakText(rawText, html) {
   }
 }
 
-async function onHotkey() {
+async function onHotkey(trigger = 'shortcut', { targetPid = 0 } = {}) {
+  console.log(`[shortcut] read invoked via ${trigger}`);
+  captureAnalytics('read_requested', { trigger });
   // Second press while the overlay is up = stop & dismiss.
   if (overlayWin && overlayWin.isVisible()) {
+    captureAnalytics('reading_stopped', { trigger });
     stopEverything();
     return;
   }
-  if (busy) return;
+  if (busy) {
+    captureAnalytics('read_rejected', { trigger, reason: 'busy' });
+    return;
+  }
   busy = true;
   try {
     if (!hasAccessibility()) {
+      console.warn('[shortcut] selection capture blocked: Accessibility permission is unavailable');
+      captureAnalytics('selection_capture_finished', {
+        trigger,
+        outcome: 'failed',
+        reason: 'not-trusted',
+      });
       systemPreferences.isTrustedAccessibilityClient(true);
       notify(
         'Accessibility permission needed',
         'Enable Tristr Flow under System Settings → Privacy & Security → Accessibility, then try again.'
       );
+      if (trigger === 'selected_text_menu') {
+        shell.openExternal(
+          'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'
+        );
+      }
       updateTrayMenu();
       return;
     }
-    const { text, html, reason } = await getSelectedText();
+    const { text, html, reason, source } = await getSelectedText({ targetPid });
     if (!text) {
+      captureAnalytics('selection_capture_finished', {
+        trigger,
+        outcome: 'failed',
+        reason: reason || 'empty-or-nocopy',
+        source: source || 'none',
+      });
       if (reason === 'not-trusted') {
         systemPreferences.isTrustedAccessibilityClient(true);
         notify(
@@ -696,9 +806,22 @@ async function onHotkey() {
       }
       return;
     }
-    await speakText(text, html);
+    captureAnalytics('selection_capture_finished', {
+      trigger,
+      outcome: 'success',
+      source: source || 'unknown',
+      character_count: text.length,
+      has_formatting: !!html,
+    });
+    await speakText(text, html, { trigger });
   } catch (err) {
     console.error('[speak] hotkey error:', err);
+    captureAnalytics('selection_capture_finished', {
+      trigger,
+      outcome: 'failed',
+      reason: 'unexpected-error',
+      error_name: err && err.name ? err.name : 'Error',
+    });
     notify('Tristr Flow error', String(err.message || err));
   } finally {
     busy = false;
@@ -706,12 +829,14 @@ async function onHotkey() {
 }
 
 async function speakFromClipboard() {
+  captureAnalytics('read_requested', { trigger: 'clipboard_menu' });
   const text = clipboard.readText().trim();
   if (!text) {
+    captureAnalytics('read_rejected', { trigger: 'clipboard_menu', reason: 'empty-clipboard' });
     notify('Clipboard is empty', 'Copy some text, then use this menu item.');
     return;
   }
-  await speakText(text);
+  await speakText(text, null, { trigger: 'clipboard_menu' });
 }
 
 function setVoice(voiceId, voiceName) {
@@ -766,6 +891,17 @@ async function checkUpdates({ manual = false } = {}) {
 function updateTrayMenu() {
   if (!tray) return;
   const ok = hasAccessibility();
+  if (shortcutManager) shortcutStatus = shortcutManager.status();
+  const liveShortcutStatus = shortcutStatus || {
+    primary: { configured: !!state.hotkey, registered: false },
+    secondary: { configured: !!state.hotkey2, registered: false },
+    allRegistered: false,
+    anyRegistered: false,
+  };
+  const selectedTextItem = selectedTextMenuPresentation({
+    accessibilityGranted: ok,
+    status: liveShortcutStatus,
+  });
 
   const voiceItems = CURATED.map((v) => ({
     label: v.name,
@@ -812,10 +948,25 @@ function updateTrayMenu() {
   }
   template.push(
     { label: 'Tristr Flow', enabled: false },
-    { label: `Hotkey:  ${hotkeyLabel(state.hotkey)}`, enabled: false }
+    {
+      label: `${liveShortcutStatus.primary.registered ? '\u2713' : '\u26a0\ufe0f'} Hotkey:  ${hotkeyLabel(state.hotkey)}`,
+      enabled: false,
+    }
   );
-  if (state.hotkey2) template.push({ label: `Also:  ${hotkeyLabel(state.hotkey2)}`, enabled: false });
+  if (state.hotkey2) {
+    template.push({
+      label: `${liveShortcutStatus.secondary.registered ? '\u2713' : '\u26a0\ufe0f'} Also:  ${hotkeyLabel(state.hotkey2)}`,
+      enabled: false,
+    });
+  }
   template.push(
+    { type: 'separator' },
+    {
+      label: selectedTextItem.label,
+      sublabel: selectedTextItem.sublabel,
+      click: () => onHotkey('selected_text_menu', { targetPid: lastExternalAppPid }),
+    },
+    { label: 'Read clipboard text aloud', click: speakFromClipboard },
     { type: 'separator' },
     { label: 'Preferences — Voice, Shortcuts…', click: openSettings, accelerator: 'Command+,' },
     { label: 'Setup — Account…', click: openOnboarding },
@@ -851,12 +1002,26 @@ function updateTrayMenu() {
             : '⚠️  Not set up — open Setup',
       enabled: false,
     },
-    { label: 'Read clipboard text aloud', click: speakFromClipboard },
     { type: 'separator' },
     { label: 'Check for Updates…', click: () => checkUpdates({ manual: true }) },
     { label: 'Quit Tristr Flow', click: () => app.quit() }
   );
   trayMenu = Menu.buildFromTemplate(template); // shown via popUpContextMenu (see createTray)
+}
+
+function rememberSelectionOwner() {
+  const pid = getFrontmostApplicationPid();
+  if (pid && pid !== process.pid) lastExternalAppPid = pid;
+}
+
+function showTrayMenu() {
+  rememberSelectionOwner();
+  // Opening the fallback menu is an explicit signal that shortcuts may be
+  // unhealthy, so force a native re-registration even if Electron's cached
+  // isRegistered() result still says they are present.
+  refreshHotkeys('tray-open');
+  updateTrayMenu();
+  if (tray && trayMenu) tray.popUpContextMenu(trayMenu);
 }
 
 function trayIcon() {
@@ -873,13 +1038,18 @@ function createTray() {
   tray = new Tray(trayIcon());
   setTrayState('idle');
   updateTrayMenu();
+  // Remember the selection-owning app before a native menu interaction can
+  // affect macOS's notion of the frontmost application.
+  if (process.platform === 'darwin') {
+    tray.on('mouse-down', rememberSelectionOwner);
+  }
   // We drive the menu manually (not setContextMenu) so a left-click can toggle
   // the panel in menu-bar mode instead of always opening the menu.
   tray.on('click', () => {
     if (state.overlayMode === 'menubar') toggleOverlayPanel();
-    else if (trayMenu) tray.popUpContextMenu(trayMenu);
+    else showTrayMenu();
   });
-  tray.on('right-click', () => { if (trayMenu) tray.popUpContextMenu(trayMenu); });
+  tray.on('right-click', showTrayMenu);
 }
 
 // ---- IPC: settings window <-> main --------------------------------------
@@ -1130,7 +1300,14 @@ ipcMain.on('overlay:openSettings', () => openSettings());
 
 // ---- lifecycle -----------------------------------------------------------
 
-app.whenReady().then(() => {
+if (hasSingleInstanceLock) {
+  app.on('second-instance', () => {
+    refreshHotkeys('second-instance');
+    notify('Tristr Flow is already running', 'The existing menu-bar app kept ownership of your shortcuts.');
+  });
+}
+
+if (hasSingleInstanceLock) app.whenReady().then(() => {
   config = loadConfig();
   const saved = settingsStore.load();
   state = {
@@ -1157,9 +1334,18 @@ app.whenReady().then(() => {
       saved.onboarded ||
       !!(config.apiKey || saved.serviceToken || saved.ownKey),
     launchCount: saved.launchCount || 0,
+    analyticsId: saved.analyticsId || randomUUID(),
   };
   state.launchCount += 1; // count this launch
   persist();
+  analytics = createAnalytics({
+    token: config.posthogToken,
+    host: config.posthogHost,
+    distinctId: state.analyticsId,
+    appVersion: app.getVersion(),
+    platform: process.platform,
+    arch: process.arch,
+  });
   nativeTheme.themeSource = state.theme; // 'system' follows macOS; else force light/dark
 
   // Keep the settings window chrome in sync when the appearance changes.
@@ -1176,6 +1362,7 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }]));
 
   createOverlay();
+  const reg = registerHotkeys();
   createTray();
   // Localhost bridge for the Chrome extension's in-page highlighting.
   try {
@@ -1184,13 +1371,26 @@ app.whenReady().then(() => {
     console.error('[localserver] failed to start:', e);
   }
 
-  const reg = registerHotkeys();
   if (!reg.h1) {
     notify('Hotkey registration failed', `Could not register ${hotkeyLabel(state.hotkey)}. It may be in use by another app.`);
   }
   if (state.hotkey2 && !reg.h2) {
     notify('Second hotkey failed', `Could not register ${hotkeyLabel(state.hotkey2)}.`);
   }
+  captureAnalytics('app_launched', {
+    accessibility_granted: hasAccessibility(),
+    overlay_mode: state.overlayMode,
+    ...shortcutAnalyticsProperties(shortcutStatus),
+  });
+
+  // macOS can drop global registrations across sleep/unlock, and an accelerator
+  // conflict can disappear while this app stays open. Recover without a restart.
+  shortcutHealthTimer = setInterval(() => repairHotkeys('periodic'), 30000);
+  const repairAfterSystemTransition = (source) => {
+    setTimeout(() => refreshHotkeys(source), 1000);
+  };
+  powerMonitor.on('resume', () => repairAfterSystemTransition('resume'));
+  powerMonitor.on('unlock-screen', () => repairAfterSystemTransition('unlock-screen'));
 
   // First run: welcome + setup. Existing users (env key / saved login / own key)
   // are already marked onboarded above and skip straight in.
@@ -1215,7 +1415,27 @@ app.whenReady().then(() => {
   setInterval(() => checkUpdates(), 6 * 60 * 60 * 1000);
 });
 
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => {
+  if (shortcutHealthTimer) clearInterval(shortcutHealthTimer);
+  if (shortcutManager) shortcutManager.dispose();
+  else globalShortcut.unregisterAll();
+});
+
+// Give the final small analytics batch a bounded chance to flush so a recently
+// recorded event is not dropped on a fast exit.
+app.on('before-quit', (event) => {
+  if (!analytics || !analytics.enabled || analyticsShutdownComplete) return;
+  event.preventDefault();
+  if (analyticsShutdownStarted) return;
+  analyticsShutdownStarted = true;
+  Promise.race([
+    analytics.shutdown(),
+    new Promise((resolve) => setTimeout(resolve, 1500)),
+  ]).finally(() => {
+    analyticsShutdownComplete = true;
+    app.quit();
+  });
+});
 
 app.on('window-all-closed', (e) => {
   if (process.platform === 'darwin') e.preventDefault();

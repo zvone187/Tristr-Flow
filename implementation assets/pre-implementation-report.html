@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tristr Flow Shortcut Recovery — Pre-Implementation</title>
+    <style>
+      :root { --canvas:#f6f2e8; --ink:#172026; --muted:#65727a; --border:#2c3338; --paper:#fff; --blue:#d9ecff; --green:#dff5df; --yellow:#fff1b8; --pink:#ffe2eb; --purple:#eadfff; --shadow:7px 7px 0 rgba(23,32,38,.18); font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+      * { box-sizing:border-box; }
+      body { background:linear-gradient(90deg,rgba(47,58,66,.07) 1px,transparent 1px),linear-gradient(rgba(47,58,66,.07) 1px,transparent 1px),var(--canvas); background-size:28px 28px; color:var(--ink); line-height:1.45; margin:0; }
+      main { margin:0 auto; padding:30px 22px 52px; width:min(1240px,100%); }
+      header { display:grid; gap:18px; grid-template-columns:1.4fr .8fr; margin-bottom:22px; }
+      h1,h2,h3,p { margin:0; } h1 { font-size:clamp(2rem,5vw,4.4rem); line-height:.96; } h2 { font-size:1.1rem; text-transform:uppercase; }
+      a { color:#0f5f85; font-weight:750; text-decoration:none; } code { background:rgba(255,255,255,.72); border:1px solid rgba(47,58,66,.24); border-radius:6px; padding:2px 5px; }
+      .hero,.card,details,.sticky { border:2px solid var(--border); box-shadow:var(--shadow); } .hero,.card,details { background:var(--paper); border-radius:16px; }
+      .hero { padding:26px; } .hero p { color:var(--muted); margin-top:12px; max-width:760px; } .meta-stack,.grid { display:grid; gap:14px; } .grid.two { grid-template-columns:repeat(2,minmax(0,1fr)); } .grid.three { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .card { padding:16px; } .card small { color:var(--muted); display:block; font-size:.78rem; font-weight:850; text-transform:uppercase; } .card strong { display:block; font-size:1.3rem; line-height:1.1; margin-top:4px; }
+      .tag,.pill { border:2px solid var(--border); border-radius:999px; display:inline-flex; font-size:.78rem; font-weight:900; padding:5px 9px; text-transform:uppercase; } .tag { background:var(--yellow); margin-bottom:12px; }
+      .board-section { margin-top:24px; } .section-title { align-items:center; display:flex; gap:10px; margin-bottom:12px; } .pin { background:#ff6b57; border:2px solid var(--border); border-radius:50%; height:16px; width:16px; }
+      .sticky { border-radius:3px; min-height:128px; padding:16px; transform:rotate(-.7deg); } .sticky:nth-child(even) { transform:rotate(.7deg); } .sticky h3 { font-size:1.1rem; margin-bottom:8px; } .sticky p,.sticky li { color:#334148; font-size:.94rem; } .sticky ul { margin:8px 0 0; padding-left:18px; }
+      .bg-blue{background:var(--blue)} .bg-green{background:var(--green)} .bg-yellow{background:var(--yellow)} .bg-pink{background:var(--pink)} .bg-purple{background:var(--purple)}
+      summary { cursor:pointer; font-weight:850; list-style:none; padding:14px 16px; } summary:before { content:"+"; display:inline-block; font-weight:900; margin-right:10px; width:14px; } details[open] summary:before { content:"-"; } .detail-body { border-top:2px solid var(--border); color:#334148; padding:14px 16px 16px; } .detail-body ul { margin:8px 0 0; padding-left:18px; }
+      @media (max-width:900px) { header,.grid.two,.grid.three { grid-template-columns:1fr; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <section class="hero" aria-labelledby="title"><span class="tag">Pre-Implementation</span><h1 id="title">Shortcut recovery + private analytics</h1><p>Ready to implement: the failure modes are isolated, tests fail for the expected missing-module reason, and user-visible recovery plus privacy constraints are explicit.</p></section>
+        <aside class="meta-stack" aria-label="Report metadata">
+          <div class="card bg-green"><small>Status</small><strong>Ready for implementation: yes</strong></div>
+          <div class="card bg-blue"><small>Scope</small><strong>Desktop shortcut, tray fallback, PostHog</strong></div>
+          <div class="card bg-yellow"><small>Date</small><strong>2026-09-13</strong></div>
+        </aside>
+      </header>
+
+      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Fast Answer</h2></div><div class="grid three">
+        <div class="sticky bg-pink"><h3>Current state</h3><p>Clipboard speech works, so TTS is healthy. The installed app is ad-hoc signed as <code>Electron</code>; rebuilds can invalidate its app-specific Accessibility grant.</p></div>
+        <div class="sticky bg-green"><h3>Implementation path</h3><p>Expose live shortcut/permission health, retry lost registrations, add a prominent Read selected text action, and instrument only operational metadata.</p></div>
+        <div class="sticky bg-yellow"><h3>Main risk</h3><p>A permanent macOS permission identity requires a stable Developer ID signature. Code can diagnose and recover registration, but cannot grant Accessibility itself.</p></div>
+      </div></section>
+
+      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Pass Criteria</h2></div><div class="grid three">
+        <div class="sticky bg-green"><h3>Shortcut health</h3><ul><li>Both accelerators register and are checked while running.</li><li>Resume/unlock and periodic checks retry a lost registration.</li><li>Duplicate app launches cannot create competing owners.</li></ul></div>
+        <div class="sticky bg-blue"><h3>Menu fallback</h3><ul><li>Read selected text invokes the same selection path.</li><li>Permission or registration trouble changes it to a clear warning state.</li><li>Clipboard reading remains available separately.</li></ul></div>
+        <div class="sticky bg-purple"><h3>PostHog privacy</h3><ul><li>Operational events reach the supplied project.</li><li>Selected/clipboard text, HTML, email, and secrets are never captured.</li><li>Anonymous install IDs do not create person profiles.</li></ul></div>
+      </div></section>
+
+      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>End-To-End Verification Plan</h2></div><div class="grid two">
+        <div class="sticky bg-blue"><h3>E2E-01 · Keyboard path</h3><p><strong>Setup:</strong> packaged app, Accessibility on, sentinel clipboard. <strong>Steps:</strong> select text, press both shortcuts. <strong>Proof:</strong> exact overlay text/audio plus unchanged clipboard. <strong>Status:</strong> pending.</p></div>
+        <div class="sticky bg-green"><h3>E2E-02 · Menu path</h3><p><strong>Setup:</strong> selected sentence in another app. <strong>Steps:</strong> tray → Read selected text. <strong>Proof:</strong> exact selection appears and speaks, independent of clipboard. <strong>Status:</strong> pending.</p></div>
+        <div class="sticky bg-pink"><h3>E2E-03 · Recovery states</h3><p><strong>Setup:</strong> Accessibility disabled, then shortcut conflict helper. <strong>Steps:</strong> inspect warning, restore condition, trigger repair. <strong>Proof:</strong> warning screenshots and recovery logs. <strong>Status:</strong> pending.</p></div>
+        <div class="sticky bg-purple"><h3>E2E-04 · Analytics side effect</h3><p><strong>Setup:</strong> target PostHog project/live events. <strong>Steps:</strong> launch, successful reads, failed capture. <strong>Proof:</strong> events arrive with operational fields and no content/identity data. <strong>Status:</strong> pending.</p></div>
+      </div></section>
+
+      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Checks And Evidence</h2></div><div class="grid two">
+        <div class="sticky bg-green"><h3>Setup complete</h3><ul><li>Fetched latest <code>origin/main</code> before worktree creation.</li><li>Created branch/worktree <code>codex/desktop-shortcut-posthog</code>.</li><li>Replayed the installed app's Fish/overlay feature commit.</li><li><code>npm ci</code> passed; required local Fish key copied.</li></ul></div>
+        <div class="sticky bg-yellow"><h3>Expected red tests</h3><ul><li>Node tests cover health, repair, warning presentation, analytics no-op, privacy filtering, and shutdown.</li><li>They currently fail because <code>src/shortcut-manager.js</code> and <code>src/analytics.js</code> do not exist yet.</li><li>No pre-existing automated test script or Husky setup exists.</li></ul></div>
+      </div></section>
+
+      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Open The Cards</h2></div>
+        <details open><summary>Worktree and base</summary><div class="detail-body"><ul><li>Worktree: <a href="file:///Users/zvonimirsabljic/Development/Trister%20Flow%20Worktrees/codex/desktop-shortcut-posthog">/Users/zvonimirsabljic/Development/Trister Flow Worktrees/codex/desktop-shortcut-posthog</a></li><li>Branch: <code>codex/desktop-shortcut-posthog</code></li><li>Remote base: <code>origin/main</code> at <code>3ef0db9</code>, fetched first.</li><li>Current installed feature commit replayed as <code>090c741</code>.</li></ul></div></details>
+        <details><summary>Diagnosis evidence</summary><div class="detail-body"><ul><li>Only one Tristr Flow main process is running, ruling out a current duplicate-instance shortcut conflict.</li><li>Installed <code>src/main.js</code> and <code>src/selection.js</code> hashes match the feature branch.</li><li>The installed app is ad-hoc signed, has no TeamIdentifier, and its code-signing Identifier is <code>Electron</code>.</li><li>Existing code reports registration failures only once and has no periodic/resume repair.</li></ul></div></details>
+        <details><summary>Automated tests</summary><div class="detail-body"><ul><li><code>test/shortcut-manager.test.js</code>: dual registration, callback routing, repair, partial failure, and three menu states.</li><li><code>test/analytics.test.js</code>: disabled no-op, initialization, default metadata, sensitive-property filtering, and shutdown flush.</li><li>Expected pre-implementation result: module-not-found failures until production modules are implemented.</li></ul></div></details>
+        <details><summary>Artifacts</summary><div class="detail-body"><ul><li><a href="qa-e2e-tests.json">qa-e2e-tests.json</a> contains the complete executable verification descriptions.</li><li>This report follows the shared implementation-report whiteboard template.</li></ul></div></details>
+      </section>
+    </main>
+  </body>
+</html>

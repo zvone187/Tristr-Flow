@@ -15,13 +15,20 @@
   },
   "scripts": {
     "start": "electron .",
+    "lint": "eslint src test eslint.config.js",
+    "test": "node --test test/*.test.js",
+    "prepare": "husky",
     "build:helper": "swiftc -O native/mediactl.swift -o bin/mediactl",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "electron": "^42.5.0",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "eslint": "^10.10.0",
+    "globals": "^17.12.0",
+    "husky": "^9.1.7"
   },
   "build": {
     "appId": "ai.pazi.tristrflow",
@@ -33,7 +40,10 @@
       "package.json"
     ],
     "extraResources": [
-      { "from": "bin/mediactl", "to": "bin/mediactl" }
+      {
+        "from": "bin/mediactl",
+        "to": "bin/mediactl"
+      }
     ],
     "mac": {
       "category": "public.app-category.productivity",
@@ -56,5 +66,8 @@
       "owner": "zvone187",
       "repo": "Tristr-Flow"
     }
+  },
+  "dependencies": {
+    "posthog-node": "^5.52.1"
   }
 }

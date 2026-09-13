@@ -4,6 +4,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+// PostHog project tokens are intentionally public ingestion identifiers (the
+// same kind embedded in websites and desktop clients), not private API keys.
+// Keep the host overrideable so an EU project can use eu.i.posthog.com.
+const DEFAULT_POSTHOG_PROJECT_TOKEN = 'phc_wgzcLfm2CQrYydZJmRmPzHFSR6WykLhKAqrpF3GUdxCB';
+
 // Minimal .env parser (handles quotes; ignores comments / blank lines).
 function parseEnv(content) {
   const out = {};
@@ -40,7 +45,7 @@ function readEnvFile(p) {
 function readKeyFile(p) {
   try {
     const v = fs.readFileSync(p, 'utf8').trim();
-    return /^[\w.\-]{16,}$/.test(v) ? v : '';
+    return /^[\w.-]{16,}$/.test(v) ? v : '';
   } catch {
     return '';
   }
@@ -94,6 +99,11 @@ function loadConfig() {
     // Second trigger. Bare "W+D" is intentionally NOT used (it would misfire
     // constantly while typing/gaming); a modifier-anchored "D" combo is safe.
     hotkey2: merged.SPEAK_HOTKEY2 || 'Control+Alt+D',
+    posthogToken:
+      merged.POSTHOG_DISABLED === 'true'
+        ? ''
+        : (merged.POSTHOG_PROJECT_TOKEN || DEFAULT_POSTHOG_PROJECT_TOKEN),
+    posthogHost: merged.POSTHOG_HOST || 'https://us.i.posthog.com',
   };
 }
 
