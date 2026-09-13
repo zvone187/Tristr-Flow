@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tristr Flow Shortcut Recovery — Implementation Report</title>
+    <style>
+      :root { --canvas:#f6f2e8; --ink:#172026; --muted:#65727a; --border:#2c3338; --paper:#fff; --blue:#d9ecff; --green:#dff5df; --yellow:#fff1b8; --pink:#ffe2eb; --purple:#eadfff; --shadow:7px 7px 0 rgba(23,32,38,.18); font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+      * { box-sizing:border-box; } body { background:linear-gradient(90deg,rgba(47,58,66,.07) 1px,transparent 1px),linear-gradient(rgba(47,58,66,.07) 1px,transparent 1px),var(--canvas); background-size:28px 28px; color:var(--ink); line-height:1.45; margin:0; }
+      main { margin:0 auto; padding:30px 22px 52px; width:min(1240px,100%); } header { display:grid; gap:18px; grid-template-columns:1.4fr .8fr; margin-bottom:22px; }
+      h1,h2,h3,p { margin:0; } h1 { font-size:clamp(2rem,5vw,4.4rem); line-height:.96; } h2 { font-size:1.1rem; text-transform:uppercase; }
+      a { color:#0f5f85; font-weight:750; text-decoration:none; } code { background:rgba(255,255,255,.72); border:1px solid rgba(47,58,66,.24); border-radius:6px; padding:2px 5px; }
+      .hero,.card,details,.sticky { border:2px solid var(--border); box-shadow:var(--shadow); } .hero,.card,details { background:var(--paper); border-radius:16px; } .hero { padding:26px; } .hero p { color:var(--muted); margin-top:12px; max-width:760px; }
+      .meta-stack,.grid { display:grid; gap:14px; } .grid.two { grid-template-columns:repeat(2,minmax(0,1fr)); } .grid.three { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .card { padding:16px; } .card small { color:var(--muted); display:block; font-size:.78rem; font-weight:850; text-transform:uppercase; } .card strong { display:block; font-size:1.3rem; line-height:1.1; margin-top:4px; }
+      .tag,.pill { border:2px solid var(--border); border-radius:999px; display:inline-flex; font-size:.78rem; font-weight:900; padding:5px 9px; text-transform:uppercase; } .tag { background:var(--yellow); margin-bottom:12px; }
+      .board-section { margin-top:24px; } .section-title { align-items:center; display:flex; gap:10px; margin-bottom:12px; } .pin { background:#ff6b57; border:2px solid var(--border); border-radius:50%; height:16px; width:16px; }
+      .sticky { border-radius:3px; min-height:128px; padding:16px; transform:rotate(-.7deg); } .sticky:nth-child(even) { transform:rotate(.7deg); } .sticky h3 { font-size:1.1rem; margin-bottom:8px; } .sticky p,.sticky li { color:#334148; font-size:.94rem; } .sticky ul { margin:8px 0 0; padding-left:18px; }
+      .bg-blue{background:var(--blue)} .bg-green{background:var(--green)} .bg-yellow{background:var(--yellow)} .bg-pink{background:var(--pink)} .bg-purple{background:var(--purple)}
+      .evidence { border:2px solid var(--border); border-radius:10px; display:block; margin-top:10px; max-height:420px; max-width:100%; object-fit:contain; width:100%; }
+      summary { cursor:pointer; font-weight:850; list-style:none; padding:14px 16px; } summary:before { content:"+"; display:inline-block; font-weight:900; margin-right:10px; width:14px; } details[open] summary:before { content:"-"; } .detail-body { border-top:2px solid var(--border); color:#334148; padding:14px 16px 16px; } .detail-body ul { margin:8px 0 0; padding-left:18px; }
+      @media (max-width:900px) { header,.grid.two,.grid.three { grid-template-columns:1fr; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <section class="hero" aria-labelledby="title"><span class="tag">Post-Implementation</span><h1 id="title">Shortcut recovery is installed</h1><p>The tray fallback, health warnings, targeted selection capture, and privacy-safe PostHog integration are working. A physical shortcut press and the target project's Live Events view remain the two user-side confirmations.</p></section>
+        <aside class="meta-stack" aria-label="Report metadata">
+          <div class="card bg-yellow"><small>Status</small><strong>Installed · partial E2E</strong></div>
+          <div class="card bg-blue"><small>Branch</small><strong>codex/desktop-shortcut-posthog</strong></div>
+          <div class="card bg-green"><small>Date</small><strong>2026-09-13</strong></div>
+        </aside>
+      </header>
+
+      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Fast Answer</h2></div><div class="grid three">
+        <div class="sticky bg-pink"><h3>Root cause</h3><p>The app registered both global accelerators only once. A lost native registration left the tray/TTS healthy but provided no retry, durable warning, or fallback selection action.</p></div>
+        <div class="sticky bg-green"><h3>What changed</h3><p>Registrations self-repair, sleep/unlock and tray opens force-refresh them, duplicate instances are blocked, and Read selected text targets the app selected before the menu opened.</p></div>
+        <div class="sticky bg-purple"><h3>Analytics</h3><p>PostHog tracks operational outcomes using a random install ID. An explicit property allowlist excludes selected text, clipboard data, HTML, emails, and credentials.</p></div>
+      </div></section>
+
+      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Pass Criteria</h2></div><div class="grid three">
+        <div class="sticky bg-green"><h3>PASS · Shortcut health</h3><ul><li>Both accelerators register in the packaged app.</li><li>Periodic repair and forced refresh are tested.</li><li>One app instance owns the lifecycle.</li></ul></div>
+        <div class="sticky bg-green"><h3>PASS · Menu fallback</h3><ul><li>Healthy and warning states rendered.</li><li>Read selected text spoke the exact inactive TextEdit selection.</li><li>Clipboard action remains separate.</li></ul></div>
+        <div class="sticky bg-yellow"><h3>PARTIAL · PostHog proof</h3><ul><li>SDK initialization and flush succeeded.</li><li>Privacy allowlist tests pass.</li><li>Target Live Events UI was unavailable to the connected PostHog admin context.</li></ul></div>
+      </div></section>
+
+      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>End-To-End Evidence</h2></div><div class="grid two">
+        <div class="sticky bg-green"><h3>E2E-02 · Selected-text menu — PASS</h3><p>The installed app captured and read “Selected text menu verification.” from an inactive TextEdit document.</p><a href="qa-screenshots/read-selected-overlay.png"><img class="evidence" src="qa-screenshots/read-selected-overlay.png" alt="Tristr Flow overlay showing the exact selected-text test sentence" /></a></div>
+        <div class="sticky bg-green"><h3>E2E-03 · Healthy menu — PASS</h3><p>Both configured shortcuts show checks; the fallback remains prominent immediately below them.</p><a href="qa-screenshots/tray-menu-healthy.png"><img class="evidence" src="qa-screenshots/tray-menu-healthy.png" alt="Healthy Tristr Flow tray menu" /></a></div>
+        <div class="sticky bg-green"><h3>E2E-03 · Warning menu — PASS</h3><p>A controlled invalid primary accelerator highlights both the failed row and fallback action.</p><a href="qa-screenshots/tray-menu-warning.png"><img class="evidence" src="qa-screenshots/tray-menu-warning.png" alt="Warning-state Tristr Flow tray menu" /></a></div>
+        <div class="sticky bg-yellow"><h3>E2E-01 / E2E-04 — BLOCKED</h3><p>macOS automation-generated key events did not reach Electron's global shortcut callback; a physical press is required. The supplied token's project is not visible in the connected PostHog organization, so Live Events needs user confirmation.</p></div>
+      </div></section>
+
+      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Verification</h2></div><div class="grid two">
+        <div class="sticky bg-green"><h3>Automated</h3><ul><li>14 Node tests passed.</li><li>ESLint passed.</li><li>Husky pre-commit ran lint + tests.</li><li>Production dependency audit: 0 vulnerabilities.</li><li>JXA capture script compiled.</li></ul></div>
+        <div class="sticky bg-blue"><h3>Build + install</h3><ul><li><code>electron-builder --dir</code> passed.</li><li>Packaged PostHog SDK and source hashes verified.</li><li>Installed at <code>/Applications/Tristr Flow.app</code>.</li><li>Previous app preserved as a timestamped backup.</li></ul></div>
+      </div></section>
+
+      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Open The Cards</h2></div>
+        <details open><summary>Implementation details</summary><div class="detail-body"><ul><li><code>src/shortcut-manager.js</code> owns registration status, targeted repair, and forced refresh.</li><li><code>src/selection.js</code> can target the selection-owning process captured before the tray opens; the fallback reactivates that app before synthetic copy.</li><li><code>src/main.js</code> shows live health in the tray, routes both triggers through one read workflow, refreshes after resume/unlock, and prevents duplicate owners.</li><li><code>src/analytics.js</code> wraps <code>posthog-node</code>, batches events, disables person profiles/geolocation, and enforces an explicit property allowlist.</li></ul></div></details>
+        <details><summary>Git and delivery</summary><div class="detail-body"><ul><li>Base: <code>origin/main</code> at <code>3ef0db9</code>; latest remote changes fetched before worktree creation.</li><li>The installed Fish/overlay feature commit was replayed before implementation.</li><li>Reviewed implementation commit: <code>9d2aaab</code>.</li><li>No pull request was requested or created.</li><li>Worktree: <code>/Users/zvonimirsabljic/Development/Trister Flow Worktrees/codex/desktop-shortcut-posthog</code>.</li></ul></div></details>
+        <details><summary>Known caveat</summary><div class="detail-body"><p>The build host has no Developer ID certificate. Electron Builder therefore skipped signing. The new in-app warning/recovery path handles stale permissions, but a stable signed identity is still required to eliminate macOS Accessibility re-grants across replaced builds.</p></div></details>
+        <details><summary>Artifacts</summary><div class="detail-body"><ul><li><a href="pre-implementation-report.html">Pre-implementation report</a></li><li><a href="qa-e2e-tests.json">QA test plan and results</a></li><li><a href="qa-screenshots/tray-menu-healthy.png">Healthy tray screenshot</a></li><li><a href="qa-screenshots/tray-menu-warning.png">Warning tray screenshot</a></li><li><a href="qa-screenshots/read-selected-overlay.png">Selected-text overlay screenshot</a></li></ul></div></details>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "status": "pending",
+  "status": "partial",
   "tests": [
     {
       "id": "E2E-01",
@@ -28,7 +28,16 @@
         "Shortcut registration/capture log lines",
         "Before/after clipboard comparison"
       ],
-      "status": "pending"
+      "actual_results": [
+        "The packaged app logged successful registration for both configured accelerators.",
+        "Computer-use and AppleScript-generated key events did not reach Electron's macOS globalShortcut callback, so a physical-key end-to-end invocation could not be completed by automation.",
+        "Targeted selection capture separately returned the exact 32-character TextEdit selection through the cmd-c fallback."
+      ],
+      "evidence": [
+        "Packaged main-process registration output",
+        "Automated test: force-refreshes stale native registrations after a system transition"
+      ],
+      "status": "blocked"
     },
     {
       "id": "E2E-02",
@@ -53,7 +62,15 @@
         "Tray menu screenshot",
         "Overlay screenshot with the selected sentence"
       ],
-      "status": "pending"
+      "actual_results": [
+        "The installed app's tray menu displayed Read selected text directly below the two shortcut health rows.",
+        "Clicking the item read the exact inactive TextEdit selection and opened the completed speech overlay."
+      ],
+      "evidence": [
+        "implementation assets/qa-screenshots/tray-menu-healthy.png",
+        "implementation assets/qa-screenshots/read-selected-overlay.png"
+      ],
+      "status": "passed"
     },
     {
       "id": "E2E-03",
@@ -79,7 +96,17 @@
         "Warning-state and healthy-state tray screenshots",
         "Registration recovery log lines"
       ],
-      "status": "pending"
+      "actual_results": [
+        "A controlled invalid primary accelerator produced warning icons on the shortcut row and Read selected text item.",
+        "A normal launch produced check marks for both accelerators and a non-warning fallback action.",
+        "Unit tests verified periodic repair and forced refresh behavior."
+      ],
+      "evidence": [
+        "implementation assets/qa-screenshots/tray-menu-warning.png",
+        "implementation assets/qa-screenshots/tray-menu-healthy.png",
+        "Automated tests: repairs a shortcut; force-refreshes stale registrations"
+      ],
+      "status": "passed"
     },
     {
       "id": "E2E-04",
@@ -104,7 +131,16 @@
         "PostHog Live Events screenshot or query result",
         "Event-property privacy inspection"
       ],
-      "status": "pending"
+      "actual_results": [
+        "A local integration_test event flushed successfully through posthog-node to the US ingestion host.",
+        "Automated privacy tests proved that non-allowlisted content, clipboard, HTML, email, and token properties are removed.",
+        "The connected PostHog administration project does not list the supplied token's project, so Live Events could not be queried for final server-side visual confirmation."
+      ],
+      "evidence": [
+        "Successful posthog-node shutdown/flush output",
+        "Automated test: drops content and identity-like properties before capture"
+      ],
+      "status": "blocked"
     }
   ]
 }
