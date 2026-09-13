@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "status": "pending",
+  "status": "partial",
   "tests": [
     {
       "id": "E2E-AN-01",
@@ -24,7 +24,17 @@
         "PostHog Live Events or query screenshot",
         "Successful SDK flush evidence"
       ],
-      "status": "pending"
+      "actual_results": [
+        "The final allowlisted SDK event was accepted locally and shutdown completed its batch flush against the configured US ingestion host.",
+        "The installed packaged app launched successfully and emitted its normal startup events.",
+        "The connected PostHog organization and browser project picker expose the same five projects, none of which owns the supplied project token, so the target Live Events table could not be queried."
+      ],
+      "evidence": [
+        "Final posthog-node capture plus shutdown command passed",
+        "Installed app asar hash matched the final packaged build",
+        "Connected PostHog organization/project inventory"
+      ],
+      "status": "blocked"
     },
     {
       "id": "E2E-AN-02",
@@ -50,7 +60,19 @@
         "Tray, preferences, and reading overlay screenshots",
         "Captured fake-client event sequence from automated integration tests"
       ],
-      "status": "pending"
+      "actual_results": [
+        "The final packaged app launched from /Applications and its localhost bridge returned a healthy ping.",
+        "Static contract coverage confirmed every literal event emitted by desktop and extension code is present in the event catalog.",
+        "The tray-only app does not expose a window to the available computer-use driver, so the full interactive settings/playback sequence could not be replayed automatically in this pass.",
+        "The inherited tray and selection-overlay screenshots confirm the unchanged user-facing surfaces from the immediately preceding build."
+      ],
+      "evidence": [
+        "implementation assets/qa-screenshots/tray-menu-healthy.png",
+        "implementation assets/qa-screenshots/read-selected-overlay.png",
+        "Passing event-catalog coverage test",
+        "Healthy localhost /ping response from installed app"
+      ],
+      "status": "blocked"
     },
     {
       "id": "E2E-AN-03",
@@ -74,7 +96,17 @@
         "Passing analytics contract test output",
         "Event taxonomy documentation"
       ],
-      "status": "pending"
+      "actual_results": [
+        "Unknown event names never reached the injected PostHog client.",
+        "Selected text, clipboard content, HTML, email, service tokens, arbitrary properties, secret-like error names, and out-of-range numeric data were rejected.",
+        "All emitted payloads retained person-profile and GeoIP disabling flags."
+      ],
+      "evidence": [
+        "test/analytics.test.js",
+        "docs/analytics.md",
+        "20-test passing suite"
+      ],
+      "status": "passed"
     },
     {
       "id": "E2E-AN-04",
@@ -97,7 +129,16 @@
       "proof_to_capture": [
         "Passing localhost bridge telemetry test output"
       ],
-      "status": "pending"
+      "actual_results": [
+        "An ephemeral localhost bridge completed an authenticated stubbed read and reported request plus completion events.",
+        "The missing-provider path reported request plus failure events.",
+        "No origin, URL, selected text, or voice identifier appeared in any recorded properties."
+      ],
+      "evidence": [
+        "test/localserver-analytics.test.js",
+        "Passing tracks extension reads without page or selected-text data test"
+      ],
+      "status": "passed"
     }
   ]
 }
