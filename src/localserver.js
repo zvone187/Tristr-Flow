@@ -33,7 +33,13 @@ function segmentText(text) {
   return segs;
 }
 
-function start({ getConfig, getState }) {
+function start({
+  getConfig,
+  getState,
+  captureAnalytics = () => {},
+  synthesize = synthesizeStream,
+  port = PORT,
+}) {
   const server = http.createServer((req, res) => {
     const origin = req.headers.origin || '';
     res.setHeader('Access-Control-Allow-Origin', origin || '*');
@@ -54,13 +60,43 @@ function start({ getConfig, getState }) {
     req.on('data', (d) => { body += d; if (body.length > 5_000_000) req.destroy(); });
     req.on('end', async () => {
       let parsed;
-      try { parsed = JSON.parse(body); } catch { res.writeHead(400); res.end(); return; }
+      try { parsed = JSON.parse(body); } catch {
+        captureAnalytics('extension_read_failed', {
+          surface: 'extension',
+          reason: 'invalid-request',
+        });
+        res.writeHead(400);
+        res.end();
+        return;
+      }
       const text = (parsed.text || '').trim();
-      if (!text) { res.writeHead(400); res.end(); return; }
+      if (!text) {
+        captureAnalytics('extension_read_failed', {
+          surface: 'extension',
+          reason: 'invalid-request',
+        });
+        res.writeHead(400);
+        res.end();
+        return;
+      }
 
       const config = getConfig();
       const state = getState();
+      const segments = segmentText(text);
+      const startedAt = Date.now();
+      captureAnalytics('extension_read_requested', {
+        surface: 'extension',
+        provider: config.apiKey ? 'elevenlabs' : 'none',
+        character_count: text.length,
+        segment_count: segments.length,
+      });
       if (!config.apiKey) {
+        captureAnalytics('extension_read_failed', {
+          surface: 'extension',
+          provider: 'none',
+          reason: 'missing-provider',
+          duration_ms: Date.now() - startedAt,
+        });
         res.writeHead(200, { 'Content-Type': 'application/x-ndjson' });
         res.write(JSON.stringify({ type: 'error', message: 'No ElevenLabs API key in the app.' }) + '\n');
         res.end();
@@ -68,12 +104,11 @@ function start({ getConfig, getState }) {
       }
 
       res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache' });
-      const segments = segmentText(text);
       try {
         for (let i = 0; i < segments.length; i++) {
           res.write(JSON.stringify({ type: 'segment', index: i }) + '\n');
           await new Promise((resolve, reject) => {
-            synthesizeStream({
+            synthesize({
               apiKey: config.apiKey,
               voiceId: state.voiceId,
               modelId: config.modelId,
@@ -88,7 +123,21 @@ function start({ getConfig, getState }) {
           });
         }
         res.write(JSON.stringify({ type: 'done' }) + '\n');
+        captureAnalytics('extension_read_completed', {
+          surface: 'extension',
+          provider: 'elevenlabs',
+          character_count: text.length,
+          segment_count: segments.length,
+          duration_ms: Date.now() - startedAt,
+        });
       } catch (e) {
+        captureAnalytics('extension_read_failed', {
+          surface: 'extension',
+          provider: 'elevenlabs',
+          reason: 'network-error',
+          duration_ms: Date.now() - startedAt,
+          error_name: e && e.name ? e.name : 'Error',
+        });
         res.write(JSON.stringify({ type: 'error', message: String(e.message || e) }) + '\n');
       }
       res.end();
@@ -96,7 +145,10 @@ function start({ getConfig, getState }) {
   });
 
   server.on('error', (e) => console.error('[localserver]', e.message));
-  server.listen(PORT, '127.0.0.1', () => console.log('[localserver] listening on 127.0.0.1:' + PORT));
+  server.listen(port, '127.0.0.1', () => {
+    const address = server.address();
+    console.log('[localserver] listening on 127.0.0.1:' + (address && address.port));
+  });
   return server;
 }
 

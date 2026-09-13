@@ -68,12 +68,22 @@ async function goStep2() {
   step1.hidden = true;
   step2.hidden = false;
   dots.forEach((d) => d.classList.toggle('active', d.dataset.step === '2'));
+  window.onb.track('onboarding_step_viewed', { surface: 'onboarding', step: 2 });
 }
 
-async function doAuth(fn) {
+async function doAuth(fn, action) {
   const email = (emailEl.value || '').trim();
   const pass = passEl.value || '';
-  if (!email || !pass) { acctMsg('Enter your email and a password.', true); return; }
+  if (!email || !pass) {
+    window.onb.track('account_action_completed', {
+      surface: 'onboarding',
+      action,
+      outcome: 'rejected',
+      reason: 'invalid-request',
+    });
+    acctMsg('Enter your email and a password.', true);
+    return;
+  }
   acctMsg('Working…');
   btnSignup.disabled = btnLogin.disabled = true;
   const r = await fn(email, pass);
@@ -82,16 +92,25 @@ async function doAuth(fn) {
   else { acctMsg((r && r.error) || 'Something went wrong.', true); }
 }
 
-btnSignup.addEventListener('click', () => doAuth(window.onb.signup));
-btnLogin.addEventListener('click', () => doAuth(window.onb.login));
+btnSignup.addEventListener('click', () => doAuth(window.onb.signup, 'signup'));
+btnLogin.addEventListener('click', () => doAuth(window.onb.login, 'login'));
 btnOwnKey.addEventListener('click', async () => {
   const key = (ownKeyEl.value || '').trim();
-  if (!key) { acctMsg('Paste your ElevenLabs key (starts with sk_).', true); return; }
+  if (!key) {
+    window.onb.track('account_action_completed', {
+      surface: 'onboarding',
+      action: 'set_elevenlabs_key',
+      outcome: 'rejected',
+      reason: 'invalid-request',
+    });
+    acctMsg('Paste your ElevenLabs key (starts with sk_).', true);
+    return;
+  }
   const r = await window.onb.setOwnKey(key);
   if (r && r.ok && r.hasOwnKey) { acctMsg(''); await goStep2(); }
   else { acctMsg('That key didn’t take — check it and try again.', true); }
 });
-passEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doAuth(window.onb.signup); } });
+passEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doAuth(window.onb.signup, 'signup'); } });
 
 // ---- step 2: voice + shortcut + finish -----------------------------------
 async function loadStep2Data() {
@@ -159,4 +178,5 @@ btnDone.addEventListener('click', async () => {
   window.onb.finish();
 });
 
+window.onb.track('onboarding_step_viewed', { surface: 'onboarding', step: 1 });
 loadStep2Data();

@@ -58,6 +58,8 @@ let analytics = null;
 let analyticsShutdownStarted = false;
 let analyticsShutdownComplete = false;
 let lastExternalAppPid = 0;
+let currentReading = null;
+let appQuitCaptured = false;
 
 function maybePauseMusic() {
   if (state.pauseMusic && !musicPausePromise) musicPausePromise = mediaCtl.pauseMusic();
@@ -122,6 +124,11 @@ function shortcutAnalyticsProperties(status, extra = {}) {
 
 function captureAnalytics(event, properties) {
   if (analytics) analytics.capture(event, properties);
+}
+
+function providerForVoice(voiceId = state && state.voiceId) {
+  if (isFishVoice(voiceId)) return 'fish';
+  return useService() ? 'service' : 'elevenlabs';
 }
 
 function repairHotkeys(source = 'periodic') {
@@ -216,6 +223,10 @@ const LOGIN_NUDGE_LAUNCHES = [1, 3, 8];
 function maybePromptOpenAtLogin() {
   if (getOpenAtLogin()) return;                              // already on — never nag
   if (!LOGIN_NUDGE_LAUNCHES.includes(state.launchCount)) return;
+  captureAnalytics('open_at_login_prompt_shown', {
+    source: 'launch-nudge',
+    launch_count: state.launchCount,
+  });
   if (app.focus) app.focus({ steal: true });                // bring the prompt forward
   dialog
     .showMessageBox({
@@ -226,7 +237,14 @@ function maybePromptOpenAtLogin() {
       message: 'Open Tristr Flow when you log in?',
       detail: 'It stays in the menu bar, ready the moment you select text and press your shortcut.',
     })
-    .then((r) => { if (r.response === 0) setOpenAtLogin(true); })
+    .then((r) => {
+      const enabled = r.response === 0;
+      if (enabled) setOpenAtLogin(true);
+      captureAnalytics('open_at_login_prompt_responded', {
+        source: 'launch-nudge',
+        enabled,
+      });
+    })
     .catch(() => {});
 }
 
@@ -414,6 +432,7 @@ function applyResizeTick() {
 function stopOverlayResize() {
   if (resizeTimer) { clearInterval(resizeTimer); resizeTimer = null; }
   if (!resizeDrag) return;
+  const completedDrag = resizeDrag;
   resizeDrag = null;
   // 'resized' does not fire for our programmatic setBounds, so persist here.
   if (overlayWin && !overlayWin.isDestroyed()) {
@@ -421,6 +440,12 @@ function stopOverlayResize() {
     state.overlayBounds = overlayWin.getBounds();
     persist();
   }
+  captureAnalytics('overlay_interaction', {
+    surface: 'overlay',
+    interaction: 'resize',
+    edge: completedDrag.edge,
+    duration_ms: Date.now() - completedDrag.startedAt,
+  });
 }
 
 const RESIZE_EDGES = new Set(['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']);
@@ -455,13 +480,21 @@ function toggleOverlayPanel() {
   if (overlayActive && overlayWin && !overlayWin.isDestroyed()) {
     if (overlayWin.isVisible()) {
       overlayWin.hide();
+      captureAnalytics('overlay_interaction', {
+        surface: 'tray',
+        interaction: 'hide',
+      });
     } else {
       positionOverlayForTray();
       overlayWin.show();
+      captureAnalytics('overlay_interaction', {
+        surface: 'tray',
+        interaction: 'show',
+      });
     }
     return;
   }
-  if (tray && trayMenu) tray.popUpContextMenu(trayMenu);
+  showTrayMenu();
 }
 
 function setTrayState(s) {
@@ -477,7 +510,16 @@ function setTrayState(s) {
 
 // Hard stop: silence audio, cancel any in-flight synthesis, hide the overlay.
 // Routed through by every close path so "talking" can never outlive the window.
-function stopEverything() {
+function stopEverything(source = 'system') {
+  if (currentReading) {
+    captureAnalytics('reading_stopped', {
+      trigger: currentReading.trigger,
+      provider: currentReading.provider,
+      source,
+      duration_ms: Date.now() - currentReading.startedAt,
+    });
+    currentReading = null;
+  }
   overlayActive = false; // reading ended; menu-bar toggle no longer shows the panel
   stopOverlayResize(); // closing mid-drag must not keep resizing a hidden window
   speakGen++; // invalidate any synthesis promise that hasn't resolved yet
@@ -497,7 +539,8 @@ function stopEverything() {
 
 // ---- settings window -----------------------------------------------------
 
-function openSettings() {
+function openSettings(source = 'system') {
+  captureAnalytics('window_opened', { surface: 'preferences', source });
   if (settingsWin && !settingsWin.isDestroyed()) {
     settingsWin.show();
     settingsWin.focus();
@@ -520,6 +563,7 @@ function openSettings() {
   });
   settingsWin.loadFile(path.join(__dirname, 'settings.html'));
   settingsWin.on('closed', () => {
+    captureAnalytics('window_closed', { surface: 'preferences' });
     settingsWin = null;
   });
   if (app.focus) app.focus({ steal: true });
@@ -528,7 +572,8 @@ function openSettings() {
 }
 
 // First-run welcome / setup. Also reachable from the tray ("Setup…").
-function openOnboarding() {
+function openOnboarding(source = 'system') {
+  captureAnalytics('window_opened', { surface: 'onboarding', source });
   if (onboardingWin && !onboardingWin.isDestroyed()) {
     onboardingWin.show();
     onboardingWin.focus();
@@ -550,7 +595,10 @@ function openOnboarding() {
     },
   });
   onboardingWin.loadFile(path.join(__dirname, 'onboarding.html'));
-  onboardingWin.on('closed', () => { onboardingWin = null; });
+  onboardingWin.on('closed', () => {
+    captureAnalytics('window_closed', { surface: 'onboarding' });
+    onboardingWin = null;
+  });
   if (app.focus) app.focus({ steal: true });
   onboardingWin.show();
   onboardingWin.focus();
@@ -676,7 +724,24 @@ async function speakText(rawText, html, { trigger = 'unknown' } = {}) {
     return;
   }
 
+  if (currentReading) {
+    captureAnalytics('reading_stopped', {
+      trigger: currentReading.trigger,
+      provider: currentReading.provider,
+      source: 'system',
+      duration_ms: Date.now() - currentReading.startedAt,
+    });
+  }
   const myGen = ++speakGen; // claim this request; a later stop/request invalidates it
+  const provider = providerForVoice();
+  const startedAt = Date.now();
+  currentReading = {
+    gen: myGen,
+    trigger,
+    provider,
+    startedAt,
+    playbackStarted: false,
+  };
 
   if (!overlayWin) createOverlay();
   overlayActive = true; // a reading session is live (menu-bar toggle now meaningful)
@@ -703,11 +768,16 @@ async function speakText(rawText, html, { trigger = 'unknown' } = {}) {
     if (myGen !== speakGen) return;
     if (rr && rr.ok && rr.text && rr.text.trim()) ttsText = rr.text;
   }
-  if (!ttsText.trim()) { setTrayState('idle'); resumeMusicIfNeeded(); return; }
+  if (!ttsText.trim()) {
+    currentReading = null;
+    setTrayState('idle');
+    resumeMusicIfNeeded();
+    return;
+  }
 
   captureAnalytics('reading_started', {
     trigger,
-    provider: isFishVoice(state.voiceId) ? 'fish' : (useService() ? 'service' : 'elevenlabs'),
+    provider,
     character_count: ttsText.length,
     has_formatting: hasHtml,
   });
@@ -727,21 +797,26 @@ async function speakText(rawText, html, { trigger = 'unknown' } = {}) {
     if (myGen === speakGen) {
       captureAnalytics('reading_synthesis_completed', {
         trigger,
+        provider,
         segment_count: segments.length,
         character_count: ttsText.length,
+        duration_ms: Date.now() - startedAt,
       });
     }
   } catch (err) {
     console.error('[speak] stream failed:', err);
     captureAnalytics('reading_failed', {
       trigger,
+      provider,
       error_name: err && err.name ? err.name : 'Error',
+      duration_ms: Date.now() - startedAt,
     });
     if (myGen === speakGen && overlayWin && !overlayWin.isDestroyed()) {
       overlayWin.webContents.send('overlay:error', { message: String(err.message || err) });
       setTrayState('idle');
     }
     resumeMusicIfNeeded();
+    if (currentReading && currentReading.gen === myGen) currentReading = null;
   }
 }
 
@@ -750,7 +825,6 @@ async function onHotkey(trigger = 'shortcut', { targetPid = 0 } = {}) {
   captureAnalytics('read_requested', { trigger });
   // Second press while the overlay is up = stop & dismiss.
   if (overlayWin && overlayWin.isVisible()) {
-    captureAnalytics('reading_stopped', { trigger });
     stopEverything();
     return;
   }
@@ -839,20 +913,35 @@ async function speakFromClipboard() {
   await speakText(text, null, { trigger: 'clipboard_menu' });
 }
 
-function setVoice(voiceId, voiceName) {
+function setVoice(voiceId, voiceName, source = 'preferences') {
   state.voiceId = voiceId;
   state.voiceName = voiceName;
   persist();
   updateTrayMenu();
+  captureAnalytics('setting_changed', {
+    surface: source,
+    setting_name: 'voice',
+    provider: providerForVoice(voiceId),
+  });
 }
 
-function setSpeedValue(val) {
+function setSpeedValue(val, source = 'preferences') {
   state.speed = clampSpeed(val);
   persist();
   updateTrayMenu();
   if (overlayWin && !overlayWin.isDestroyed()) {
     overlayWin.webContents.send('overlay:speed', { speed: state.speed });
   }
+  captureAnalytics('setting_changed', {
+    surface: source,
+    setting_name: 'speed',
+    speed: state.speed,
+  });
+}
+
+function openUpdateDownload(url, source) {
+  captureAnalytics('update_download_opened', { source });
+  return shell.openExternal(url);
 }
 
 // ---- tray ----------------------------------------------------------------
@@ -874,16 +963,32 @@ async function checkUpdates({ manual = false } = {}) {
             body: 'Click to download the update.',
             silent: false,
           });
-          n.on('click', () => shell.openExternal(res.url));
+          n.on('click', () => openUpdateDownload(res.url, 'system'));
           n.show();
         } catch { /* ignore */ }
       }
+      captureAnalytics('update_check_completed', {
+        manual,
+        outcome: 'success',
+        available: true,
+      });
     } else {
       pendingUpdate = null;
       updateTrayMenu();
       if (manual) notify('You’re up to date', `Tristr Flow ${app.getVersion()} is the latest version.`);
+      captureAnalytics('update_check_completed', {
+        manual,
+        outcome: 'success',
+        available: false,
+      });
     }
   } catch (e) {
+    captureAnalytics('update_check_completed', {
+      manual,
+      outcome: 'failed',
+      reason: 'network-error',
+      error_name: e && e.name ? e.name : 'Error',
+    });
     if (manual) notify('Update check failed', String(e.message || e));
   }
 }
@@ -907,7 +1012,7 @@ function updateTrayMenu() {
     label: v.name,
     type: 'radio',
     checked: v.voice_id === state.voiceId,
-    click: () => setVoice(v.voice_id, v.name),
+    click: () => setVoice(v.voice_id, v.name, 'tray'),
   }));
 
   const speedOptions = [
@@ -921,7 +1026,7 @@ function updateTrayMenu() {
     label,
     type: 'radio',
     checked: Math.abs(state.speed - val) < 0.001,
-    click: () => setSpeedValue(val),
+    click: () => setSpeedValue(val, 'tray'),
   }));
 
   const stabilityOptions = [
@@ -936,13 +1041,18 @@ function updateTrayMenu() {
     click: () => {
       state.stability = val;
       persist();
+      captureAnalytics('setting_changed', {
+        surface: 'tray',
+        setting_name: 'stability',
+        stability: state.stability,
+      });
     },
   }));
 
   const template = [];
   if (pendingUpdate) {
     template.push(
-      { label: `⬆︎  Update available — get ${pendingUpdate.version}…`, click: () => shell.openExternal(pendingUpdate.url) },
+      { label: `⬆︎  Update available — get ${pendingUpdate.version}…`, click: () => openUpdateDownload(pendingUpdate.url, 'tray') },
       { type: 'separator' }
     );
   }
@@ -968,15 +1078,23 @@ function updateTrayMenu() {
     },
     { label: 'Read clipboard text aloud', click: speakFromClipboard },
     { type: 'separator' },
-    { label: 'Preferences — Voice, Shortcuts…', click: openSettings, accelerator: 'Command+,' },
-    { label: 'Setup — Account…', click: openOnboarding },
+    { label: 'Preferences — Voice, Shortcuts…', click: () => openSettings('tray'), accelerator: 'Command+,' },
+    { label: 'Setup — Account…', click: () => openOnboarding('tray') },
     { label: `Voice:  ${state.voiceName}`, submenu: voiceItems },
     { label: 'Stability', submenu: stabilityItems },
     {
       label: 'Pause music while reading',
       type: 'checkbox',
       checked: !!state.pauseMusic,
-      click: () => { state.pauseMusic = !state.pauseMusic; persist(); },
+      click: () => {
+        state.pauseMusic = !state.pauseMusic;
+        persist();
+        captureAnalytics('setting_changed', {
+          surface: 'tray',
+          setting_name: 'pause_music',
+          enabled: state.pauseMusic,
+        });
+      },
     },
     { label: 'Speed', submenu: speedItems }
   );
@@ -986,6 +1104,7 @@ function updateTrayMenu() {
       label: ok ? '✓ Accessibility granted' : '⚠️  Grant Accessibility…',
       click: () => {
         if (!ok) {
+          captureAnalytics('accessibility_prompt_opened', { surface: 'tray' });
           systemPreferences.isTrustedAccessibilityClient(true);
           shell.openExternal(
             'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'
@@ -1020,6 +1139,11 @@ function showTrayMenu() {
   // unhealthy, so force a native re-registration even if Electron's cached
   // isRegistered() result still says they are present.
   refreshHotkeys('tray-open');
+  captureAnalytics('tray_menu_opened', {
+    surface: 'tray',
+    accessibility_granted: hasAccessibility(),
+    ...shortcutAnalyticsProperties(shortcutStatus),
+  });
   updateTrayMenu();
   if (tray && trayMenu) tray.popUpContextMenu(trayMenu);
 }
@@ -1072,9 +1196,15 @@ ipcMain.handle('settings:get', () => ({
   openAtLogin: getOpenAtLogin(),
 }));
 
-ipcMain.on('settings:setOverlayMode', (_e, { mode }) => {
+ipcMain.on('settings:setOverlayMode', (_e, { mode, source = 'preferences' }) => {
   state.overlayMode = mode === 'menubar' ? 'menubar' : 'floating';
   persist();
+  captureAnalytics('setting_changed', {
+    surface: source,
+    setting_name: 'overlay_mode',
+    setting_value: state.overlayMode,
+    overlay_mode: state.overlayMode,
+  });
   // re-place an open overlay to match the new mode
   if (overlayWin && !overlayWin.isDestroyed() && overlayWin.isVisible()) positionOverlayForMode();
 });
@@ -1087,7 +1217,15 @@ function setOpenAtLogin(value) {
   try { app.setLoginItemSettings({ openAtLogin: !!value }); } catch { /* ignore */ }
   return getOpenAtLogin();
 }
-ipcMain.handle('settings:setOpenAtLogin', (_e, { value }) => ({ openAtLogin: setOpenAtLogin(value) }));
+ipcMain.handle('settings:setOpenAtLogin', (_e, { value, source = 'preferences' }) => {
+  const openAtLogin = setOpenAtLogin(value);
+  captureAnalytics('setting_changed', {
+    surface: source,
+    setting_name: 'open_at_login',
+    enabled: openAtLogin,
+  });
+  return { openAtLogin };
+});
 
 // ---- IPC: account / service mode ----------------------------------------
 
@@ -1127,11 +1265,12 @@ ipcMain.handle('account:get', async () => {
 
 // Opens the hosted account/billing page in the browser (upgrade / manage Pro).
 ipcMain.handle('account:openBilling', () => {
+  captureAnalytics('billing_opened', { surface: 'preferences', account_mode: accountMode() });
   shell.openExternal(`${config.serviceBaseUrl || 'https://tristr-flow.onrender.com'}/account`);
   return { ok: true };
 });
 
-ipcMain.handle('account:login', async (_e, { email, password }) => {
+ipcMain.handle('account:login', async (_e, { email, password, source = 'preferences' }) => {
   try {
     const r = await svc.login({ baseUrl: config.serviceBaseUrl, email, password });
     state.serviceToken = r.apiToken;
@@ -1139,13 +1278,25 @@ ipcMain.handle('account:login', async (_e, { email, password }) => {
     state.onboarded = true;
     persist();
     updateTrayMenu();
+    captureAnalytics('account_action_completed', {
+      action: 'login',
+      outcome: 'success',
+      account_mode: accountMode(),
+      surface: source,
+    });
     return { ok: true, email: r.email, creditsMicros: r.creditsMicros };
   } catch (e) {
+    captureAnalytics('account_action_completed', {
+      action: 'login',
+      outcome: 'failed',
+      surface: source,
+      error_name: e && e.name ? e.name : 'Error',
+    });
     return { ok: false, error: String(e.message || e) };
   }
 });
 
-ipcMain.handle('account:signup', async (_e, { email, password }) => {
+ipcMain.handle('account:signup', async (_e, { email, password, source = 'preferences' }) => {
   try {
     const r = await svc.signup({ baseUrl: config.serviceBaseUrl, email, password });
     state.serviceToken = r.apiToken;
@@ -1153,8 +1304,20 @@ ipcMain.handle('account:signup', async (_e, { email, password }) => {
     state.onboarded = true;
     persist();
     updateTrayMenu();
+    captureAnalytics('account_action_completed', {
+      action: 'signup',
+      outcome: 'success',
+      account_mode: accountMode(),
+      surface: source,
+    });
     return { ok: true, email: r.email, creditsMicros: r.creditsMicros };
   } catch (e) {
+    captureAnalytics('account_action_completed', {
+      action: 'signup',
+      outcome: 'failed',
+      surface: source,
+      error_name: e && e.name ? e.name : 'Error',
+    });
     return { ok: false, error: String(e.message || e) };
   }
 });
@@ -1164,6 +1327,12 @@ ipcMain.handle('account:logout', () => {
   state.serviceEmail = '';
   persist();
   updateTrayMenu();
+  captureAnalytics('account_action_completed', {
+    action: 'logout',
+    outcome: 'success',
+    account_mode: accountMode(),
+    surface: 'preferences',
+  });
   return { ok: true };
 });
 
@@ -1175,6 +1344,10 @@ ipcMain.on('onboarding:finish', () => {
   state.onboarded = true;
   persist();
   updateTrayMenu();
+  captureAnalytics('onboarding_completed', {
+    surface: 'onboarding',
+    account_mode: accountMode(),
+  });
   if (onboardingWin && !onboardingWin.isDestroyed()) onboardingWin.close();
 });
 
@@ -1183,48 +1356,77 @@ ipcMain.on('onboarding:finish', () => {
 // Fish Audio key. Kept separate from the ElevenLabs own-key: a user can have
 // one, both, or neither, and this is the only way an installed build can get a
 // Fish key at all (the dev-machine file paths in config.js never exist there).
-ipcMain.handle('account:setFishKey', (_e, { key }) => {
+ipcMain.handle('account:setFishKey', (_e, { key, source = 'preferences' }) => {
   state.fishKey = String(key || '').trim();
   if (state.fishKey) state.onboarded = true;
   persist();
   updateTrayMenu();
+  captureAnalytics('account_action_completed', {
+    action: 'set_fish_key',
+    outcome: 'success',
+    account_mode: accountMode(),
+    surface: source,
+    setting_value: state.fishKey ? 'configured' : 'cleared',
+  });
   // voices.js keys its Fish cache on the key value, so the next listVoices()
   // refetches on its own.
   return { ok: true, present: !!effectiveFishKey() };
 });
 
-ipcMain.handle('account:setOwnKey', (_e, { key }) => {
+ipcMain.handle('account:setOwnKey', (_e, { key, source = 'preferences' }) => {
   state.ownKey = (key || '').trim();
   state.onboarded = true;
   persist();
   updateTrayMenu();
+  captureAnalytics('account_action_completed', {
+    action: 'set_elevenlabs_key',
+    outcome: 'success',
+    account_mode: accountMode(),
+    surface: source,
+    setting_value: state.ownKey ? 'configured' : 'cleared',
+  });
   return { ok: true, hasOwnKey: !!effectiveKey(), mode: accountMode() };
 });
 
-ipcMain.on('settings:setTheme', (_e, { theme }) => {
+ipcMain.on('settings:setTheme', (_e, { theme, source = 'preferences' }) => {
   state.theme = cleanTheme(theme);
   persist();
   nativeTheme.themeSource = state.theme; // live-updates overlay + settings prefers-color-scheme
+  captureAnalytics('setting_changed', {
+    surface: source,
+    setting_name: 'theme',
+    setting_value: state.theme,
+  });
 });
 
-ipcMain.on('settings:setFontSize', (_e, { fontSize }) => {
+ipcMain.on('settings:setFontSize', (_e, { fontSize, source = 'preferences' }) => {
   state.fontSize = clampFont(fontSize);
   persist();
   // live-apply to an open overlay
   if (overlayWin && !overlayWin.isDestroyed()) {
     overlayWin.webContents.send('overlay:fontSize', { fontSize: state.fontSize });
   }
+  captureAnalytics('setting_changed', {
+    surface: source,
+    setting_name: 'font_size',
+    font_size: state.fontSize,
+  });
 });
 
-ipcMain.on('settings:setPauseMusic', (_e, { value }) => {
+ipcMain.on('settings:setPauseMusic', (_e, { value, source = 'preferences' }) => {
   state.pauseMusic = !!value;
   persist();
   updateTrayMenu();
+  captureAnalytics('setting_changed', {
+    surface: source,
+    setting_name: 'pause_music',
+    enabled: state.pauseMusic,
+  });
 });
 
 // Set/clear a global trigger (which = 1 primary, 2 secondary). Validates by
 // actually registering; reverts and reports on conflict/invalid combo.
-ipcMain.handle('settings:setHotkey', (_e, { which, accel }) => {
+ipcMain.handle('settings:setHotkey', (_e, { which, accel, source = 'preferences' }) => {
   const oldH1 = state.hotkey;
   const oldH2 = state.hotkey2;
   if (which === 2) state.hotkey2 = accel || '';
@@ -1236,16 +1438,53 @@ ipcMain.handle('settings:setHotkey', (_e, { which, accel }) => {
     state.hotkey = oldH1;
     state.hotkey2 = oldH2;
     registerHotkeys();
+    captureAnalytics('setting_changed', {
+      surface: source,
+      setting_name: which === 2 ? 'hotkey_secondary' : 'hotkey_primary',
+      shortcut_slot: which === 2 ? 2 : 1,
+      outcome: 'failed',
+    });
     return { ok: false, hotkey: state.hotkey, hotkey2: state.hotkey2 || '', error: `“${hotkeyLabel(accel)}” is unavailable (in use or invalid).` };
   }
   persist();
   updateTrayMenu();
+  captureAnalytics('setting_changed', {
+    surface: source,
+    setting_name: which === 2 ? 'hotkey_secondary' : 'hotkey_primary',
+    shortcut_slot: which === 2 ? 2 : 1,
+    setting_value: accel ? 'configured' : 'cleared',
+    outcome: 'success',
+  });
   return { ok: true, hotkey: state.hotkey, hotkey2: state.hotkey2 || '' };
 });
 
-ipcMain.handle('settings:listVoices', () => listVoices(config.apiKey, effectiveFishKey()));
+ipcMain.handle('settings:listVoices', async (_e, { source = 'preferences' } = {}) => {
+  const startedAt = Date.now();
+  try {
+    const voices = await listVoices(config.apiKey, effectiveFishKey());
+    captureAnalytics('voice_list_completed', {
+      surface: source,
+      outcome: 'success',
+      voice_count: voices.length,
+      duration_ms: Date.now() - startedAt,
+    });
+    return voices;
+  } catch (error) {
+    captureAnalytics('voice_list_completed', {
+      surface: source,
+      outcome: 'failed',
+      duration_ms: Date.now() - startedAt,
+      error_name: error && error.name ? error.name : 'Error',
+    });
+    throw error;
+  }
+});
 
-ipcMain.handle('settings:preview', async (_e, { voiceId, speed }) => {
+ipcMain.handle('settings:preview', async (_e, { voiceId, speed, source = 'preferences' }) => {
+  const startedAt = Date.now();
+  // Preview currently calls provider SDKs directly, even when full readings
+  // use the hosted service, so report the path actually exercised here.
+  const provider = isFishVoice(voiceId) ? 'fish' : 'elevenlabs';
   try {
     if (isFishVoice(voiceId)) {
       const fr = await synthesizeFish({
@@ -1253,6 +1492,12 @@ ipcMain.handle('settings:preview', async (_e, { voiceId, speed }) => {
         voiceId,
         modelId: config.fishModelId,
         text: "Hey! This is how I sound. I'll read your selected text aloud, just like this.",
+      });
+      captureAnalytics('voice_preview_completed', {
+        surface: source,
+        provider,
+        outcome: 'success',
+        duration_ms: Date.now() - startedAt,
       });
       return { audioBase64: fr.audio_base64 };
     }
@@ -1264,27 +1509,51 @@ ipcMain.handle('settings:preview', async (_e, { voiceId, speed }) => {
       stability: state.stability,
       text: "Hey! This is how I sound. I'll read your selected text aloud, just like this.",
     });
+    captureAnalytics('voice_preview_completed', {
+      surface: source,
+      provider,
+      outcome: 'success',
+      duration_ms: Date.now() - startedAt,
+    });
     return { audioBase64: result.audio_base64 };
   } catch (err) {
+    captureAnalytics('voice_preview_completed', {
+      surface: source,
+      provider,
+      outcome: 'failed',
+      duration_ms: Date.now() - startedAt,
+      error_name: err && err.name ? err.name : 'Error',
+    });
     return { error: String(err.message || err) };
   }
 });
 
-ipcMain.on('settings:setVoice', (_e, { voiceId, voiceName }) => {
-  setVoice(voiceId, voiceName);
+ipcMain.on('settings:setVoice', (_e, { voiceId, voiceName, source = 'preferences' }) => {
+  setVoice(voiceId, voiceName, source);
 });
 
-ipcMain.on('settings:setSpeed', (_e, { speed }) => setSpeedValue(speed));
-ipcMain.on('overlay:setSpeed', (_e, { speed }) => setSpeedValue(speed)); // speed control on the reading overlay
+ipcMain.on('settings:setSpeed', (_e, { speed, source = 'preferences' }) => setSpeedValue(speed, source));
+ipcMain.on('overlay:setSpeed', (_e, { speed }) => setSpeedValue(speed, 'overlay')); // speed control on the reading overlay
 
-ipcMain.on('settings:setStability', (_e, { stability }) => {
+ipcMain.on('settings:setStability', (_e, { stability, source = 'preferences' }) => {
   state.stability = clampStability(stability);
   persist();
   updateTrayMenu();
+  captureAnalytics('setting_changed', {
+    surface: source,
+    setting_name: 'stability',
+    stability: state.stability,
+  });
 });
 
 ipcMain.on('settings:close', () => {
   if (settingsWin && !settingsWin.isDestroyed()) settingsWin.close();
+});
+
+// Renderers can report only catalogued, schema-validated events. analytics.js
+// rejects unknown names, properties, and free-form string values.
+ipcMain.on('analytics:track', (_e, { event, properties } = {}) => {
+  captureAnalytics(event, properties);
 });
 
 ipcMain.on('overlay:rich-ready', (_e, { gen, text, ok }) => {
@@ -1293,10 +1562,44 @@ ipcMain.on('overlay:rich-ready', (_e, { gen, text, ok }) => {
     pendingRich = null;
   }
 });
-ipcMain.on('overlay:started', () => setTrayState('playing'));
-ipcMain.on('overlay:ended', () => { setTrayState('idle'); resumeMusicIfNeeded(); });
-ipcMain.on('overlay:close', () => stopEverything());
-ipcMain.on('overlay:openSettings', () => openSettings());
+ipcMain.on('overlay:started', () => {
+  setTrayState('playing');
+  if (!currentReading) return;
+  if (!currentReading.playbackStarted) {
+    currentReading.playbackStarted = true;
+    captureAnalytics('reading_playback_started', {
+      trigger: currentReading.trigger,
+      provider: currentReading.provider,
+      duration_ms: Date.now() - currentReading.startedAt,
+    });
+  } else {
+    captureAnalytics('reading_playback_state_changed', {
+      trigger: currentReading.trigger,
+      playback_state: 'playing',
+    });
+  }
+});
+ipcMain.on('overlay:paused', () => {
+  if (!currentReading || !currentReading.playbackStarted) return;
+  captureAnalytics('reading_playback_state_changed', {
+    trigger: currentReading.trigger,
+    playback_state: 'paused',
+  });
+});
+ipcMain.on('overlay:ended', () => {
+  setTrayState('idle');
+  resumeMusicIfNeeded();
+  if (currentReading) {
+    captureAnalytics('reading_playback_completed', {
+      trigger: currentReading.trigger,
+      provider: currentReading.provider,
+      duration_ms: Date.now() - currentReading.startedAt,
+    });
+    currentReading = null;
+  }
+});
+ipcMain.on('overlay:close', () => stopEverything('overlay'));
+ipcMain.on('overlay:openSettings', () => openSettings('overlay'));
 
 // ---- lifecycle -----------------------------------------------------------
 
@@ -1366,7 +1669,11 @@ if (hasSingleInstanceLock) app.whenReady().then(() => {
   createTray();
   // Localhost bridge for the Chrome extension's in-page highlighting.
   try {
-    localserver.start({ getConfig: () => config, getState: () => state });
+    localserver.start({
+      getConfig: () => config,
+      getState: () => state,
+      captureAnalytics,
+    });
   } catch (e) {
     console.error('[localserver] failed to start:', e);
   }
@@ -1379,6 +1686,10 @@ if (hasSingleInstanceLock) app.whenReady().then(() => {
   }
   captureAnalytics('app_launched', {
     accessibility_granted: hasAccessibility(),
+    account_mode: accountMode(),
+    onboarded: state.onboarded,
+    open_at_login_enabled: getOpenAtLogin(),
+    launch_count: state.launchCount,
     overlay_mode: state.overlayMode,
     ...shortcutAnalyticsProperties(shortcutStatus),
   });
@@ -1395,7 +1706,7 @@ if (hasSingleInstanceLock) app.whenReady().then(() => {
   // First run: welcome + setup. Existing users (env key / saved login / own key)
   // are already marked onboarded above and skip straight in.
   if (!state.onboarded) {
-    openOnboarding();
+    openOnboarding('system');
   } else if (!canSpeak()) {
     notify(
       'Tristr Flow needs setup',
@@ -1424,6 +1735,12 @@ app.on('will-quit', () => {
 // Give the final small analytics batch a bounded chance to flush so a recently
 // recorded event is not dropped on a fast exit.
 app.on('before-quit', (event) => {
+  if (!appQuitCaptured) {
+    appQuitCaptured = true;
+    captureAnalytics('app_quit', {
+      account_mode: state ? accountMode() : 'unconfigured',
+    });
+  }
   if (!analytics || !analytics.enabled || analyticsShutdownComplete) return;
   event.preventDefault();
   if (analyticsShutdownStarted) return;

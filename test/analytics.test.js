@@ -2,8 +2,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
-const { createAnalytics } = require('../src/analytics');
+const { ALLOWED_EVENTS, createAnalytics } = require('../src/analytics');
 
 test('is a no-op when no PostHog project token is configured', async () => {
   let factoryCalls = 0;
@@ -110,4 +112,133 @@ test('flushes the client during shutdown', async () => {
   await analytics.shutdown();
 
   assert.equal(shutDown, true);
+});
+
+test('defines a complete product journey event catalog', () => {
+  const expected = [
+    'account_action_completed',
+    'app_launched',
+    'app_quit',
+    'billing_opened',
+    'extension_read_completed',
+    'extension_read_failed',
+    'extension_read_requested',
+    'onboarding_completed',
+    'overlay_interaction',
+    'reading_playback_completed',
+    'reading_playback_started',
+    'reading_playback_state_changed',
+    'setting_changed',
+    'tray_menu_opened',
+    'update_check_completed',
+    'voice_list_completed',
+    'voice_preview_completed',
+    'window_opened',
+  ];
+
+  assert.ok(ALLOWED_EVENTS instanceof Set);
+  for (const event of expected) assert.ok(ALLOWED_EVENTS.has(event), event);
+});
+
+test('catalogues every literal event emitted across desktop and extension code', () => {
+  const files = [
+    'main.js',
+    'localserver.js',
+    'overlay.js',
+    'settings-renderer.js',
+    'onboarding-renderer.js',
+  ];
+  const used = new Set();
+  const patterns = [
+    /captureAnalytics\(\s*'([^']+)'/g,
+    /\.track\(\s*'([^']+)'/g,
+  ];
+
+  for (const file of files) {
+    const source = fs.readFileSync(path.join(__dirname, '..', 'src', file), 'utf8');
+    for (const pattern of patterns) {
+      let match;
+      while ((match = pattern.exec(source))) used.add(match[1]);
+    }
+  }
+
+  const missing = [...used].filter((event) => !ALLOWED_EVENTS.has(event));
+  assert.deepEqual(missing, []);
+});
+
+test('drops unknown event names before they reach PostHog', () => {
+  const calls = [];
+  const analytics = createAnalytics({
+    token: 'public-project-token',
+    distinctId: 'install-123',
+    clientFactory() {
+      return {
+        capture(value) { calls.push(value); },
+        shutdown() { return Promise.resolve(); },
+      };
+    },
+  });
+
+  analytics.capture('arbitrary_renderer_event', { outcome: 'success' });
+
+  assert.equal(calls.length, 0);
+});
+
+test('allows documented product properties and rejects free-form string values', () => {
+  let payload;
+  const analytics = createAnalytics({
+    token: 'public-project-token',
+    distinctId: 'install-123',
+    clientFactory() {
+      return {
+        capture(value) { payload = value; },
+        shutdown() { return Promise.resolve(); },
+      };
+    },
+  });
+
+  analytics.capture('setting_changed', {
+    surface: 'preferences',
+    setting_name: 'theme',
+    setting_value: 'dark',
+    trigger: 'selected text that must never become analytics',
+    error_name: 'phc_secret',
+  });
+
+  assert.deepEqual(payload.properties, {
+    $process_person_profile: false,
+    $geoip_disable: true,
+    surface: 'preferences',
+    setting_name: 'theme',
+    setting_value: 'dark',
+  });
+});
+
+test('bounds numeric telemetry to safe operational ranges', () => {
+  let payload;
+  const analytics = createAnalytics({
+    token: 'public-project-token',
+    distinctId: 'install-123',
+    clientFactory() {
+      return {
+        capture(value) { payload = value; },
+        shutdown() { return Promise.resolve(); },
+      };
+    },
+  });
+
+  analytics.capture('reading_synthesis_completed', {
+    character_count: 420,
+    segment_count: 2,
+    duration_ms: 1250,
+    position_percent: 101,
+  });
+
+  assert.deepEqual(payload.properties, {
+    $process_person_profile: false,
+    $geoip_disable: true,
+    character_count: 420,
+    segment_count: 2,
+    duration_ms: 1250,
+  });
 });

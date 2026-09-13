@@ -248,7 +248,14 @@ if (overlayModeEl) {
   });
 }
 
-searchEl.addEventListener('input', () => render(searchEl.value));
+let voiceSearchTracked = false;
+searchEl.addEventListener('input', () => {
+  render(searchEl.value);
+  if (!voiceSearchTracked && searchEl.value.trim()) {
+    voiceSearchTracked = true;
+    window.prefs.track('voice_search_used', { surface: 'preferences' });
+  }
+});
 
 if (pauseMusicEl) {
   pauseMusicEl.addEventListener('change', () => window.prefs.setPauseMusic(pauseMusicEl.checked));
@@ -437,10 +444,19 @@ async function loadAccount() {
   }
 }
 
-async function doAuth(fn) {
+async function doAuth(fn, action) {
   const email = (acctEmailEl.value || '').trim();
   const pass = acctPassEl.value || '';
-  if (!email || !pass) { acctMsg('Enter your email and password.', true); return; }
+  if (!email || !pass) {
+    window.prefs.track('account_action_completed', {
+      surface: 'preferences',
+      action,
+      outcome: 'rejected',
+      reason: 'invalid-request',
+    });
+    acctMsg('Enter your email and password.', true);
+    return;
+  }
   acctMsg('Working…');
   btnLogin.disabled = btnSignup.disabled = true;
   const r = await fn(email, pass);
@@ -449,12 +465,21 @@ async function doAuth(fn) {
   else { acctMsg((r && r.error) || 'Could not sign in.', true); }
 }
 
-if (btnLogin) btnLogin.addEventListener('click', () => doAuth(window.prefs.login));
-if (btnSignup) btnSignup.addEventListener('click', () => doAuth(window.prefs.signup));
+if (btnLogin) btnLogin.addEventListener('click', () => doAuth(window.prefs.login, 'login'));
+if (btnSignup) btnSignup.addEventListener('click', () => doAuth(window.prefs.signup, 'signup'));
 if (btnLogout) btnLogout.addEventListener('click', async () => { await window.prefs.logout(); await loadAccount(); });
 if (btnOwnKey) btnOwnKey.addEventListener('click', async () => {
   const key = (ownKeyEl.value || '').trim();
-  if (!key) { acctMsg('Paste your ElevenLabs key (starts with sk_).', true); return; }
+  if (!key) {
+    window.prefs.track('account_action_completed', {
+      surface: 'preferences',
+      action: 'set_elevenlabs_key',
+      outcome: 'rejected',
+      reason: 'invalid-request',
+    });
+    acctMsg('Paste your ElevenLabs key (starts with sk_).', true);
+    return;
+  }
   await window.prefs.setOwnKey(key);
   ownKeyEl.value = '';
   await loadAccount();
@@ -489,7 +514,7 @@ if (btnClearKey) btnClearKey.addEventListener('click', async () => { await windo
 if (btnUpgrade) btnUpgrade.addEventListener('click', () => window.prefs.openBilling());
 if (btnBilling) btnBilling.addEventListener('click', () => window.prefs.openBilling());
 [acctEmailEl, acctPassEl].forEach((el) => el && el.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); doAuth(window.prefs.login); }
+  if (e.key === 'Enter') { e.preventDefault(); doAuth(window.prefs.login, 'login'); }
 }));
 
 init();

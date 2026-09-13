@@ -1,146 +1,103 @@
 {
-  "version": 1,
-  "status": "partial",
+  "version": 2,
+  "status": "pending",
   "tests": [
     {
-      "id": "E2E-01",
-      "title": "Global shortcut reads the current selection and preserves the clipboard",
-      "user_story": "As a desktop user, I can select text in another app and invoke Tristr Flow without disturbing my clipboard.",
+      "id": "E2E-AN-01",
+      "title": "PostHog receives a real desktop event",
+      "user_story": "As the product owner, I can confirm that the installed desktop app is delivering events to the intended PostHog project.",
       "setup_instrumentation": [
-        "Run the packaged macOS app with Accessibility granted.",
-        "Put a unique non-text item or sentinel text on the clipboard.",
-        "Keep main-process logs visible for shortcut and selection diagnostics."
+        "Build and install the instrumented macOS app with the supplied project token and US ingestion host.",
+        "Record the installed app's anonymous installation identifier without displaying it in the report.",
+        "Use PostHog Live Events or a schema query in the exact token-owning project."
       ],
       "steps": [
-        "Select a known sentence in TextEdit or Chrome.",
-        "Press the configured primary shortcut.",
-        "Confirm the overlay opens, shows the exact selected sentence, and starts audio.",
-        "Confirm the prior clipboard value is restored.",
-        "Repeat using the secondary shortcut."
+        "Launch the installed app and open its tray menu.",
+        "Wait for the Node SDK batch to flush.",
+        "Query the target project for app_launched and tray_menu_opened from that installation."
       ],
       "expected_results": [
-        "Both registered shortcuts invoke selection capture.",
-        "The overlay content matches the selected text.",
-        "Clipboard contents are unchanged after capture."
+        "Both events appear in the target project with app version, platform, and architecture.",
+        "The ingestion request completes successfully."
       ],
       "proof_to_capture": [
-        "Overlay screenshot",
-        "Shortcut registration/capture log lines",
-        "Before/after clipboard comparison"
+        "PostHog Live Events or query screenshot",
+        "Successful SDK flush evidence"
       ],
-      "actual_results": [
-        "The packaged app logged successful registration for both configured accelerators.",
-        "Computer-use and AppleScript-generated key events did not reach Electron's macOS globalShortcut callback, so a physical-key end-to-end invocation could not be completed by automation.",
-        "Targeted selection capture separately returned the exact 32-character TextEdit selection through the cmd-c fallback."
-      ],
-      "evidence": [
-        "Packaged main-process registration output",
-        "Automated test: force-refreshes stale native registrations after a system transition"
-      ],
-      "status": "blocked"
+      "status": "pending"
     },
     {
-      "id": "E2E-02",
-      "title": "Read selected text works from the tray menu",
-      "user_story": "As a user whose shortcut is unavailable, I can still read the current selection from the menu-bar dropdown.",
+      "id": "E2E-AN-02",
+      "title": "Core desktop journey produces useful events without changing behavior",
+      "user_story": "As the product owner, I can understand activation, reading, playback, settings, account, and update behavior.",
       "setup_instrumentation": [
-        "Run the packaged macOS app with Accessibility granted.",
-        "Open a document containing a unique sentence."
+        "Run the packaged app with Accessibility enabled and a usable TTS provider.",
+        "Keep the tray, preferences, onboarding, and reading overlay available."
       ],
       "steps": [
-        "Select the unique sentence.",
-        "Open the Tristr Flow tray menu without changing the document selection.",
-        "Click Read selected text.",
-        "Confirm the overlay opens with the exact sentence and audio begins."
+        "Open the tray, preferences, and setup windows.",
+        "Change theme, overlay mode, speed, stability, pause-music, open-at-login, voice, and one shortcut.",
+        "Read selected text, pause/resume, seek, change speed, and finish or stop playback.",
+        "Run a manual update check and exercise a non-secret account-mode action.",
+        "Confirm the original visible workflows still succeed."
       ],
       "expected_results": [
-        "The menu item is prominent near the top of the action section.",
-        "It uses selection capture rather than existing clipboard text.",
-        "The same speech workflow runs as the keyboard shortcut."
+        "Meaningful events cover each journey and report only normalized outcome and operational metadata.",
+        "No interaction is double-counted by both renderer and main-process handlers.",
+        "Application behavior is unchanged."
       ],
       "proof_to_capture": [
-        "Tray menu screenshot",
-        "Overlay screenshot with the selected sentence"
+        "Tray, preferences, and reading overlay screenshots",
+        "Captured fake-client event sequence from automated integration tests"
       ],
-      "actual_results": [
-        "The installed app's tray menu displayed Read selected text directly below the two shortcut health rows.",
-        "Clicking the item read the exact inactive TextEdit selection and opened the completed speech overlay."
-      ],
-      "evidence": [
-        "implementation assets/qa-screenshots/tray-menu-healthy.png",
-        "implementation assets/qa-screenshots/read-selected-overlay.png"
-      ],
-      "status": "passed"
+      "status": "pending"
     },
     {
-      "id": "E2E-03",
-      "title": "Broken shortcut or Accessibility state is visible and recoverable",
-      "user_story": "As a user, I receive an obvious fallback when macOS permission or shortcut registration is unhealthy.",
+      "id": "E2E-AN-03",
+      "title": "Analytics privacy boundary rejects content and arbitrary renderer data",
+      "user_story": "As a user, my selected text, clipboard, credentials, email, URLs, and free-form UI values never enter analytics.",
       "setup_instrumentation": [
-        "Use a controlled build with Accessibility disabled, then repeat with a configured shortcut held by a helper Electron process.",
-        "Inspect the tray menu before and after restoring each condition."
+        "Use an injected PostHog client to inspect exact capture payloads.",
+        "Attempt unknown events, secret-like properties, and unapproved string values."
       ],
       "steps": [
-        "Open the tray menu while Accessibility is unavailable.",
-        "Confirm Read selected text is warning-highlighted and explains the required grant.",
-        "Restore Accessibility and reopen the menu.",
-        "Hold one configured accelerator in another process, relaunch Tristr Flow, and confirm the menu warns that a shortcut is unavailable.",
-        "Release the accelerator, wait for the health repair interval or simulate resume, and confirm the warning clears."
+        "Capture all approved event/property combinations used by the application.",
+        "Attempt an unknown event name and arbitrary free-form properties.",
+        "Inspect every emitted payload."
       ],
       "expected_results": [
-        "Permission loss and registration failure are never presented as healthy.",
-        "The menu action opens the appropriate recovery path.",
-        "Lost registrations are retried and recover without restarting the app."
+        "Only catalogued events are emitted.",
+        "Only typed and allowlisted properties survive validation.",
+        "Person profiles and IP geolocation remain disabled."
       ],
       "proof_to_capture": [
-        "Warning-state and healthy-state tray screenshots",
-        "Registration recovery log lines"
+        "Passing analytics contract test output",
+        "Event taxonomy documentation"
       ],
-      "actual_results": [
-        "A controlled invalid primary accelerator produced warning icons on the shortcut row and Read selected text item.",
-        "A normal launch produced check marks for both accelerators and a non-warning fallback action.",
-        "Unit tests verified periodic repair and forced refresh behavior."
-      ],
-      "evidence": [
-        "implementation assets/qa-screenshots/tray-menu-warning.png",
-        "implementation assets/qa-screenshots/tray-menu-healthy.png",
-        "Automated tests: repairs a shortcut; force-refreshes stale registrations"
-      ],
-      "status": "passed"
+      "status": "pending"
     },
     {
-      "id": "E2E-04",
-      "title": "PostHog receives operational events without selected content",
-      "user_story": "As the product owner, I can measure shortcut reliability without collecting private clipboard or selected text.",
+      "id": "E2E-AN-04",
+      "title": "Browser-extension reading is represented in desktop analytics",
+      "user_story": "As the product owner, I can distinguish extension reading from native desktop reading without collecting page URLs or selected text.",
       "setup_instrumentation": [
-        "Use the configured PostHog project token and correct regional ingestion host.",
-        "Open PostHog Live Events or query the target project after running the app."
+        "Start the localhost bridge with an injected analytics recorder and stubbed synthesizer.",
+        "Send authenticated success and failure requests without contacting a real TTS provider."
       ],
       "steps": [
-        "Launch the app and invoke one successful shortcut read.",
-        "Invoke Read selected text from the menu.",
-        "Exercise an Accessibility-missing or selection-capture failure.",
-        "Inspect the resulting PostHog events and properties."
+        "Submit one valid extension read request and complete the stream.",
+        "Submit a request when no provider key is available.",
+        "Inspect emitted event names and properties."
       ],
       "expected_results": [
-        "Operational events include trigger, registration outcome, failure reason, app version, and platform where applicable.",
-        "No selected text, clipboard content, HTML, API keys, service tokens, or email addresses are sent.",
-        "Events use an anonymous installation identifier without creating person profiles."
+        "Request, completion, and failure events distinguish the extension surface.",
+        "Only character count, segment count, duration, provider, outcome, and reason are captured.",
+        "No origin, URL, page title, or selected text is captured."
       ],
       "proof_to_capture": [
-        "PostHog Live Events screenshot or query result",
-        "Event-property privacy inspection"
+        "Passing localhost bridge telemetry test output"
       ],
-      "actual_results": [
-        "A local integration_test event flushed successfully through posthog-node to the US ingestion host.",
-        "Automated privacy tests proved that non-allowlisted content, clipboard, HTML, email, and token properties are removed.",
-        "The connected PostHog administration project does not list the supplied token's project, so Live Events could not be queried for final server-side visual confirmation."
-      ],
-      "evidence": [
-        "Successful posthog-node shutdown/flush output",
-        "Automated test: drops content and identity-like properties before capture"
-      ],
-      "status": "blocked"
+      "status": "pending"
     }
   ]
 }

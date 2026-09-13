@@ -160,7 +160,10 @@ function resetForNew(voice) {
     startRaf();
     updatePlayBtn();
   });
-  audio.addEventListener('pause', () => { updatePlayBtn(); });
+  audio.addEventListener('pause', () => {
+    updatePlayBtn();
+    if (window.speak) window.speak.paused();
+  });
   audio.addEventListener('ended', onPlaybackEnded);
 }
 
@@ -396,6 +399,14 @@ textEl.addEventListener('click', (e) => {
   const t = charStart[words[wi].first]; // timing for this word's first char
   if (t == null || t > bufferedEnd() - 0.05) { flashStatus('Not generated yet…'); return; }
   audio.currentTime = Math.max(0, t);
+  if (window.speak && window.speak.track) {
+    const total = totalDur();
+    window.speak.track('overlay_interaction', {
+      surface: 'overlay',
+      interaction: 'seek',
+      position_percent: total > 0 ? Math.round((audio.currentTime / total) * 100) : 0,
+    });
+  }
   currentWord = -1; // force re-highlight from the new position
   resumeFollow(); // clicking a word means "follow from here"
   if (audio.paused) audio.play().catch(() => {});
@@ -467,13 +478,26 @@ function stopVoicePreview() {
   if (vPreviewBtn) { vPreviewBtn.textContent = '▶'; vPreviewBtn = null; }
 }
 function closeVoicePanel() {
+  const wasOpen = !voicePanel.hidden;
   stopVoicePreview();
   voicePanel.hidden = true;
+  if (wasOpen && window.speak && window.speak.track) {
+    window.speak.track('overlay_interaction', {
+      surface: 'overlay',
+      interaction: 'voice_picker_closed',
+    });
+  }
   if (mainWasPlayingForPreview && audio && audio.paused) { audio.play().catch(() => {}); updatePlayBtn(); }
   mainWasPlayingForPreview = false;
 }
 async function openVoicePanel() {
   voicePanel.hidden = false;
+  if (window.speak && window.speak.track) {
+    window.speak.track('overlay_interaction', {
+      surface: 'overlay',
+      interaction: 'voice_picker_opened',
+    });
+  }
   if (!voicesCache) {
     voiceListEl.textContent = 'Loading voices…';
     try {
@@ -547,8 +571,19 @@ function selectVoice(voiceId, name, row) {
 
 // ---- wiring --------------------------------------------------------------
 playBtn.addEventListener('click', togglePause);
-closeBtn.addEventListener('click', () => { teardown(); if (window.speak) window.speak.close(); });
-settingsBtn.addEventListener('click', () => { if (window.speak && window.speak.openSettings) window.speak.openSettings(); });
+closeBtn.addEventListener('click', () => {
+  if (window.speak && window.speak.track) {
+    window.speak.track('overlay_interaction', { surface: 'overlay', interaction: 'close' });
+  }
+  teardown();
+  if (window.speak) window.speak.close();
+});
+settingsBtn.addEventListener('click', () => {
+  if (window.speak && window.speak.track) {
+    window.speak.track('overlay_interaction', { surface: 'overlay', interaction: 'open_settings' });
+  }
+  if (window.speak && window.speak.openSettings) window.speak.openSettings();
+});
 if (speedDownBtn) speedDownBtn.addEventListener('click', () => stepSpeed(-1));
 if (speedUpBtn) speedUpBtn.addEventListener('click', () => stepSpeed(1));
 voiceEl.addEventListener('click', (e) => { e.stopPropagation(); if (voicePanel.hidden) openVoicePanel(); else closeVoicePanel(); });
@@ -561,7 +596,13 @@ const SCROLL_KEYS = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !voicePanel.hidden) { closeVoicePanel(); return; } // close the picker first
   if (e.code === 'Space' || e.key === ' ') { e.preventDefault(); togglePause(); }
-  else if (e.key === 'Escape') { teardown(); if (window.speak) window.speak.close(); }
+  else if (e.key === 'Escape') {
+    if (window.speak && window.speak.track) {
+      window.speak.track('overlay_interaction', { surface: 'overlay', interaction: 'close' });
+    }
+    teardown();
+    if (window.speak) window.speak.close();
+  }
   else if (e.key === 'ArrowLeft') { e.preventDefault(); stepSpeed(-1); }
   else if (e.key === 'ArrowRight') { e.preventDefault(); stepSpeed(1); }
   else if (SCROLL_KEYS.includes(e.key)) { pauseFollow(); } // user is scrolling with the keyboard
