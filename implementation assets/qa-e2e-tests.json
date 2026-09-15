@@ -139,6 +139,69 @@
         "Passing tracks extension reads without page or selected-text data test"
       ],
       "status": "passed"
+    },
+    {
+      "id": "E2E-REL-01",
+      "title": "Tagged macOS release produces usable arm64 artifacts",
+      "user_story": "As the product owner, I can tag a version and receive a GitHub Release containing a launchable Mac app.",
+      "setup_instrumentation": [
+        "Use the pinned GitHub Actions release workflow and package version 0.1.1.",
+        "Build the same arm64 DMG and ZIP locally without publishing."
+      ],
+      "steps": [
+        "Install exactly from package-lock.json.",
+        "Run lint and all tests.",
+        "Build the arm64 DMG and ZIP.",
+        "Launch the packaged app and request its localhost ping endpoint."
+      ],
+      "expected_results": [
+        "Both distributable artifacts are generated at version 0.1.1.",
+        "The exact packaged application starts and answers its health ping."
+      ],
+      "proof_to_capture": [
+        "electron-builder output",
+        "Artifact checksums",
+        "Packaged-app PID and localhost ping"
+      ],
+      "actual_results": [
+        "Generated a 117 MB DMG and 115 MB ZIP for arm64 macOS.",
+        "The exact packaged application launched and returned HTTP 200 from /ping.",
+        "The release workflow validates that the v-tag matches package.json before publishing."
+      ],
+      "evidence": [
+        ".github/workflows/release.yml",
+        "test/release-workflow.test.js",
+        "Local SHA-256 checksums for both artifacts"
+      ],
+      "status": "passed"
+    },
+    {
+      "id": "E2E-REL-02",
+      "title": "macOS trust and notarization",
+      "user_story": "As a customer, I can open the downloaded app without an unidentified-developer warning.",
+      "setup_instrumentation": [
+        "Provide an Apple Developer ID Application certificate and notarization credentials through GitHub Actions secrets."
+      ],
+      "steps": [
+        "Sign the hardened app.",
+        "Notarize and staple the DMG.",
+        "Install on a clean Mac and verify Gatekeeper acceptance."
+      ],
+      "expected_results": [
+        "Gatekeeper accepts the release without a bypass workflow."
+      ],
+      "proof_to_capture": [
+        "codesign verification",
+        "spctl assessment",
+        "notarytool result"
+      ],
+      "actual_results": [
+        "electron-builder found no valid Developer ID identity, so the local package is unsigned."
+      ],
+      "evidence": [
+        "Local electron-builder signing output"
+      ],
+      "status": "blocked"
     }
   ]
 }
