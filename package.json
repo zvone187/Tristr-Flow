@@ -33,6 +33,8 @@
   "build": {
     "appId": "ai.pazi.tristrflow",
     "productName": "Tristr Flow",
+    "artifactName": "Tristr-Flow-${version}-${arch}.${ext}",
+    "afterPack": "scripts/after-pack.js",
     "files": [
       "src/**/*",
       "assets/trayTemplate.png",

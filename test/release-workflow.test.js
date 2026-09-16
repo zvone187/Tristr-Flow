@@ -13,6 +13,16 @@ test('release metadata is bumped consistently to 0.1.1', () => {
   assert.equal(pkg.version, '0.1.1');
   assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[''].version, pkg.version);
+  assert.equal(pkg.build.artifactName, 'Tristr-Flow-${version}-${arch}.${ext}');
+  assert.equal(pkg.build.afterPack, 'scripts/after-pack.js');
+});
+
+test('unsigned macOS releases receive a complete ad-hoc bundle signature', () => {
+  const hook = fs.readFileSync(path.join(root, 'scripts/after-pack.js'), 'utf8');
+  assert.match(hook, /electronPlatformName !== 'darwin'/);
+  assert.match(hook, /codesign/);
+  assert.match(hook, /'--deep'/);
+  assert.match(hook, /'--sign', '-'/);
 });
 
 test('tagged releases validate and publish the arm64 macOS app', () => {
