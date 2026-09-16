@@ -54,6 +54,44 @@ html, body {
   border-radius: 16px;
   box-shadow: var(--card-shadow);
   overflow: hidden;
+  transition: box-shadow 0.12s, border-color 0.12s;
+}
+
+/* ---- resize handles ------------------------------------------------------
+   The native frameless resize band is off (resizable:false in createOverlay),
+   so these strips are the only grab area. They straddle the card's visible
+   outline (which sits 10px in): 3px..12px from the window edge — 7px of slack
+   outside the card, 2px inside. Anywhere else, a drag moves the window
+   instead of resizing it. */
+:root {
+  --rz-in: 3px;      /* dead zone at the very edge of the window */
+  --rz: 9px;         /* band thickness, centred on the 10px outline */
+  --rz-corner: 16px; /* corner squares (also keeps edge strips out of them) */
+}
+.rz {
+  position: fixed;
+  z-index: 30;
+  -webkit-app-region: no-drag; /* must beat the draggable header */
+}
+.rz-n, .rz-s { left: var(--rz-corner); right: var(--rz-corner); height: var(--rz); cursor: ns-resize; }
+.rz-e, .rz-w { top: var(--rz-corner); bottom: var(--rz-corner); width: var(--rz); cursor: ew-resize; }
+.rz-n { top: var(--rz-in); }
+.rz-s { bottom: var(--rz-in); }
+.rz-w { left: var(--rz-in); }
+.rz-e { right: var(--rz-in); }
+
+.rz-nw, .rz-ne, .rz-sw, .rz-se { width: var(--rz-corner); height: var(--rz-corner); }
+.rz-nw { top: 2px; left: 2px; cursor: nwse-resize; }
+.rz-se { bottom: 2px; right: 2px; cursor: nwse-resize; }
+.rz-ne { top: 2px; right: 2px; cursor: nesw-resize; }
+.rz-sw { bottom: 2px; left: 2px; cursor: nesw-resize; }
+
+/* Light up the outline while a handle is hovered or being dragged, so it is
+   obvious when you are on the edge and resizing is armed. */
+body:has(.rz:hover) #card,
+body.rz-active #card {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1.5px var(--accent), var(--card-shadow);
 }
 
 #bar {
@@ -250,7 +288,22 @@ html, body {
 .vrow:hover { background: var(--control); }
 .vrow.sel { background: var(--sentence-bg); }
 .vrow .vmeta { flex: 1; min-width: 0; }
-.vrow .vname { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrow .vname { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
+/* Provider badge in the voice picker. */
+.vprov {
+  flex: none;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 5px;
+  border: 1px solid currentColor;
+  opacity: 0.85;
+}
+.vprov.el { color: #7bb7ff; }
+.vprov.fish { color: #3fbfa6; }
+.vprov.mine { color: #5fd8bd; border-color: transparent; background: rgba(63, 191, 166, 0.22); }
 .vrow .vdesc { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrow .vplay {
   flex: none;
@@ -307,6 +360,13 @@ html, body {
 
 .word { cursor: pointer; }
 .word:hover { background: var(--soft); }
+
+/* Generation progress: text starts slightly dimmed and each word lifts to full
+   opacity once its audio has been generated, so you can see how far ahead the
+   synthesis has got. --ungen is the one knob for how deep the dim is. */
+:root { --ungen: 0.55; }
+.word { opacity: var(--ungen); transition: opacity 0.35s ease; }
+.word.gen { opacity: 1; }
 
 /* Continuous highlight via the CSS Custom Highlight API: one soft block under
    the current sentence, one strong block on the current word — no per-word boxes. */

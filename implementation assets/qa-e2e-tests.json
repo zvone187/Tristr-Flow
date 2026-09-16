@@ -1,0 +1,207 @@
+{
+  "version": 2,
+  "status": "partial",
+  "tests": [
+    {
+      "id": "E2E-AN-01",
+      "title": "PostHog receives a real desktop event",
+      "user_story": "As the product owner, I can confirm that the installed desktop app is delivering events to the intended PostHog project.",
+      "setup_instrumentation": [
+        "Build and install the instrumented macOS app with the supplied project token and US ingestion host.",
+        "Record the installed app's anonymous installation identifier without displaying it in the report.",
+        "Use PostHog Live Events or a schema query in the exact token-owning project."
+      ],
+      "steps": [
+        "Launch the installed app and open its tray menu.",
+        "Wait for the Node SDK batch to flush.",
+        "Query the target project for app_launched and tray_menu_opened from that installation."
+      ],
+      "expected_results": [
+        "Both events appear in the target project with app version, platform, and architecture.",
+        "The ingestion request completes successfully."
+      ],
+      "proof_to_capture": [
+        "PostHog Live Events or query screenshot",
+        "Successful SDK flush evidence"
+      ],
+      "actual_results": [
+        "The final allowlisted SDK event was accepted locally and shutdown completed its batch flush against the configured US ingestion host.",
+        "The installed packaged app launched successfully and emitted its normal startup events.",
+        "The connected PostHog organization and browser project picker expose the same five projects, none of which owns the supplied project token, so the target Live Events table could not be queried."
+      ],
+      "evidence": [
+        "Final posthog-node capture plus shutdown command passed",
+        "Installed app asar hash matched the final packaged build",
+        "Connected PostHog organization/project inventory"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "E2E-AN-02",
+      "title": "Core desktop journey produces useful events without changing behavior",
+      "user_story": "As the product owner, I can understand activation, reading, playback, settings, account, and update behavior.",
+      "setup_instrumentation": [
+        "Run the packaged app with Accessibility enabled and a usable TTS provider.",
+        "Keep the tray, preferences, onboarding, and reading overlay available."
+      ],
+      "steps": [
+        "Open the tray, preferences, and setup windows.",
+        "Change theme, overlay mode, speed, stability, pause-music, open-at-login, voice, and one shortcut.",
+        "Read selected text, pause/resume, seek, change speed, and finish or stop playback.",
+        "Run a manual update check and exercise a non-secret account-mode action.",
+        "Confirm the original visible workflows still succeed."
+      ],
+      "expected_results": [
+        "Meaningful events cover each journey and report only normalized outcome and operational metadata.",
+        "No interaction is double-counted by both renderer and main-process handlers.",
+        "Application behavior is unchanged."
+      ],
+      "proof_to_capture": [
+        "Tray, preferences, and reading overlay screenshots",
+        "Captured fake-client event sequence from automated integration tests"
+      ],
+      "actual_results": [
+        "The final packaged app launched from /Applications and its localhost bridge returned a healthy ping.",
+        "Static contract coverage confirmed every literal event emitted by desktop and extension code is present in the event catalog.",
+        "The tray-only app does not expose a window to the available computer-use driver, so the full interactive settings/playback sequence could not be replayed automatically in this pass.",
+        "The inherited tray and selection-overlay screenshots confirm the unchanged user-facing surfaces from the immediately preceding build."
+      ],
+      "evidence": [
+        "implementation assets/qa-screenshots/tray-menu-healthy.png",
+        "implementation assets/qa-screenshots/read-selected-overlay.png",
+        "Passing event-catalog coverage test",
+        "Healthy localhost /ping response from installed app"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "E2E-AN-03",
+      "title": "Analytics privacy boundary rejects content and arbitrary renderer data",
+      "user_story": "As a user, my selected text, clipboard, credentials, email, URLs, and free-form UI values never enter analytics.",
+      "setup_instrumentation": [
+        "Use an injected PostHog client to inspect exact capture payloads.",
+        "Attempt unknown events, secret-like properties, and unapproved string values."
+      ],
+      "steps": [
+        "Capture all approved event/property combinations used by the application.",
+        "Attempt an unknown event name and arbitrary free-form properties.",
+        "Inspect every emitted payload."
+      ],
+      "expected_results": [
+        "Only catalogued events are emitted.",
+        "Only typed and allowlisted properties survive validation.",
+        "Person profiles and IP geolocation remain disabled."
+      ],
+      "proof_to_capture": [
+        "Passing analytics contract test output",
+        "Event taxonomy documentation"
+      ],
+      "actual_results": [
+        "Unknown event names never reached the injected PostHog client.",
+        "Selected text, clipboard content, HTML, email, service tokens, arbitrary properties, secret-like error names, and out-of-range numeric data were rejected.",
+        "All emitted payloads retained person-profile and GeoIP disabling flags."
+      ],
+      "evidence": [
+        "test/analytics.test.js",
+        "docs/analytics.md",
+        "20-test passing suite"
+      ],
+      "status": "passed"
+    },
+    {
+      "id": "E2E-AN-04",
+      "title": "Browser-extension reading is represented in desktop analytics",
+      "user_story": "As the product owner, I can distinguish extension reading from native desktop reading without collecting page URLs or selected text.",
+      "setup_instrumentation": [
+        "Start the localhost bridge with an injected analytics recorder and stubbed synthesizer.",
+        "Send authenticated success and failure requests without contacting a real TTS provider."
+      ],
+      "steps": [
+        "Submit one valid extension read request and complete the stream.",
+        "Submit a request when no provider key is available.",
+        "Inspect emitted event names and properties."
+      ],
+      "expected_results": [
+        "Request, completion, and failure events distinguish the extension surface.",
+        "Only character count, segment count, duration, provider, outcome, and reason are captured.",
+        "No origin, URL, page title, or selected text is captured."
+      ],
+      "proof_to_capture": [
+        "Passing localhost bridge telemetry test output"
+      ],
+      "actual_results": [
+        "An ephemeral localhost bridge completed an authenticated stubbed read and reported request plus completion events.",
+        "The missing-provider path reported request plus failure events.",
+        "No origin, URL, selected text, or voice identifier appeared in any recorded properties."
+      ],
+      "evidence": [
+        "test/localserver-analytics.test.js",
+        "Passing tracks extension reads without page or selected-text data test"
+      ],
+      "status": "passed"
+    },
+    {
+      "id": "E2E-REL-01",
+      "title": "Tagged macOS release produces usable arm64 artifacts",
+      "user_story": "As the product owner, I can tag a version and receive a GitHub Release containing a launchable Mac app.",
+      "setup_instrumentation": [
+        "Use the pinned GitHub Actions release workflow and package version 0.1.1.",
+        "Build the same arm64 DMG and ZIP locally without publishing."
+      ],
+      "steps": [
+        "Install exactly from package-lock.json.",
+        "Run lint and all tests.",
+        "Build the arm64 DMG and ZIP.",
+        "Launch the packaged app and request its localhost ping endpoint."
+      ],
+      "expected_results": [
+        "Both distributable artifacts are generated at version 0.1.1.",
+        "The exact packaged application starts and answers its health ping."
+      ],
+      "proof_to_capture": [
+        "electron-builder output",
+        "Artifact checksums",
+        "Packaged-app PID and localhost ping"
+      ],
+      "actual_results": [
+        "Generated a 117 MB DMG and 115 MB ZIP for arm64 macOS.",
+        "The exact packaged application launched and returned HTTP 200 from /ping.",
+        "The release workflow validates that the v-tag matches package.json before publishing."
+      ],
+      "evidence": [
+        ".github/workflows/release.yml",
+        "test/release-workflow.test.js",
+        "Local SHA-256 checksums for both artifacts"
+      ],
+      "status": "passed"
+    },
+    {
+      "id": "E2E-REL-02",
+      "title": "macOS trust and notarization",
+      "user_story": "As a customer, I can open the downloaded app without an unidentified-developer warning.",
+      "setup_instrumentation": [
+        "Provide an Apple Developer ID Application certificate and notarization credentials through GitHub Actions secrets."
+      ],
+      "steps": [
+        "Sign the hardened app.",
+        "Notarize and staple the DMG.",
+        "Install on a clean Mac and verify Gatekeeper acceptance."
+      ],
+      "expected_results": [
+        "Gatekeeper accepts the release without a bypass workflow."
+      ],
+      "proof_to_capture": [
+        "codesign verification",
+        "spctl assessment",
+        "notarytool result"
+      ],
+      "actual_results": [
+        "electron-builder found no valid Developer ID identity, so the local package is unsigned."
+      ],
+      "evidence": [
+        "Local electron-builder signing output"
+      ],
+      "status": "blocked"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 'use strict';
 
 const https = require('https');
+const { listFishVoices } = require('./fishaudio');
 
 // Curated picks shown at the top of the picker. Includes the two "Hope" voices
 // (the Clear/Relatable/Charismatic one is the default; it's a library voice that
@@ -85,14 +86,38 @@ function fetchUserVoices(apiKey) {
   });
 }
 
-// Curated picks first, then any of the user's own voices not already listed.
-async function listVoices(apiKey) {
-  const user = await fetchUserVoices(apiKey);
+// The Fish library is ~1000 entries and does not change during a session, so
+// fetch it once; opening Preferences should not cost two round trips each time.
+let fishCache = null;
+let fishCacheKey = '';
+async function cachedFishVoices(fishKey) {
+  if (!fishKey) return [];
+  if (fishCache && fishCacheKey === fishKey) return fishCache;
+  const list = await listFishVoices(fishKey);
+  if (list.length) { fishCache = list; fishCacheKey = fishKey; }
+  return list;
+}
+
+// Curated ElevenLabs picks first, then the user's own ElevenLabs voices, then
+// the Fish Audio library. Every entry carries `provider` so the pickers can
+// badge them and so synthesis knows where to route.
+async function listVoices(apiKey, fishKey) {
+  const [user, fish] = await Promise.all([
+    fetchUserVoices(apiKey),
+    cachedFishVoices(fishKey).catch(() => []),
+  ]);
+
   const seen = new Set(CURATED.map((v) => v.voice_id));
-  const merged = CURATED.map((v) => ({ ...v }));
+  const merged = CURATED.map((v) => ({ ...v, provider: 'elevenlabs' }));
   for (const v of user) {
     if (!seen.has(v.voice_id)) {
-      merged.push(v);
+      merged.push({ ...v, provider: 'elevenlabs' });
+      seen.add(v.voice_id);
+    }
+  }
+  for (const v of fish) {
+    if (!seen.has(v.voice_id)) {
+      merged.push(v); // already tagged provider:'fish'
       seen.add(v.voice_id);
     }
   }

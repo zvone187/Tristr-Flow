@@ -56,6 +56,15 @@
         </div>
       </div>
 
+      <details id="fishwrap">
+        <summary>Fish Audio voices <span id="fishstate" class="acct-info"></span></summary>
+        <div class="acct-fields">
+          <input id="fishkey" type="password" placeholder="Fish Audio API key (sk-…)" autocomplete="off" />
+          <button id="btnfishkey" class="acct-ghost">Save key</button>
+        </div>
+        <p id="fishmsg" class="acct-msg"></p>
+      </details>
+
       <div id="shortcuts">
         <div class="sc-row">
           <label>Shortcut</label>
@@ -95,6 +104,15 @@
           <button type="button" data-val="dark">Dark</button>
         </div>
       </div>
+
+      <div id="moderow">
+        <label>Reading window</label>
+        <div id="overlaymode" class="segmented" role="group" aria-label="Reading window">
+          <button type="button" data-val="floating">Floating</button>
+          <button type="button" data-val="menubar">Menu bar</button>
+        </div>
+      </div>
+      <p id="modehint">Floating = a movable pop-up · Menu bar = a dropdown the ▸ menu-bar icon shows/hides (audio keeps playing)</p>
 
       <div id="speedrow">
         <label for="speed">Speed</label>

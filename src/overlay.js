@@ -49,6 +49,7 @@ let currentWord = -1;
 let currentSentence = -1;
 let curSentIdx = 0; // sentence counter while building words
 let timeOffset = 0; // added to a segment's relative timestamps (multi-request)
+let genWord = 0; // words already lifted to full opacity (audio generated)
 
 // Continuous highlight via the CSS Custom Highlight API (one range per sentence,
 // one for the word) — no per-word boxes, so the sentence reads as one block.
@@ -105,6 +106,7 @@ function teardown() {
   currentSentence = -1;
   curSentIdx = 0;
   timeOffset = 0;
+  genWord = 0;
   richMode = false;
   following = true;
   if (followResumeTimer) { clearTimeout(followResumeTimer); followResumeTimer = null; }
@@ -158,7 +160,10 @@ function resetForNew(voice) {
     startRaf();
     updatePlayBtn();
   });
-  audio.addEventListener('pause', () => { updatePlayBtn(); });
+  audio.addEventListener('pause', () => {
+    updatePlayBtn();
+    if (window.speak) window.speak.paused();
+  });
   audio.addEventListener('ended', onPlaybackEnded);
 }
 
@@ -248,6 +253,27 @@ function appendAlignment(a) {
       curWordLast = idx;
       charToWord[idx] = words.length; // index this word will get on flush
     }
+  }
+}
+
+// ---- generation progress -------------------------------------------------
+// A word is "generated" once every one of its characters has a timing, i.e.
+// its last char index is inside charEnd. words[] is in document order and
+// charEnd only grows, so a single advancing cursor covers it.
+function markGenerated() {
+  const upto = charEnd.length;
+  while (genWord < words.length && words[genWord].last < upto) {
+    words[genWord].el.classList.add('gen');
+    genWord++;
+  }
+}
+
+// Synthesis finished: nothing may stay dimmed, even if the returned alignment
+// ran short of the text we rendered (ElevenLabs normalises what it speaks).
+function markAllGenerated() {
+  while (genWord < words.length) {
+    words[genWord].el.classList.add('gen');
+    genWord++;
   }
 }
 
@@ -373,6 +399,14 @@ textEl.addEventListener('click', (e) => {
   const t = charStart[words[wi].first]; // timing for this word's first char
   if (t == null || t > bufferedEnd() - 0.05) { flashStatus('Not generated yet…'); return; }
   audio.currentTime = Math.max(0, t);
+  if (window.speak && window.speak.track) {
+    const total = totalDur();
+    window.speak.track('overlay_interaction', {
+      surface: 'overlay',
+      interaction: 'seek',
+      position_percent: total > 0 ? Math.round((audio.currentTime / total) * 100) : 0,
+    });
+  }
   currentWord = -1; // force re-highlight from the new position
   resumeFollow(); // clicking a word means "follow from here"
   if (audio.paused) audio.play().catch(() => {});
@@ -444,13 +478,26 @@ function stopVoicePreview() {
   if (vPreviewBtn) { vPreviewBtn.textContent = '▶'; vPreviewBtn = null; }
 }
 function closeVoicePanel() {
+  const wasOpen = !voicePanel.hidden;
   stopVoicePreview();
   voicePanel.hidden = true;
+  if (wasOpen && window.speak && window.speak.track) {
+    window.speak.track('overlay_interaction', {
+      surface: 'overlay',
+      interaction: 'voice_picker_closed',
+    });
+  }
   if (mainWasPlayingForPreview && audio && audio.paused) { audio.play().catch(() => {}); updatePlayBtn(); }
   mainWasPlayingForPreview = false;
 }
 async function openVoicePanel() {
   voicePanel.hidden = false;
+  if (window.speak && window.speak.track) {
+    window.speak.track('overlay_interaction', {
+      surface: 'overlay',
+      interaction: 'voice_picker_opened',
+    });
+  }
   if (!voicesCache) {
     voiceListEl.textContent = 'Loading voices…';
     try {
@@ -470,6 +517,20 @@ function renderVoices(voices, currentId) {
     const name = document.createElement('div');
     name.className = 'vname';
     name.textContent = v.name;
+    // Badge the engine so ElevenLabs and Fish Audio voices are never confused.
+    const prov = document.createElement('span');
+    const isFish = v.provider === 'fish';
+    prov.className = 'vprov ' + (isFish ? 'fish' : 'el');
+    prov.textContent = isFish ? 'Fish' : '11L';
+    prov.title = isFish ? 'Fish Audio' : 'ElevenLabs';
+    name.appendChild(prov);
+    if (v.tag === 'custom') {
+      const mine = document.createElement('span');
+      mine.className = 'vprov mine';
+      mine.textContent = 'Yours';
+      mine.title = 'Your own voice on Fish Audio';
+      name.appendChild(mine);
+    }
     meta.appendChild(name);
     if (v.description) {
       const d = document.createElement('div'); d.className = 'vdesc'; d.textContent = v.description; meta.appendChild(d);
@@ -510,8 +571,19 @@ function selectVoice(voiceId, name, row) {
 
 // ---- wiring --------------------------------------------------------------
 playBtn.addEventListener('click', togglePause);
-closeBtn.addEventListener('click', () => { teardown(); if (window.speak) window.speak.close(); });
-settingsBtn.addEventListener('click', () => { if (window.speak && window.speak.openSettings) window.speak.openSettings(); });
+closeBtn.addEventListener('click', () => {
+  if (window.speak && window.speak.track) {
+    window.speak.track('overlay_interaction', { surface: 'overlay', interaction: 'close' });
+  }
+  teardown();
+  if (window.speak) window.speak.close();
+});
+settingsBtn.addEventListener('click', () => {
+  if (window.speak && window.speak.track) {
+    window.speak.track('overlay_interaction', { surface: 'overlay', interaction: 'open_settings' });
+  }
+  if (window.speak && window.speak.openSettings) window.speak.openSettings();
+});
 if (speedDownBtn) speedDownBtn.addEventListener('click', () => stepSpeed(-1));
 if (speedUpBtn) speedUpBtn.addEventListener('click', () => stepSpeed(1));
 voiceEl.addEventListener('click', (e) => { e.stopPropagation(); if (voicePanel.hidden) openVoicePanel(); else closeVoicePanel(); });
@@ -524,7 +596,13 @@ const SCROLL_KEYS = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !voicePanel.hidden) { closeVoicePanel(); return; } // close the picker first
   if (e.code === 'Space' || e.key === ' ') { e.preventDefault(); togglePause(); }
-  else if (e.key === 'Escape') { teardown(); if (window.speak) window.speak.close(); }
+  else if (e.key === 'Escape') {
+    if (window.speak && window.speak.track) {
+      window.speak.track('overlay_interaction', { surface: 'overlay', interaction: 'close' });
+    }
+    teardown();
+    if (window.speak) window.speak.close();
+  }
   else if (e.key === 'ArrowLeft') { e.preventDefault(); stepSpeed(-1); }
   else if (e.key === 'ArrowRight') { e.preventDefault(); stepSpeed(1); }
   else if (SCROLL_KEYS.includes(e.key)) { pauseFollow(); } // user is scrolling with the keyboard
@@ -573,10 +651,13 @@ if (window.speak) {
 
   window.speak.onChunk(({ audioBase64, alignment }) => {
     if (audioBase64) { appendQueue.push(b64ToBytes(audioBase64)); pump(); }
-    if (alignment) { if (richMode) appendAlignmentTimings(alignment); else appendAlignment(alignment); }
+    if (alignment) {
+      if (richMode) appendAlignmentTimings(alignment); else appendAlignment(alignment);
+      markGenerated();
+    }
   });
 
-  window.speak.onAllDone(() => { flushWord(); allReceived = true; pump(); });
+  window.speak.onAllDone(() => { flushWord(); markAllGenerated(); allReceived = true; pump(); });
 
   window.speak.onError(({ message }) => showError(message));
 
@@ -585,4 +666,32 @@ if (window.speak) {
   window.speak.onSpeed(({ speed }) => { if (speed) { playbackSpeed = speed; if (audio) { audio.defaultPlaybackRate = speed; audio.playbackRate = speed; } renderSpeed(); } });
 
   window.speak.onStop(() => { teardown(); });
+}
+
+// ---- window resize handles ----------------------------------------------
+// The native frameless resize band is disabled, so resizing only happens from
+// the strips drawn on the card's outline. Pointer capture keeps the drag alive
+// once the cursor leaves the window; main polls the cursor and moves the edge.
+for (const handle of document.querySelectorAll('.rz')) {
+  let dragging = false;
+
+  const endResize = () => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.classList.remove('rz-active');
+    window.speak.resizeEnd();
+  };
+
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    dragging = true;
+    try { handle.setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
+    document.body.classList.add('rz-active');
+    window.speak.resizeStart(handle.dataset.edge);
+  });
+
+  handle.addEventListener('pointerup', endResize);
+  handle.addEventListener('pointercancel', endResize);
+  handle.addEventListener('lostpointercapture', endResize);
 }

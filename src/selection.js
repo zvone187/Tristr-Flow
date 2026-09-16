@@ -27,10 +27,36 @@
 //     - Only restore if no other process wrote the clipboard after our copy
 //       (concurrent clipboard-manager guard).
 
-const { execFile } = require('child_process');
+const { execFile, execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+
+function normalizeTargetPid(value) {
+  const pid = Number(value);
+  return Number.isInteger(pid) && pid > 0 ? pid : 0;
+}
+
+// Capture this on the tray's mouse-down event, before opening a native menu can
+// make Tristr Flow itself appear frontmost. osascript stays in the background.
+function getFrontmostApplicationPid() {
+  if (process.platform !== 'darwin') return 0;
+  try {
+    const output = execFileSync(
+      '/usr/bin/osascript',
+      [
+        '-l',
+        'JavaScript',
+        '-e',
+        "ObjC.import('AppKit'); var a=$.NSWorkspace.sharedWorkspace.frontmostApplication; a && !a.isNil() ? String(a.processIdentifier) : '0';",
+      ],
+      { encoding: 'utf8', timeout: 750 }
+    );
+    return normalizeTargetPid(String(output).trim());
+  } catch {
+    return 0;
+  }
+}
 
 const CAPTURE_JXA = `
 ObjC.import('AppKit');
@@ -40,6 +66,18 @@ ObjC.import('CoreGraphics');
 ObjC.import('ApplicationServices');
 
 function sleep(s) { $.NSThread.sleepForTimeInterval(s); }
+
+function requestedTargetApplication() {
+  var envValue = $.NSProcessInfo.processInfo.environment.objectForKey('TRISTR_FLOW_TARGET_PID');
+  if (envValue && !envValue.isNil()) {
+    var pid = parseInt(String(ObjC.unwrap(envValue)), 10);
+    if (pid > 0) {
+      var requested = $.NSRunningApplication.runningApplicationWithProcessIdentifier(pid);
+      if (requested && !requested.isNil()) return requested;
+    }
+  }
+  return $.NSWorkspace.sharedWorkspace.frontmostApplication;
+}
 
 // --- lossless clipboard snapshot / restore -------------------------------
 function snapshot(pb) {
@@ -77,9 +115,8 @@ function pollChange(pb, startCount, capSeconds) {
 
 // --- PRIMARY: press Edit > Copy via Accessibility (modifier-immune) -------
 // Returns 'pressed' | 'disabled' | 'notfound' | 'untrusted'.
-function tryAXCopy() {
+function tryAXCopy(fa) {
   if (!$.AXIsProcessTrusted()) return 'untrusted';
-  var fa = $.NSWorkspace.sharedWorkspace.frontmostApplication;
   if (!fa || fa.isNil()) return 'notfound';
   var app = $.AXUIElementCreateApplication(fa.processIdentifier);
 
@@ -128,7 +165,7 @@ function tryAXCopy() {
 }
 
 // --- FALLBACK: clean Cmd+C via session tap after modifiers clear ----------
-function postCleanCmdC() {
+function postCleanCmdC(targetApp) {
   var C = 8, CMD = 0x37;
   var CMD_FLAG = 0x100000;            // kCGEventFlagMaskCommand
   var SESSION_TAP = 1;                // kCGSessionEventTap (above HID merge)
@@ -141,6 +178,16 @@ function postCleanCmdC() {
   while (waited < 0.7) {
     if ((Number($.CGEventSourceFlagsState(HIDSTATE)) & MODBITS) === 0) break;
     sleep(0.02); waited += 0.02;
+  }
+
+  // A tray-menu click can make the status app appear frontmost. The AX path
+  // above can copy from an inactive app, but this keystroke fallback cannot.
+  if (targetApp && !targetApp.isNil()) {
+    var current = $.NSWorkspace.sharedWorkspace.frontmostApplication;
+    if (!current || current.isNil() || Number(current.processIdentifier) !== Number(targetApp.processIdentifier)) {
+      targetApp.activateWithOptions(2); // NSApplicationActivateIgnoringOtherApps
+      sleep(0.08);
+    }
   }
 
   var src = $.CGEventSourceCreate(0); // combined session state
@@ -159,6 +206,7 @@ function postCleanCmdC() {
 function run() {
   var pb = $.NSPasteboard.generalPasteboard;
   var res = { ok: true, changed: false, text: '', html: '', source: 'none', reason: '' };
+  var targetApp = requestedTargetApplication();
 
   if ($.IsSecureEventInputEnabled()) { res.reason = 'secure-input'; return JSON.stringify(res); }
   if (!$.AXIsProcessTrusted()) { res.reason = 'not-trusted'; return JSON.stringify(res); }
@@ -168,7 +216,7 @@ function run() {
 
   // 1) Primary: AX menu Copy (modifier-immune). 'disabled'/'notfound' just fall
   // through to the keystroke path (AX enabled-state can be unreliable in Chrome).
-  var ax = tryAXCopy();
+  var ax = tryAXCopy(targetApp);
   if (ax === 'untrusted') { res.reason = 'not-trusted'; return JSON.stringify(res); }
   var changed = false;
   if (ax === 'pressed') {
@@ -178,7 +226,7 @@ function run() {
 
   // 2) Fallback: clean synthetic Cmd+C.
   if (!changed) {
-    postCleanCmdC();
+    postCleanCmdC(targetApp);
     changed = pollChange(pb, startCount, 0.4);
     if (changed) res.source = 'cmd-c';
   }
@@ -223,41 +271,53 @@ let inFlight = false;
 // Returns { text: string, reason: string }. text === '' means nothing captured;
 // reason is one of: '', 'secure-input', 'not-trusted', 'empty-or-nocopy',
 // 'capture-failed', 'busy', 'unsupported'.
-function getSelectedText() {
+function getSelectedText({ targetPid = 0 } = {}) {
   return new Promise((resolve) => {
     if (process.platform !== 'darwin') {
-      resolve({ text: '', reason: 'unsupported' });
+      resolve({ text: '', html: '', reason: 'unsupported', source: 'none' });
       return;
     }
     if (inFlight) {
-      resolve({ text: '', reason: 'busy' });
+      resolve({ text: '', html: '', reason: 'busy', source: 'none' });
       return;
     }
     if (!fs.existsSync(SCRIPT_PATH) && !ensureScript()) {
-      resolve({ text: '', reason: 'capture-failed' });
+      resolve({ text: '', html: '', reason: 'capture-failed', source: 'none' });
       return;
     }
     inFlight = true;
     execFile(
       '/usr/bin/osascript',
       ['-l', 'JavaScript', SCRIPT_PATH],
-      { timeout: 3000, maxBuffer: 64 * 1024 * 1024 },
+      {
+        timeout: 3000,
+        maxBuffer: 64 * 1024 * 1024,
+        env: {
+          ...process.env,
+          TRISTR_FLOW_TARGET_PID: String(normalizeTargetPid(targetPid)),
+        },
+      },
       (err, stdout, stderr) => {
         inFlight = false;
         if (err) {
           console.error('[selection] osascript error:', stderr || err.message);
-          resolve({ text: '', reason: 'capture-failed' });
+          resolve({ text: '', html: '', reason: 'capture-failed', source: 'none' });
           return;
         }
         try {
           const r = JSON.parse(String(stdout).trim());
-          resolve({ text: (r.text || '').trim(), html: r.html || '', reason: r.reason || '' });
+          resolve({
+            text: (r.text || '').trim(),
+            html: r.html || '',
+            reason: r.reason || '',
+            source: r.source || 'none',
+          });
         } catch {
-          resolve({ text: '', html: '', reason: 'capture-failed' });
+          resolve({ text: '', html: '', reason: 'capture-failed', source: 'none' });
         }
       }
     );
   });
 }
 
-module.exports = { getSelectedText };
+module.exports = { getSelectedText, getFrontmostApplicationPid, normalizeTargetPid };

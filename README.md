@@ -54,6 +54,13 @@ a bare two-letter chord can't be a global shortcut and would misfire constantly
 while typing or gaming, so it's a modifier-anchored `⌃⌥D` instead; change it via
 `SPEAK_HOTKEY2`.)
 
+Tristr Flow checks both native registrations while it is running and retries a
+lost registration after sleep/unlock, periodically, and whenever the tray menu
+opens. The tray shows a check or warning beside each shortcut. **Read selected
+text** is the prominent fallback action; it becomes a warning action when a
+shortcut or macOS Accessibility permission is unavailable. **Read clipboard
+text aloud** remains a separate action and never attempts selection capture.
+
 ### Voice, stability & speed
 
 Open **Preferences — Voice & Stability…** from the menu-bar menu (or ⌘,):
@@ -137,6 +144,21 @@ Applications.
 
 All optional — see [.env.example](.env.example). You can change the voice,
 model, hotkey, and max length via a `.env` next to the app or real env vars.
+
+### Product analytics
+
+PostHog records operational events such as app launch, shortcut registration,
+read trigger, selection-capture outcome, reading/playback lifecycle, settings,
+onboarding, account-mode actions, update checks, overlay controls, voice usage,
+and browser-extension reads. The full taxonomy and suggested funnels are in
+[`docs/analytics.md`](docs/analytics.md).
+It does **not** send selected text, clipboard contents, HTML, email addresses, or
+API/service tokens, voice identifiers, URLs, or arbitrary renderer values.
+Unknown events and invalid property values are rejected before capture. Events
+use a random installation ID, disable PostHog person profiles and IP geolocation,
+and can be disabled with
+`POSTHOG_DISABLED=true`. Use `POSTHOG_HOST=https://eu.i.posthog.com` for an EU
+project; the default is the US ingestion host.
 
 ## Files
 

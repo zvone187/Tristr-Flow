@@ -15,13 +15,18 @@ contextBridge.exposeInMainWorld('speak', {
   // renderer -> main
   richReady: (gen, text, ok) => ipcRenderer.send('overlay:rich-ready', { gen, text, ok }),
   started: () => ipcRenderer.send('overlay:started'),
+  paused: () => ipcRenderer.send('overlay:paused'),
   ended: () => ipcRenderer.send('overlay:ended'),
   close: () => ipcRenderer.send('overlay:close'),
   openSettings: () => ipcRenderer.send('overlay:openSettings'),
   setSpeed: (speed) => ipcRenderer.send('overlay:setSpeed', { speed }),
+  // Custom window resize (native frameless band is off — see createOverlay).
+  resizeStart: (edge) => ipcRenderer.send('overlay:resizeStart', { edge }),
+  resizeEnd: () => ipcRenderer.send('overlay:resizeEnd'),
   // voice picker (reuses the settings IPC)
-  listVoices: () => ipcRenderer.invoke('settings:listVoices'),
-  previewVoice: (voiceId) => ipcRenderer.invoke('settings:preview', { voiceId, speed: 1 }),
-  pickVoice: (voiceId, voiceName) => ipcRenderer.send('settings:setVoice', { voiceId, voiceName }),
+  listVoices: () => ipcRenderer.invoke('settings:listVoices', { source: 'overlay' }),
+  previewVoice: (voiceId) => ipcRenderer.invoke('settings:preview', { voiceId, speed: 1, source: 'overlay' }),
+  pickVoice: (voiceId, voiceName) => ipcRenderer.send('settings:setVoice', { voiceId, voiceName, source: 'overlay' }),
   currentVoiceId: () => ipcRenderer.invoke('settings:get').then((c) => (c && c.voiceId) || null),
+  track: (event, properties) => ipcRenderer.send('analytics:track', { event, properties }),
 });

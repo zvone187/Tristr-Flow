@@ -159,6 +159,19 @@ body {
   background: rgba(160, 107, 255, 0.25);
   color: #c9aaff;
 }
+/* Provider badges: which engine will speak this voice. */
+.vname .chip.prov {
+  background: none;
+  border: 1px solid currentColor;
+  font-weight: 700;
+  opacity: 0.85;
+}
+.vname .chip.mine {
+  background: rgba(63, 191, 166, 0.22);
+  color: #5fd8bd;
+}
+.vname .chip.prov.el { color: #7bb7ff; }
+.vname .chip.prov.fish { color: #3fbfa6; }
 .vdesc {
   color: var(--muted);
   font-size: 11.5px;
@@ -243,7 +256,8 @@ body {
 }
 
 #stabilityrow,
-#themerow {
+#themerow,
+#moderow {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -256,9 +270,18 @@ body {
 #themerow {
   margin-bottom: 12px;
 }
-#themerow label {
+#themerow label,
+#moderow label {
   font-weight: 600;
   width: 80px;
+}
+#moderow {
+  margin-top: 4px;
+}
+#modehint {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 0 0 12px 92px;
 }
 .segmented {
   display: flex;
@@ -424,3 +447,19 @@ body {
 #ownkeywrap summary::-webkit-details-marker { display: none; }
 #ownkeywrap summary:hover { color: var(--text); }
 #acctsignedin { display: flex; gap: 8px; }
+
+/* Fish Audio key: the only way an installed build can get one. */
+#fishwrap {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+#fishwrap summary {
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#fishwrap #fishstate { font-weight: 400; }
+#fishwrap .acct-fields { margin-top: 8px; }
