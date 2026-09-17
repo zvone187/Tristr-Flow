@@ -1281,7 +1281,7 @@ ipcMain.handle('account:get', async () => {
 // Opens the hosted account/billing page in the browser (upgrade / manage Pro).
 ipcMain.handle('account:openBilling', () => {
   captureAnalytics('billing_opened', { surface: 'preferences', account_mode: accountMode() });
-  shell.openExternal(`${config.serviceBaseUrl || 'https://tristr-flow.onrender.com'}/account`);
+  shell.openExternal(`${config.serviceBaseUrl || 'https://tristr-flow-5iy7.onrender.com'}/account`);
   return { ok: true };
 });
 

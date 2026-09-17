@@ -8,6 +8,7 @@ const path = require('path');
 // same kind embedded in websites and desktop clients), not private API keys.
 // Keep the host overrideable so an EU project can use eu.i.posthog.com.
 const DEFAULT_POSTHOG_PROJECT_TOKEN = 'phc_wgzcLfm2CQrYydZJmRmPzHFSR6WykLhKAqrpF3GUdxCB';
+const DEFAULT_SERVICE_BASE_URL = 'https://tristr-flow-5iy7.onrender.com';
 
 // Minimal .env parser (handles quotes; ignores comments / blank lines).
 function parseEnv(content) {
@@ -74,7 +75,7 @@ function loadConfig() {
     fishModelId: merged.FISH_MODEL_ID || 's1',
     // Hosted Tristr Flow service. Used in "service mode" (no own ElevenLabs key):
     // the app logs in and routes TTS through the credit-metered proxy.
-    serviceBaseUrl: merged.SPEAK_SERVICE_URL || 'https://tristr-flow.onrender.com',
+    serviceBaseUrl: merged.SPEAK_SERVICE_URL || DEFAULT_SERVICE_BASE_URL,
     // Force routing through the hosted service even when a local key exists
     // (for testing the service path on a dev machine that has its own key).
     forceService: (merged.SPEAK_FORCE_SERVICE || 'false') === 'true',
@@ -107,4 +108,4 @@ function loadConfig() {
   };
 }
 
-module.exports = { loadConfig };
+module.exports = { DEFAULT_SERVICE_BASE_URL, loadConfig };

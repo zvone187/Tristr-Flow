@@ -8,10 +8,10 @@ const { spawnSync } = require('node:child_process');
 
 const root = path.join(__dirname, '..');
 
-test('release metadata is bumped consistently to 0.1.3', () => {
+test('release metadata is bumped consistently to 0.1.4', () => {
   const pkg = require('../package.json');
   const lock = require('../package-lock.json');
-  assert.equal(pkg.version, '0.1.3');
+  assert.equal(pkg.version, '0.1.4');
   assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[''].version, pkg.version);
   assert.equal(pkg.build.artifactName, 'Tristr-Flow-${version}-${arch}.${ext}');
@@ -52,11 +52,11 @@ test('release recovery uses a fixed signing tool and the immutable requested tag
   const validation = workflow.match(/- name: Validate release tag[\s\S]*?node <<'NODE'\n([\s\S]*?)\n\s+NODE/);
   assert.ok(validation, 'Release tag validation must run before checkout');
   assert.ok(workflow.indexOf('- name: Validate release tag') < workflow.indexOf('- name: Check out repository'));
-  for (const tag of ['v0.1.3', 'main', '../v0.1.3', 'v0.1.3\nmain', '']) {
+  for (const tag of ['v0.1.4', 'main', '../v0.1.4', 'v0.1.4\nmain', '']) {
     const result = spawnSync(process.execPath, ['-e', validation[1]], {
       env: { ...process.env, RELEASE_TAG: tag },
     });
-    assert.equal(result.status === 0, tag === 'v0.1.3', `Unexpected acceptance for ${JSON.stringify(tag)}`);
+    assert.equal(result.status === 0, tag === 'v0.1.4', `Unexpected acceptance for ${JSON.stringify(tag)}`);
   }
 });
 

@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { loadConfig } = require('../src/config');
+const { DEFAULT_SERVICE_BASE_URL, loadConfig } = require('../src/config');
 
 function withEnv(values, fn) {
   const previous = {};
@@ -38,4 +38,8 @@ test('allows the PostHog project and regional ingestion host to be overridden', 
     assert.equal(config.posthogToken, 'replacement-public-token');
     assert.equal(config.posthogHost, 'https://eu.i.posthog.com');
   });
+});
+
+test('ships the production Render service used by the public account site', () => {
+  assert.equal(DEFAULT_SERVICE_BASE_URL, 'https://tristr-flow-5iy7.onrender.com');
 });
