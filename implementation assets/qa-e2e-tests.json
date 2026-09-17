@@ -63,7 +63,7 @@
         "Published artifact checksum"
       ],
       "status": "pending",
-      "notes": "Local Developer ID signing, hardened runtime, secure timestamps, native helper signing, and actual signed entitlements pass. Credentials are ready. Tagged notarization, stapling, and Gatekeeper validation remain pending."
+      "notes": "Initial run failed before publication due to an upstream signing-tool bug. Corrected tool and immutable-tag recovery workflow are under local validation; notarization and production trust gates remain pending."
     },
     {
       "id": "E2E-SIGN-03",
@@ -129,6 +129,8 @@
     "Application and native media helper both pass deep strict codesign verification with expected Developer ID authority, hardened runtime, and secure timestamp. Signed main-app Electron and Apple Events entitlements verified.",
     "No commit, tag, push, PR, or new public release has been created.",
     "Final local recheck: npm ci enabled Husky; all 25 tests, ESLint, production dependency audit, and git diff --check pass. Remote main and v0.1.2 tag state remain unchanged.",
-    "New API private key found at the user-specified location, validated without displaying contents, and matched to the approved Apple API key ID. A protected credential copy was saved; all five encrypted GitHub Actions secrets are now present."
+    "New API private key found at the user-specified location, validated without displaying contents, and matched to the approved Apple API key ID. A protected credential copy was saved; all five encrypted GitHub Actions secrets are now present.",
+    "Release implementation committed as 7c67667 through normal Husky hooks; main fast-forwarded and v0.1.2 pushed atomically. Initial run 35174556374 passed 25 source tests and secret validation but failed before signing/notarization/publication because electron-builder 26.15.3 passes the PKCS12 password instead of the temporary keychain password.",
+    "Recovery pins official electron-builder 26.16.1 and adds a manually dispatched workflow that checks out the existing immutable release tag. New contract test failed before implementation. The v0.1.2 tag remains unchanged."
   ]
 }

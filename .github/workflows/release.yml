@@ -4,12 +4,21 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build without moving it
+        required: true
+        type: string
 
 permissions:
   contents: write
 
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -18,8 +27,18 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
+      - name: Validate release tag
+        run: |
+          node <<'NODE'
+          if (!/^v\d+\.\d+\.\d+$/.test(process.env.RELEASE_TAG || '')) {
+            throw new Error('A release tag in vMAJOR.MINOR.PATCH format is required');
+          }
+          NODE
+
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -31,7 +50,7 @@ jobs:
         run: npm ci
 
       - name: Verify tag matches package version
-        run: node -e "const expected = 'v' + require('./package.json').version; if (process.env.GITHUB_REF_NAME !== expected) { throw new Error('Expected tag ' + expected + ', received ' + process.env.GITHUB_REF_NAME); }"
+        run: node -e "const expected = 'v' + require('./package.json').version; if (process.env.RELEASE_TAG !== expected) { throw new Error('Expected tag ' + expected + ', received ' + process.env.RELEASE_TAG); }"
 
       - name: Lint
         run: npm run lint
@@ -75,7 +94,8 @@ jobs:
           NODE
 
       - name: Build signed and notarized release
-        run: npx electron-builder --mac --arm64 --publish never --config.mac.hardenedRuntime=true --config.forceCodeSigning=true
+        # Pin the fixed signing tool even when recovering a tag with an older lockfile.
+        run: npm exec --yes --package=electron-builder@26.16.1 -- electron-builder --mac --arm64 --publish never --config.mac.hardenedRuntime=true --config.forceCodeSigning=true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
@@ -120,8 +140,8 @@ jobs:
         run: |
           set -euo pipefail
           artifacts=(dist/Tristr-Flow-*-arm64.dmg dist/Tristr-Flow-*-arm64.zip)
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "${artifacts[@]}" --clobber
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${artifacts[@]}" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" "${artifacts[@]}" --title "$GITHUB_REF_NAME" --generate-notes
+            gh release create "$RELEASE_TAG" "${artifacts[@]}" --title "$RELEASE_TAG" --generate-notes
           fi

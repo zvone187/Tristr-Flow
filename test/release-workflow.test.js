@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 
 const root = path.join(__dirname, '..');
 
@@ -39,6 +40,26 @@ test('hardened releases preserve Electron runtime and media automation entitleme
   }
 });
 
+test('release recovery uses a fixed signing tool and the immutable requested tag', () => {
+  const pkg = require('../package.json');
+  const workflow = fs.readFileSync(path.join(root, '.github/workflows/release.yml'), 'utf8');
+  assert.equal(pkg.devDependencies['electron-builder'], '26.16.1');
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /ref: refs\/tags\/\$\{\{ env\.RELEASE_TAG \}\}/);
+  assert.match(workflow, /npm exec --yes --package=electron-builder@26\.16\.1 -- electron-builder/);
+  assert.match(workflow, /process\.env\.RELEASE_TAG/);
+  assert.match(workflow, /gh release create "\$RELEASE_TAG"/);
+  const validation = workflow.match(/- name: Validate release tag[\s\S]*?node <<'NODE'\n([\s\S]*?)\n\s+NODE/);
+  assert.ok(validation, 'Release tag validation must run before checkout');
+  assert.ok(workflow.indexOf('- name: Validate release tag') < workflow.indexOf('- name: Check out repository'));
+  for (const tag of ['v0.1.2', 'main', '../v0.1.2', 'v0.1.2\nmain', '']) {
+    const result = spawnSync(process.execPath, ['-e', validation[1]], {
+      env: { ...process.env, RELEASE_TAG: tag },
+    });
+    assert.equal(result.status === 0, tag === 'v0.1.2', `Unexpected acceptance for ${JSON.stringify(tag)}`);
+  }
+});
+
 test('tagged releases validate before publishing the arm64 macOS app', () => {
   const workflow = fs.readFileSync(path.join(root, '.github/workflows/release.yml'), 'utf8');
   assert.match(workflow, /push:\s*\n\s+tags:\s*\n\s+- ['"]v\*['"]/);
@@ -52,7 +73,7 @@ test('tagged releases validate before publishing the arm64 macOS app', () => {
   assert.match(workflow, /electron-builder --mac --arm64 --publish never/);
   assert.match(workflow, /gh release (?:create|upload)/);
   assert.match(workflow, /GH_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}/);
-  assert.match(workflow, /GITHUB_REF_NAME/);
+  assert.match(workflow, /RELEASE_TAG/);
 });
 
 test('production releases require Developer ID signing and Apple notarization', () => {

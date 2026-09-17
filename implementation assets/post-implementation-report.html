@@ -133,10 +133,10 @@
 				<section class="hero" aria-labelledby="title">
 					<span class="tag">Post-Implementation · Draft</span>
 					<h1 id="title">Apple Notarization</h1>
-					<p><strong>RELEASE VALIDATION PENDING:</strong> Credentials are ready and local Developer ID signing passes. Next: commit with normal hooks, fast-forward to main, tag v0.1.2, push, and verify the signed release and public download.</p>
+					<p><strong>RECOVERY VALIDATION PENDING:</strong> The first v0.1.2 run failed before signing or publication because of an upstream keychain-password bug. A corrected workflow is prepared to retry with electron-builder 26.16.1 while preserving the existing tag.</p>
 				</section>
 				<aside class="meta-stack" aria-label="Report metadata">
-					<div class="card bg-yellow"><small>Delivery status</small><strong>Release validation pending</strong></div>
+					<div class="card bg-yellow"><small>Delivery status</small><strong>Recovery validation pending</strong></div>
 					<div class="card bg-blue"><small>Scope</small><strong>Tristr Flow · v0.1.2 · arm64</strong></div>
 					<div class="card bg-yellow"><small>Snapshot date</small><strong>2026-09-16 · provisional</strong></div>
 				</aside>
@@ -146,7 +146,7 @@
 				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="fast-answer">Fast Answer</h2></div>
 				<div class="grid three">
 					<div class="sticky bg-green"><h3>Credentials ready</h3><p>The certificate matches its private key. The new Developer-scoped API key is located and validated, and all five encrypted Actions secrets are verified present.</p></div>
-					<div class="sticky bg-yellow"><h3>Next release step</h3><p>Commit with normal hooks, fast-forward main, tag v0.1.2, and push. The tagged run must prove signing, Apple notarization, and verification before publication.</p></div>
+					<div class="sticky bg-yellow"><h3>Next release step</h3><p>Validate and commit the recovery fix, then dispatch the workflow from main for existing tag v0.1.2. The retry and public download checks remain pending.</p></div>
 					<div class="sticky bg-pink"><h3>Fresh launch blocked</h3><p>The installed Tristr Flow app owns port 8757. A new packaged-app launch and /ping test need a clean runtime or the existing app to quit.</p></div>
 				</div>
 			</section>
@@ -154,7 +154,7 @@
 			<section class="board-section" aria-labelledby="implementation">
 				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="implementation">Implementation</h2></div>
 				<div class="grid three">
-					<div class="sticky bg-blue"><h3>Release validation</h3><p>The tag workflow requires Apple credentials, enables hardened runtime, and requires code signing. Publishing follows signature and ticket checks.</p></div>
+					<div class="sticky bg-blue"><h3>Release validation</h3><p>The workflow requires credentials, hardened runtime, and code signing. Recovery selects an existing version tag and pins the fixed signing tool; publishing still follows trust checks.</p></div>
 					<div class="sticky bg-purple"><h3>Runtime entitlements</h3><p>The main app retains Electron runtime entitlements and adds Apple Events access for the existing media-control fallback.</p></div>
 					<div class="sticky bg-green"><h3>Local packaging</h3><p>Version metadata is 0.1.2. Local arm64 DMG/ZIP packaging and the ad-hoc signing path pass their current checks.</p></div>
 				</div>
@@ -163,20 +163,20 @@
 			<section class="board-section" aria-labelledby="criteria">
 				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="criteria">Pass Criteria</h2></div>
 				<div class="grid three">
-					<div class="sticky bg-yellow"><h3>Partial · Fail closed</h3><p>Workflow contract tests and local signing with the certificate pass. The tagged Actions job still needs live verification.</p></div>
+					<div class="sticky bg-yellow"><h3>Partial · Fail closed</h3><p>Workflow contracts and local signing pass. The first Actions run stopped before publication on the keychain error; the corrected run still needs verification.</p></div>
 					<div class="sticky bg-yellow"><h3>Partial · Developer ID</h3><p>The local arm64 app and native helper pass Developer ID signature checks, with hardened runtime and secure timestamps. Tagged-release verification remains pending.</p></div>
 					<div class="sticky bg-pink"><h3>Pending · Apple ticket</h3><p>Apple acceptance and a stapled ticket must be verified before GitHub Release publication.</p></div>
 					<div class="sticky bg-pink"><h3>Pending · Public DMG</h3><p>A fresh public download still needs codesign, Gatekeeper, stapler, checksum, launch, and /ping evidence.</p></div>
 					<div class="sticky bg-yellow"><h3>Partial · Local fallback</h3><p>Build, ad-hoc signature, and disk image integrity pass. Fresh local launch and /ping remain blocked.</p></div>
-					<div class="sticky bg-yellow"><h3>Pending · Handoff</h3><p>Direct delivery to main and the v0.1.2 tag remain pending in this draft. No PR is part of this workflow.</p></div>
+					<div class="sticky bg-yellow"><h3>Partial · Handoff</h3><p>Implementation commit 7c67667 and tag v0.1.2 are pushed. The recovery fix commit and successful release are pending. No PR is part of this workflow.</p></div>
 				</div>
 			</section>
 
 			<section class="board-section" aria-labelledby="e2e">
 				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="e2e">End-to-End Verification</h2></div>
 				<div class="grid two">
-					<div class="sticky bg-yellow"><h3>E2E-SIGN-01 · Partial</h3><p>Release workflow and entitlement contract tests pass, and local Developer ID signing succeeds. A tagged run must still verify the production path.</p></div>
-					<div class="sticky bg-pink"><h3>E2E-SIGN-02 · Pending</h3><p>Credentials are ready, and local Developer ID signing and main-app entitlements pass. The tagged build, Apple notarization, stapling, mounted-app assessments, and publication still need verification.</p></div>
+					<div class="sticky bg-yellow"><h3>E2E-SIGN-01 · Partial</h3><p>Workflow and entitlement contracts pass. The first release run stopped on the signing-tool error without publishing; verification of the corrected production path remains pending.</p></div>
+					<div class="sticky bg-pink"><h3>E2E-SIGN-02 · Pending</h3><p>The first run failed during temporary-keychain setup, before signing or notarization. The corrected workflow retry, Apple acceptance, stapling, and publication remain pending.</p></div>
 					<div class="sticky bg-pink"><h3>E2E-SIGN-03 · Pending</h3><p>The public signed DMG is not yet available for this validation. Fresh-download trust checks, launch, and healthy /ping proof are pending.</p></div>
 					<div class="sticky bg-yellow"><h3>E2E-SIGN-04 · Partial</h3><p>Local packaging, complete ad-hoc signature, and DMG integrity pass. The existing listener prevents attributing a new /ping to this build.</p></div>
 				</div>
@@ -185,8 +185,8 @@
 			<section class="board-section" aria-labelledby="checks">
 				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="checks">Checks and Evidence</h2></div>
 				<div class="grid two">
-					<div class="sticky bg-green"><h3>Passed locally</h3><p>ESLint, 25 tests, Husky, local packaging, plist, ad-hoc signature, and DMG integrity checks pass. The local Developer ID app, native helper, and signed entitlements also pass.</p></div>
-					<div class="sticky bg-pink"><h3>Production proof pending</h3><p>Apple notarization, the tagged release, and public artifact trust checks are pending. No browser or native-app screenshots have been captured for this task.</p></div>
+					<div class="sticky bg-green"><h3>Passed locally</h3><p>Prior ESLint, 25 tests, Husky, local packaging, signature, and integrity checks passed. Local Developer ID checks pass; all six focused recovery-workflow tests now pass.</p></div>
+					<div class="sticky bg-pink"><h3>Production proof pending</h3><p>The first run failed without publishing. Corrected-run signing, Apple notarization, and public artifact trust checks remain pending. No task screenshots have been captured.</p></div>
 				</div>
 			</section>
 
@@ -196,15 +196,15 @@
 				<details><summary>Implementation files</summary><div class="detail-body"><ul>
 					<li><a href="../.github/workflows/release.yml">Release workflow</a>: required secrets, temporary API key file, forced signing, hardened runtime, and verification before publishing.</li>
 					<li><a href="../build/entitlements.mac.plist">Main-app entitlements</a>: Electron runtime settings plus Apple Events.</li>
-					<li><a href="../package.json">Package configuration</a> and lockfile: version 0.1.2; explicit main-app entitlements.</li>
+					<li><a href="../package.json">Package configuration</a> and lockfile: app version 0.1.2, main-app entitlements, and an exact electron-builder 26.16.1 pin in the recovery change.</li>
 					<li><a href="../test/release-workflow.test.js">Release tests</a>: version, local ad-hoc fallback, entitlement, and workflow contracts.</li>
 					<li><a href="../scripts/after-pack.js">Existing afterPack hook</a>: local ad-hoc signing remains available.</li>
 					<li><a href="../.gitignore">Credential-file exclusions</a>: <code>*.key.pem</code>, <code>*.p8</code>, <code>*.p12</code>, and <code>*.pfx</code> are ignored.</li>
-					<li><a href="../AGENTS.md">Delivery instructions</a>: tag/version matching, required trust checks, the G2 intermediate in the PKCS12, and protected secret storage are documented.</li>
+					<li><a href="../AGENTS.md">Delivery instructions</a>: tag/version matching, trust checks, the G2 intermediate, protected secrets, and recovery by dispatching an existing tag from main are documented.</li>
 				</ul></div></details>
 				<details><summary>Local validation record</summary><div class="detail-body"><ul>
 					<li><code>npm ci</code> completed and enabled Husky.</li>
-					<li><code>npm run lint</code>, <code>npm test</code> (25 tests), and the Husky pre-commit entry point passed. Lint, all 25 tests, and the production audit pass the most recent completed recheck. Final validation is rerunning after the documentation and ignore-list updates; normal hooks will run again on commit.</li>
+					<li><code>npm run lint</code>, <code>npm test</code> (25 tests), and the Husky pre-commit entry point passed. Lint, all 25 tests, and the production audit pass the most recent completed recheck. All six release-workflow tests pass after adding the recovery contract. Full validation and normal hooks for the recovery commit are pending.</li>
 					<li>Local electron-builder arm64 DMG/ZIP packaging passed with no production signing credentials.</li>
 					<li><code>plutil -lint</code>, <code>codesign --verify --deep --strict</code> for the ad-hoc app, and <code>hdiutil verify</code> for the local DMG passed.</li>
 					<li>Production dependency audit: zero reported vulnerabilities. Installation reported seven development-dependency findings.</li>
@@ -220,22 +220,31 @@
 					<li>The signed main-app entitlements retain Electron runtime permissions and <code>com.apple.security.automation.apple-events</code>; inspection passed.</li>
 					<li>The earlier local build intentionally skipped notarization while the API key file was unavailable. That credential blocker is now resolved; Apple acceptance, stapling, and Gatekeeper validation remain pending in the release run.</li>
 				</ul></div></details>
+				<details open><summary>First release failure and unchanged-tag recovery</summary><div class="detail-body"><ul>
+					<li><a href="https://github.com/zvone187/Tristr-Flow/actions/runs/35174556374">First release run 35174556374</a> failed during temporary-keychain setup, before application signing, notarization, or publication.</li>
+					<li>Root cause: electron-builder 26.15.3 passed the PKCS12 import password to <code>security set-key-partition-list -k</code> instead of the randomly generated keychain password. The runner rejected it with <code>SecKeychainUnlock</code>.</li>
+					<li><a href="https://github.com/electron-userland/electron-builder/pull/10172">Upstream fix #10172</a> corrects the password argument; the fix is included in <a href="https://github.com/electron-userland/electron-builder/releases/tag/electron-builder%4026.16.1">electron-builder 26.16.1</a>. The published package's corrected argument was independently verified.</li>
+					<li>The pending recovery workflow accepts an existing tag, validates its version-shaped name, explicitly checks out <code>refs/tags/RELEASE_TAG</code>, and checks the selected tag against the package version.</li>
+					<li>An explicit <code>npm exec --package=electron-builder@26.16.1</code> uses the fixed signing tool even when the immutable tag's lockfile contains 26.15.3. Publication uses the selected release tag.</li>
+					<li>Implementation commit <code>7c67667</code> and tag <code>v0.1.2</code> are already pushed. The new fix commit and workflow retry are pending; the existing tag will not be moved.</li>
+					<li>Read-only recovery review found no concrete blockers, and all six focused release-workflow tests pass. This does not yet establish successful signing or notarization on the runner.</li>
+				</ul></div></details>
 				<details><summary>Runtime and browser QA limits</summary><div class="detail-body"><p>The existing installed app listens on localhost port 8757. The packaged application requests a single-instance lock and uses that same fixed port. An existing /ping response cannot prove a fresh build works. No existing app was stopped. A clean macOS runtime, or an agreed interruption of the existing app, is needed for unambiguous launch and /ping evidence. There are no screenshots for this task; older screenshots are not used as notarization evidence.</p></div></details>
 				<details><summary>Remaining delivery sequence</summary><div class="detail-body"><ol>
-					<li>Create the normal commit for the validated changes with Husky hooks enabled; all five Actions secrets are ready.</li>
-					<li>Deliver the validated branch directly to main, tag v0.1.2, and push under the authorized no-PR workflow.</li>
+					<li>Finish recovery validation and create the normal fix commit with Husky hooks enabled; all five Actions secrets are ready.</li>
+					<li>Fast-forward the recovery fix to main and push. Keep existing tag v0.1.2 at implementation commit 7c67667, then dispatch the updated workflow from main with that tag.</li>
 					<li>Monitor the authorized release run and verify it signs, receives Apple acceptance, staples, and publishes only after checks pass.</li>
 					<li>Download the public DMG; verify checksum, disk integrity, codesign, Gatekeeper, stapler, fresh launch, and /ping.</li>
 					<li>Update this report and the QA record with actual results and evidence before marking the task complete.</li>
 				</ol></div></details>
 				<details><summary>Handoff and artifacts</summary><div class="detail-body"><ul>
 					<li>Branch: <code>codex/apple-notarization</code>; work continues in the existing isolated worktree.</li>
-					<li>Target tag: <code>v0.1.2</code>. Expected artifacts: <code>Tristr-Flow-0.1.2-arm64.dmg</code> and <code>Tristr-Flow-0.1.2-arm64.zip</code>.</li>
-					<li>At this report snapshot, the commit, tag, push, and release are pending. Credentials are ready; handoff now depends on release and public-artifact validation. No PR and no force push.</li>
+					<li>Existing immutable tag: <code>v0.1.2</code> at <code>7c67667</code>. Expected artifacts: <code>Tristr-Flow-0.1.2-arm64.dmg</code> and <code>Tristr-Flow-0.1.2-arm64.zip</code>.</li>
+					<li>Implementation commit 7c67667 is pushed and v0.1.2 remains unchanged. The first release run failed; the new recovery fix commit, corrected retry, and public-artifact validation are pending. No PR and no force push.</li>
 					<li><a href="qa-e2e-tests.json">QA source of truth</a> · <a href="pre-implementation-report.html">Readiness report</a></li>
 					<li>Public release URL, final checksum, trust output, and fresh-launch evidence: pending.</li>
 				</ul></div></details>
 			</section>
-		<section class="board-section"><div class="card bg-yellow"><h2>Latest credential status</h2><p>Credential setup is complete: the located API key validates and all five encrypted Actions secrets are verified present. The most recent completed local recheck passes all 25 tests, ESLint, production dependency audit, and diff checks. Final validation is rerunning before the normal commit hooks. The signed release and public DMG validation remain pending; no release success is claimed.</p></div></section></main>
+		<section class="board-section"><div class="card bg-yellow"><h2>Latest recovery status</h2><p>All five credentials remain ready. The first run failed because electron-builder 26.15.3 passed the certificate password where macOS requires the temporary keychain password. The 26.16.1 recovery workflow is prepared, with all six focused workflow tests passing. Commit, retry, notarization, and public DMG validation remain pending.</p></div></section></main>
 	</body>
 </html>

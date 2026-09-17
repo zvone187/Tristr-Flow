@@ -1,0 +1,25 @@
+X v0.1.2 Release macOS app · 35174556374
+Triggered via push less than a minute ago
+
+JOBS
+X Build, notarize, and publish arm64 macOS release in 21s (ID 105053273049)
+  ✓ Set up job
+  ✓ Check out repository
+  ✓ Set up Node.js
+  ✓ Install dependencies
+  ✓ Verify tag matches package version
+  ✓ Lint
+  ✓ Test
+  ✓ Validate Apple release secrets
+  ✓ Prepare App Store Connect API key
+  X Build signed and notarized release
+  - Verify Developer ID signature and notarization ticket
+  - Publish verified GitHub release
+  - Post Set up Node.js
+  ✓ Post Check out repository
+  ✓ Complete job
+
+ANNOTATIONS
+X Process completed with exit code 1.
+Build, notarize, and publish arm64 macOS release: .github#43
+
