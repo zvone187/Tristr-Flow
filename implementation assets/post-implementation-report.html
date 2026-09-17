@@ -1,26 +1,241 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Desktop Launch and PostHog — Implementation Report</title>
-    <style>
-      :root { --canvas:#f6f2e8;--ink:#172026;--muted:#65727a;--border:#2c3338;--paper:#fff;--blue:#d9ecff;--green:#dff5df;--yellow:#fff1b8;--pink:#ffe2eb;--purple:#eadfff;--shadow:7px 7px 0 rgba(23,32,38,.18);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif }
-      *{box-sizing:border-box}body{background:linear-gradient(90deg,rgba(47,58,66,.07) 1px,transparent 1px),linear-gradient(rgba(47,58,66,.07) 1px,transparent 1px),var(--canvas);background-size:28px 28px;color:var(--ink);line-height:1.45;margin:0}main{margin:0 auto;padding:30px 22px 52px;width:min(1240px,100%)}header{display:grid;gap:18px;grid-template-columns:1.4fr .8fr;margin-bottom:22px}h1,h2,h3,p{margin:0}h1{font-size:clamp(2rem,5vw,4.4rem);line-height:.96}h2{font-size:1.1rem;text-transform:uppercase}a{color:#0f5f85;font-weight:750;text-decoration:none}code{background:rgba(255,255,255,.72);border:1px solid rgba(47,58,66,.24);border-radius:6px;padding:2px 5px}.hero,.card,details,.sticky{border:2px solid var(--border);box-shadow:var(--shadow)}.hero,.card,details{background:var(--paper);border-radius:16px}.hero{padding:26px}.hero p{color:var(--muted);margin-top:12px;max-width:760px}.meta-stack,.grid{display:grid;gap:14px}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.card{padding:16px}.card small{color:var(--muted);display:block;font-size:.78rem;font-weight:850;text-transform:uppercase}.card strong{display:block;font-size:1.3rem;line-height:1.1;margin-top:4px}.tag,.pill{border:2px solid var(--border);border-radius:999px;display:inline-flex;font-size:.78rem;font-weight:900;padding:5px 9px;text-transform:uppercase}.tag{background:var(--yellow);margin-bottom:12px}.pill{margin:0 6px 6px 0}.board-section{margin-top:24px}.section-title{align-items:center;display:flex;gap:10px;margin-bottom:12px}.pin{background:#ff6b57;border:2px solid var(--border);border-radius:50%;height:16px;width:16px}.sticky{border-radius:3px;min-height:128px;padding:16px;transform:rotate(-.7deg)}.sticky:nth-child(even){transform:rotate(.7deg)}.sticky h3{font-size:1.1rem;margin-bottom:8px}.sticky p,.sticky li{color:#334148;font-size:.94rem}.sticky ul{margin:8px 0 0;padding-left:18px}.bg-blue{background:var(--blue)}.bg-green{background:var(--green)}.bg-yellow{background:var(--yellow)}.bg-pink{background:var(--pink)}.bg-purple{background:var(--purple)}summary{cursor:pointer;font-weight:850;list-style:none;padding:14px 16px}summary:before{content:"+";display:inline-block;font-weight:900;margin-right:10px;width:14px}details[open] summary:before{content:"-"}.detail-body{border-top:2px solid var(--border);color:#334148;padding:14px 16px 16px}.detail-body ul{margin:8px 0 0;padding-left:18px}@media(max-width:900px){header,.grid.two,.grid.three{grid-template-columns:1fr}}
-    </style>
-  </head>
-  <body>
-    <main>
-      <header>
-        <section class="hero" aria-labelledby="title"><span class="tag">Post-Implementation</span><h1 id="title">Desktop Launch + PostHog</h1><p>Version 0.1.1, privacy-safe product analytics, and a tag-driven GitHub release are implemented and locally validated; Apple trust and target-project access remain external blockers.</p></section>
-        <aside class="meta-stack" aria-label="Report metadata"><div class="card bg-yellow"><small>Status</small><strong>Code ready · launch partial</strong></div><div class="card bg-blue"><small>Branch</small><strong>codex/launch-readiness</strong></div><div class="card bg-green"><small>Date</small><strong>2026-09-14</strong></div></aside>
-      </header>
-      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Fast Answer</h2></div><div class="grid three"><div class="sticky bg-green"><h3>Release Works</h3><p>The exact version 0.1.1 package launches, answers its localhost health ping, and produces an arm64 DMG plus ZIP.</p></div><div class="sticky bg-blue"><h3>37 Event Types</h3><p>85 capture points cover activation, tray, onboarding, account, settings, reading, playback, overlay, updates, reliability, and extension use.</p></div><div class="sticky bg-pink"><h3>External Blockers</h3><p>No Developer ID certificate is available, and the connected PostHog organization cannot query the supplied token's project.</p></div></div></section>
-      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Privacy And Design</h2></div><div class="grid three"><div class="sticky bg-green"><h3>Schema Before SDK</h3><p>Unknown events, properties, enum values, secret-like error names, and out-of-range numbers are dropped before PostHog capture.</p></div><div class="sticky bg-purple"><h3>Anonymous Install</h3><p>A random install ID is used. Person profiles and IP geolocation remain disabled on every event.</p></div><div class="sticky bg-yellow"><h3>No User Content</h3><p>No selected/clipboard text, HTML, email, credentials, tokens, URLs, origins, voice IDs, voice names, or free-form renderer values are sent.</p></div></div></section>
-      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Pass Criteria</h2></div><div class="grid three"><div class="sticky bg-green"><h3>Met · Useful Journey</h3><p>All literal capture sites are catalogued; main-process boundaries distinguish surfaces, providers, outcomes, settings, and durations.</p></div><div class="sticky bg-green"><h3>Met · Safe Contract</h3><p>Contract, rejection, bounds, and content-exclusion tests pass against exact outgoing fake-client payloads.</p></div><div class="sticky bg-yellow"><h3>Partial · Server Proof</h3><p>SDK delivery and flush pass. Server-side target-project visibility remains blocked until the correct project is connected.</p></div></div></section>
-      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>End-To-End Evidence</h2></div><div class="grid two"><div class="sticky bg-pink"><h3>E2E-AN-01 · Blocked</h3><p>Installed app and real SDK flush pass; target Live Events query is unavailable because the connected account cannot see the token-owning project.</p></div><div class="sticky bg-yellow"><h3>E2E-AN-02 · Blocked</h3><p>Final app launches, matches the package hash, and reports a healthy bridge. The tray-only UI is not attachable to the available computer-use driver; prior unchanged UI evidence is linked below.</p></div><div class="sticky bg-green"><h3>E2E-AN-03 · Passed</h3><p>Event catalog and typed-property privacy boundary reject unknown and sensitive payload data.</p></div><div class="sticky bg-green"><h3>E2E-AN-04 · Passed</h3><p>Stubbed extension success and missing-provider paths emit useful events without content, URL, origin, or voice identity.</p></div></div></section>
-      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Checks And Evidence</h2></div><div class="grid two"><div class="sticky bg-green"><h3>Passed</h3><ul><li>ESLint and 22 Node tests.</li><li>Production dependency audit: 0 vulnerabilities.</li><li>Tag/version and pinned-action workflow tests.</li><li>117 MB DMG and 115 MB ZIP.</li><li>Exact packaged-app launch and HTTP 200 health ping.</li><li>Real PostHog SDK flush.</li></ul></div><div class="sticky bg-yellow"><h3>Caveats</h3><ul><li>No Developer ID certificate: packaged app remains unsigned.</li><li>Full native interactive QA still requires a physical shortcut/menu pass.</li><li>Target-project query needs PostHog access to the supplied token's project.</li></ul></div></div></section>
-      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Open The Cards</h2></div><details open><summary>Implementation details</summary><div class="detail-body"><ul><li><code>src/analytics.js</code>: central event catalog, typed property rules, anonymous delivery, graceful shutdown.</li><li><code>src/main.js</code>: lifecycle, windows, tray, account, settings, selection, synthesis, playback, shortcut, accessibility, and update events.</li><li><code>.github/workflows/release.yml</code>: pinned GitHub Actions, tag/version validation, lint, tests, and arm64 publishing.</li><li><code>docs/analytics.md</code>: taxonomy, privacy contract, and suggested funnels.</li></ul></div></details><details><summary>Decisions</summary><div class="detail-body">Meaningful custom events were chosen over Electron DOM autocapture so analytics reflects completed product actions and does not observe arbitrary interface content. The release remains arm64-only because the bundled macOS helper is arm64. Publishing is tag-driven and refuses a tag that differs from package.json.</div></details><details><summary>Automated tests</summary><div class="detail-body"><ul><li>Existing shortcut, selection, and configuration tests remain green.</li><li>Catalog and static coverage tests verify all required event types and capture points.</li><li>Unknown-event, typed-property, and numeric-bound tests verify privacy rejection.</li><li>Release tests verify version metadata, pinned actions, validation, and publish arguments.</li></ul></div></details><details><summary>Git and delivery</summary><div class="detail-body"><ul><li>Branch: <code>codex/launch-readiness</code></li><li>Version: <code>0.1.1</code></li><li>Release trigger: an exact version tag such as <code>v0.1.1</code></li><li>Artifacts: <code>Tristr Flow-0.1.1-arm64.dmg</code> and <code>Tristr Flow-0.1.1-arm64-mac.zip</code></li><li>The currently installed 0.1.0 app was restored after testing the packaged 0.1.1 build.</li></ul></div></details><details><summary>QA artifacts</summary><div class="detail-body"><ul><li><a href="qa-e2e-tests.json">QA source of truth</a></li><li><a href="qa-screenshots/tray-menu-healthy.png">Tray menu evidence</a></li><li><a href="qa-screenshots/read-selected-overlay.png">Reading overlay evidence</a></li><li><a href="../docs/analytics.md">Event taxonomy</a></li></ul></div></details></section>
-    </main>
-  </body>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Apple Notarization — Draft Implementation Report</title>
+		<style>
+			:root {
+				--canvas: #f6f2e8;
+				--ink: #172026;
+				--muted: #65727a;
+				--border: #2c3338;
+				--paper: #ffffff;
+				--blue: #d9ecff;
+				--green: #dff5df;
+				--yellow: #fff1b8;
+				--pink: #ffe2eb;
+				--purple: #eadfff;
+				--shadow: 7px 7px 0 rgba(23, 32, 38, 0.18);
+				font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+			}
+
+			* { box-sizing: border-box; }
+
+			body {
+				background:
+					linear-gradient(90deg, rgba(47, 58, 66, 0.07) 1px, transparent 1px),
+					linear-gradient(rgba(47, 58, 66, 0.07) 1px, transparent 1px),
+					var(--canvas);
+				background-size: 28px 28px;
+				color: var(--ink);
+				line-height: 1.45;
+				margin: 0;
+			}
+
+			main {
+				margin: 0 auto;
+				padding: 30px 22px 52px;
+				width: min(1240px, 100%);
+			}
+
+			header {
+				display: grid;
+				gap: 18px;
+				grid-template-columns: 1.4fr 0.8fr;
+				margin-bottom: 22px;
+			}
+
+			h1, h2, h3, p { margin: 0; }
+			h1 { font-size: clamp(2rem, 5vw, 4.4rem); letter-spacing: 0; line-height: 0.96; }
+			h2 { font-size: 1.1rem; letter-spacing: 0; text-transform: uppercase; }
+			a { color: #0f5f85; font-weight: 750; text-decoration: none; }
+			code { background: rgba(255,255,255,0.72); border: 1px solid rgba(47,58,66,0.24); border-radius: 6px; padding: 2px 5px; }
+
+			.hero, .card, details, .sticky {
+				border: 2px solid var(--border);
+				box-shadow: var(--shadow);
+			}
+
+			.hero, .card, details {
+				background: var(--paper);
+				border-radius: 16px;
+			}
+
+			.hero { padding: 26px; }
+			.hero p { color: var(--muted); margin-top: 12px; max-width: 760px; }
+			.meta-stack, .grid { display: grid; gap: 14px; }
+			.grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+			.grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+			.card { padding: 16px; }
+			.card small {
+				color: var(--muted);
+				display: block;
+				font-size: 0.78rem;
+				font-weight: 850;
+				text-transform: uppercase;
+			}
+			.card strong {
+				display: block;
+				font-size: 1.3rem;
+				line-height: 1.1;
+				margin-top: 4px;
+			}
+
+			.tag, .pill {
+				border: 2px solid var(--border);
+				border-radius: 999px;
+				display: inline-flex;
+				font-size: 0.78rem;
+				font-weight: 900;
+				padding: 5px 9px;
+				text-transform: uppercase;
+			}
+
+			.tag { background: var(--yellow); margin-bottom: 12px; }
+			.pill { margin: 0 6px 6px 0; }
+			.board-section { margin-top: 24px; }
+			.section-title { align-items: center; display: flex; gap: 10px; margin-bottom: 12px; }
+			.pin { background: #ff6b57; border: 2px solid var(--border); border-radius: 50%; height: 16px; width: 16px; }
+
+			.sticky {
+				border-radius: 3px;
+				min-height: 128px;
+				padding: 16px;
+				transform: rotate(-0.7deg);
+			}
+			.sticky:nth-child(even) { transform: rotate(0.7deg); }
+			.sticky h3 { font-size: 1.1rem; margin-bottom: 8px; }
+			.sticky p, .sticky li { color: #334148; font-size: 0.94rem; }
+			.sticky ul { margin: 8px 0 0; padding-left: 18px; }
+			.bg-blue { background: var(--blue); }
+			.bg-green { background: var(--green); }
+			.bg-yellow { background: var(--yellow); }
+			.bg-pink { background: var(--pink); }
+			.bg-purple { background: var(--purple); }
+
+			summary { cursor: pointer; font-weight: 850; list-style: none; padding: 14px 16px; }
+			summary::-webkit-details-marker { display: none; }
+			summary:before { content: "+"; display: inline-block; font-weight: 900; margin-right: 10px; width: 14px; }
+			details[open] summary:before { content: "-"; }
+			.detail-body { border-top: 2px solid var(--border); color: #334148; padding: 14px 16px 16px; }
+			.detail-body ul { margin: 8px 0 0; padding-left: 18px; }
+
+			@media (max-width: 900px) {
+				header, .grid.two, .grid.three { grid-template-columns: 1fr; }
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<header>
+				<section class="hero" aria-labelledby="title">
+					<span class="tag">Post-Implementation · Draft</span>
+					<h1 id="title">Apple Notarization</h1>
+					<p><strong>RELEASE VALIDATION PENDING:</strong> Credentials are ready and local Developer ID signing passes. Next: commit with normal hooks, fast-forward to main, tag v0.1.2, push, and verify the signed release and public download.</p>
+				</section>
+				<aside class="meta-stack" aria-label="Report metadata">
+					<div class="card bg-yellow"><small>Delivery status</small><strong>Release validation pending</strong></div>
+					<div class="card bg-blue"><small>Scope</small><strong>Tristr Flow · v0.1.2 · arm64</strong></div>
+					<div class="card bg-yellow"><small>Snapshot date</small><strong>2026-09-16 · provisional</strong></div>
+				</aside>
+			</header>
+
+			<section class="board-section" aria-labelledby="fast-answer">
+				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="fast-answer">Fast Answer</h2></div>
+				<div class="grid three">
+					<div class="sticky bg-green"><h3>Credentials ready</h3><p>The certificate matches its private key. The new Developer-scoped API key is located and validated, and all five encrypted Actions secrets are verified present.</p></div>
+					<div class="sticky bg-yellow"><h3>Next release step</h3><p>Commit with normal hooks, fast-forward main, tag v0.1.2, and push. The tagged run must prove signing, Apple notarization, and verification before publication.</p></div>
+					<div class="sticky bg-pink"><h3>Fresh launch blocked</h3><p>The installed Tristr Flow app owns port 8757. A new packaged-app launch and /ping test need a clean runtime or the existing app to quit.</p></div>
+				</div>
+			</section>
+
+			<section class="board-section" aria-labelledby="implementation">
+				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="implementation">Implementation</h2></div>
+				<div class="grid three">
+					<div class="sticky bg-blue"><h3>Release validation</h3><p>The tag workflow requires Apple credentials, enables hardened runtime, and requires code signing. Publishing follows signature and ticket checks.</p></div>
+					<div class="sticky bg-purple"><h3>Runtime entitlements</h3><p>The main app retains Electron runtime entitlements and adds Apple Events access for the existing media-control fallback.</p></div>
+					<div class="sticky bg-green"><h3>Local packaging</h3><p>Version metadata is 0.1.2. Local arm64 DMG/ZIP packaging and the ad-hoc signing path pass their current checks.</p></div>
+				</div>
+			</section>
+
+			<section class="board-section" aria-labelledby="criteria">
+				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="criteria">Pass Criteria</h2></div>
+				<div class="grid three">
+					<div class="sticky bg-yellow"><h3>Partial · Fail closed</h3><p>Workflow contract tests and local signing with the certificate pass. The tagged Actions job still needs live verification.</p></div>
+					<div class="sticky bg-yellow"><h3>Partial · Developer ID</h3><p>The local arm64 app and native helper pass Developer ID signature checks, with hardened runtime and secure timestamps. Tagged-release verification remains pending.</p></div>
+					<div class="sticky bg-pink"><h3>Pending · Apple ticket</h3><p>Apple acceptance and a stapled ticket must be verified before GitHub Release publication.</p></div>
+					<div class="sticky bg-pink"><h3>Pending · Public DMG</h3><p>A fresh public download still needs codesign, Gatekeeper, stapler, checksum, launch, and /ping evidence.</p></div>
+					<div class="sticky bg-yellow"><h3>Partial · Local fallback</h3><p>Build, ad-hoc signature, and disk image integrity pass. Fresh local launch and /ping remain blocked.</p></div>
+					<div class="sticky bg-yellow"><h3>Pending · Handoff</h3><p>Direct delivery to main and the v0.1.2 tag remain pending in this draft. No PR is part of this workflow.</p></div>
+				</div>
+			</section>
+
+			<section class="board-section" aria-labelledby="e2e">
+				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="e2e">End-to-End Verification</h2></div>
+				<div class="grid two">
+					<div class="sticky bg-yellow"><h3>E2E-SIGN-01 · Partial</h3><p>Release workflow and entitlement contract tests pass, and local Developer ID signing succeeds. A tagged run must still verify the production path.</p></div>
+					<div class="sticky bg-pink"><h3>E2E-SIGN-02 · Pending</h3><p>Credentials are ready, and local Developer ID signing and main-app entitlements pass. The tagged build, Apple notarization, stapling, mounted-app assessments, and publication still need verification.</p></div>
+					<div class="sticky bg-pink"><h3>E2E-SIGN-03 · Pending</h3><p>The public signed DMG is not yet available for this validation. Fresh-download trust checks, launch, and healthy /ping proof are pending.</p></div>
+					<div class="sticky bg-yellow"><h3>E2E-SIGN-04 · Partial</h3><p>Local packaging, complete ad-hoc signature, and DMG integrity pass. The existing listener prevents attributing a new /ping to this build.</p></div>
+				</div>
+			</section>
+
+			<section class="board-section" aria-labelledby="checks">
+				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="checks">Checks and Evidence</h2></div>
+				<div class="grid two">
+					<div class="sticky bg-green"><h3>Passed locally</h3><p>ESLint, 25 tests, Husky, local packaging, plist, ad-hoc signature, and DMG integrity checks pass. The local Developer ID app, native helper, and signed entitlements also pass.</p></div>
+					<div class="sticky bg-pink"><h3>Production proof pending</h3><p>Apple notarization, the tagged release, and public artifact trust checks are pending. No browser or native-app screenshots have been captured for this task.</p></div>
+				</div>
+			</section>
+
+			<section class="board-section" aria-labelledby="details">
+				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="details">Evidence and Follow-ups</h2></div>
+				<details open><summary>Source of truth and snapshot limits</summary><div class="detail-body"><p><a href="qa-e2e-tests.json">qa-e2e-tests.json</a> defines the pass criteria and four E2E cases. Latest credential evidence resolves the earlier blocker: the new API .p8 file was located in the user-designated project directory, its private-key structure validates, and its filename key-ID fingerprint matches the Apple-created key. A protected copy uses mode 0600. All five encrypted Actions secrets are verified present; the QA record may still contain earlier credential notes. This report combines that QA record with the latest task status; it is a draft, not a completion record.</p></div></details>
+				<details><summary>Implementation files</summary><div class="detail-body"><ul>
+					<li><a href="../.github/workflows/release.yml">Release workflow</a>: required secrets, temporary API key file, forced signing, hardened runtime, and verification before publishing.</li>
+					<li><a href="../build/entitlements.mac.plist">Main-app entitlements</a>: Electron runtime settings plus Apple Events.</li>
+					<li><a href="../package.json">Package configuration</a> and lockfile: version 0.1.2; explicit main-app entitlements.</li>
+					<li><a href="../test/release-workflow.test.js">Release tests</a>: version, local ad-hoc fallback, entitlement, and workflow contracts.</li>
+					<li><a href="../scripts/after-pack.js">Existing afterPack hook</a>: local ad-hoc signing remains available.</li>
+					<li><a href="../.gitignore">Credential-file exclusions</a>: <code>*.key.pem</code>, <code>*.p8</code>, <code>*.p12</code>, and <code>*.pfx</code> are ignored.</li>
+					<li><a href="../AGENTS.md">Delivery instructions</a>: tag/version matching, required trust checks, the G2 intermediate in the PKCS12, and protected secret storage are documented.</li>
+				</ul></div></details>
+				<details><summary>Local validation record</summary><div class="detail-body"><ul>
+					<li><code>npm ci</code> completed and enabled Husky.</li>
+					<li><code>npm run lint</code>, <code>npm test</code> (25 tests), and the Husky pre-commit entry point passed. Lint, all 25 tests, and the production audit pass the most recent completed recheck. Final validation is rerunning after the documentation and ignore-list updates; normal hooks will run again on commit.</li>
+					<li>Local electron-builder arm64 DMG/ZIP packaging passed with no production signing credentials.</li>
+					<li><code>plutil -lint</code>, <code>codesign --verify --deep --strict</code> for the ad-hoc app, and <code>hdiutil verify</code> for the local DMG passed.</li>
+					<li>Production dependency audit: zero reported vulnerabilities. Installation reported seven development-dependency findings.</li>
+					<li>Local Developer ID verification also passed after the certificate-chain fix. These results do not establish Apple notarization or successful launch of the final public artifact.</li>
+				</ul></div></details>
+				<details><summary>Credential readiness and successful local signing</summary><div class="detail-body"><ul>
+					<li>All five encrypted Actions secrets are verified present: <code>MAC_CSC_LINK</code>, <code>MAC_CSC_KEY_PASSWORD</code>, <code>APPLE_API_ISSUER</code>, <code>APPLE_API_KEY_ID</code>, and <code>APPLE_API_KEY_BASE64</code>.</li>
+					<li>The new API .p8 was located in the user-designated project directory. Its key structure validates, its filename key-ID fingerprint matches the Apple-created key, and a protected copy was created with mode 0600. No credential values are included in this report.</li>
+					<li>The initial local Developer ID build failed with <code>CSSMERR_TP_NOT_TRUSTED</code>: the exported PKCS12 omitted the G2 intermediate certificate.</li>
+					<li>The official Apple G2 intermediate was obtained, the PKCS12 was exported again with the intermediate, and the certificate secret was updated.</li>
+					<li>The G2-inclusive PKCS12 fixed certificate trust, and the local Developer ID arm64 app build passed.</li>
+					<li>The application and bundled native <code>mediactl</code> helper passed deep strict codesign verification, with the expected Pythagora Developer ID authority, hardened runtime, and secure timestamps.</li>
+					<li>The signed main-app entitlements retain Electron runtime permissions and <code>com.apple.security.automation.apple-events</code>; inspection passed.</li>
+					<li>The earlier local build intentionally skipped notarization while the API key file was unavailable. That credential blocker is now resolved; Apple acceptance, stapling, and Gatekeeper validation remain pending in the release run.</li>
+				</ul></div></details>
+				<details><summary>Runtime and browser QA limits</summary><div class="detail-body"><p>The existing installed app listens on localhost port 8757. The packaged application requests a single-instance lock and uses that same fixed port. An existing /ping response cannot prove a fresh build works. No existing app was stopped. A clean macOS runtime, or an agreed interruption of the existing app, is needed for unambiguous launch and /ping evidence. There are no screenshots for this task; older screenshots are not used as notarization evidence.</p></div></details>
+				<details><summary>Remaining delivery sequence</summary><div class="detail-body"><ol>
+					<li>Create the normal commit for the validated changes with Husky hooks enabled; all five Actions secrets are ready.</li>
+					<li>Deliver the validated branch directly to main, tag v0.1.2, and push under the authorized no-PR workflow.</li>
+					<li>Monitor the authorized release run and verify it signs, receives Apple acceptance, staples, and publishes only after checks pass.</li>
+					<li>Download the public DMG; verify checksum, disk integrity, codesign, Gatekeeper, stapler, fresh launch, and /ping.</li>
+					<li>Update this report and the QA record with actual results and evidence before marking the task complete.</li>
+				</ol></div></details>
+				<details><summary>Handoff and artifacts</summary><div class="detail-body"><ul>
+					<li>Branch: <code>codex/apple-notarization</code>; work continues in the existing isolated worktree.</li>
+					<li>Target tag: <code>v0.1.2</code>. Expected artifacts: <code>Tristr-Flow-0.1.2-arm64.dmg</code> and <code>Tristr-Flow-0.1.2-arm64.zip</code>.</li>
+					<li>At this report snapshot, the commit, tag, push, and release are pending. Credentials are ready; handoff now depends on release and public-artifact validation. No PR and no force push.</li>
+					<li><a href="qa-e2e-tests.json">QA source of truth</a> · <a href="pre-implementation-report.html">Readiness report</a></li>
+					<li>Public release URL, final checksum, trust output, and fresh-launch evidence: pending.</li>
+				</ul></div></details>
+			</section>
+		<section class="board-section"><div class="card bg-yellow"><h2>Latest credential status</h2><p>Credential setup is complete: the located API key validates and all five encrypted Actions secrets are verified present. The most recent completed local recheck passes all 25 tests, ESLint, production dependency audit, and diff checks. Final validation is rerunning before the normal commit hooks. The signed release and public DMG validation remain pending; no release success is claimed.</p></div></section></main>
+	</body>
 </html>

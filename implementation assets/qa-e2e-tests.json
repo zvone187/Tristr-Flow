@@ -1,207 +1,134 @@
 {
-  "version": 2,
-  "status": "partial",
+  "version": 3,
+  "task": "Developer ID signing and Apple notarization",
+  "status": "release_validation_pending",
+  "pass_criteria": [
+    "The tagged release job fails closed when Developer ID signing credentials are missing or invalid.",
+    "The production app is signed with the current organization's Developer ID Application certificate and hardened runtime.",
+    "Apple notarization succeeds and the ticket is stapled before GitHub Release publication.",
+    "The published DMG passes codesign, Gatekeeper, and stapler validation after a fresh download.",
+    "Local unsigned development packaging remains launchable through the existing ad-hoc fallback."
+  ],
   "tests": [
     {
-      "id": "E2E-AN-01",
-      "title": "PostHog receives a real desktop event",
-      "user_story": "As the product owner, I can confirm that the installed desktop app is delivering events to the intended PostHog project.",
+      "id": "E2E-SIGN-01",
+      "title": "Release pipeline fails closed without Apple credentials",
+      "user_story": "As the product owner, I never publish an unsigned production release by accident.",
       "setup_instrumentation": [
-        "Build and install the instrumented macOS app with the supplied project token and US ingestion host.",
-        "Record the installed app's anonymous installation identifier without displaying it in the report.",
-        "Use PostHog Live Events or a schema query in the exact token-owning project."
+        "Run the release workflow contract tests against the committed GitHub Actions YAML.",
+        "Keep the local ad-hoc packaging path separate from the tag-driven production job."
       ],
       "steps": [
-        "Launch the installed app and open its tray menu.",
-        "Wait for the Node SDK batch to flush.",
-        "Query the target project for app_launched and tray_menu_opened from that installation."
+        "Confirm the workflow imports a Developer ID Application certificate from encrypted GitHub secrets.",
+        "Confirm the workflow reconstructs the App Store Connect API key in the runner's temporary directory.",
+        "Confirm electron-builder is invoked with hardened runtime and forceCodeSigning enabled."
       ],
       "expected_results": [
-        "Both events appear in the target project with app version, platform, and architecture.",
-        "The ingestion request completes successfully."
+        "The job cannot silently fall back to an unsigned build.",
+        "No certificate, password, API key, key ID, issuer ID, or team ID is committed to Git."
       ],
       "proof_to_capture": [
-        "PostHog Live Events or query screenshot",
-        "Successful SDK flush evidence"
+        "Passing release workflow contract test",
+        "GitHub Actions log showing signing identity discovery without secret values"
       ],
-      "actual_results": [
-        "The final allowlisted SDK event was accepted locally and shutdown completed its batch flush against the configured US ingestion host.",
-        "The installed packaged app launched successfully and emitted its normal startup events.",
-        "The connected PostHog organization and browser project picker expose the same five projects, none of which owns the supplied project token, so the target Live Events table could not be queried."
-      ],
-      "evidence": [
-        "Final posthog-node capture plus shutdown command passed",
-        "Installed app asar hash matched the final packaged build",
-        "Connected PostHog organization/project inventory"
-      ],
-      "status": "blocked"
+      "status": "passed",
+      "notes": "Workflow contract and entitlements tests pass. The Developer ID signing credential works in a real local production-signing build; all five required Actions secrets are configured."
     },
     {
-      "id": "E2E-AN-02",
-      "title": "Core desktop journey produces useful events without changing behavior",
-      "user_story": "As the product owner, I can understand activation, reading, playback, settings, account, and update behavior.",
+      "id": "E2E-SIGN-02",
+      "title": "Tagged build is signed, notarized, and stapled",
+      "user_story": "As a Mac user, I can open Tristr Flow without an unidentified-developer warning.",
       "setup_instrumentation": [
-        "Run the packaged app with Accessibility enabled and a usable TTS provider.",
-        "Keep the tray, preferences, onboarding, and reading overlay available."
+        "Developer ID Application certificate issued to the current Apple organization.",
+        "App Store Connect API key with the minimum role required for notarization.",
+        "Secrets stored only in the GitHub repository's Actions secrets."
       ],
       "steps": [
-        "Open the tray, preferences, and setup windows.",
-        "Change theme, overlay mode, speed, stability, pause-music, open-at-login, voice, and one shortcut.",
-        "Read selected text, pause/resume, seek, change speed, and finish or stop playback.",
-        "Run a manual update check and exercise a non-secret account-mode action.",
-        "Confirm the original visible workflows still succeed."
+        "Push a release tag matching package.json.",
+        "Build the arm64 app with hardened runtime and Developer ID signing.",
+        "Inspect signed main-app entitlements and verify the Apple Events entitlement and Electron runtime entitlements remain enabled.",
+        "Submit the app to Apple's notary service and wait for acceptance.",
+        "Staple the ticket, mount the DMG, and run codesign, spctl, and stapler validation on the packaged app."
       ],
       "expected_results": [
-        "Meaningful events cover each journey and report only normalized outcome and operational metadata.",
-        "No interaction is double-counted by both renderer and main-process handlers.",
-        "Application behavior is unchanged."
+        "codesign verification succeeds with the Developer ID chain.",
+        "spctl reports the application is accepted.",
+        "stapler validates the embedded notarization ticket.",
+        "Only verified artifacts are published to the GitHub Release.",
+        "Hardened runtime retains the Apple Events capability required by the existing media-control fallback."
       ],
       "proof_to_capture": [
-        "Tray, preferences, and reading overlay screenshots",
-        "Captured fake-client event sequence from automated integration tests"
+        "Successful GitHub Actions release run",
+        "codesign, spctl, and stapler output",
+        "Published artifact checksum"
       ],
-      "actual_results": [
-        "The final packaged app launched from /Applications and its localhost bridge returned a healthy ping.",
-        "Static contract coverage confirmed every literal event emitted by desktop and extension code is present in the event catalog.",
-        "The tray-only app does not expose a window to the available computer-use driver, so the full interactive settings/playback sequence could not be replayed automatically in this pass.",
-        "The inherited tray and selection-overlay screenshots confirm the unchanged user-facing surfaces from the immediately preceding build."
-      ],
-      "evidence": [
-        "implementation assets/qa-screenshots/tray-menu-healthy.png",
-        "implementation assets/qa-screenshots/read-selected-overlay.png",
-        "Passing event-catalog coverage test",
-        "Healthy localhost /ping response from installed app"
-      ],
-      "status": "blocked"
+      "status": "pending",
+      "notes": "Local Developer ID signing, hardened runtime, secure timestamps, native helper signing, and actual signed entitlements pass. Credentials are ready. Tagged notarization, stapling, and Gatekeeper validation remain pending."
     },
     {
-      "id": "E2E-AN-03",
-      "title": "Analytics privacy boundary rejects content and arbitrary renderer data",
-      "user_story": "As a user, my selected text, clipboard, credentials, email, URLs, and free-form UI values never enter analytics.",
+      "id": "E2E-SIGN-03",
+      "title": "Fresh public DMG passes Gatekeeper and launches",
+      "user_story": "As a new customer, I can download, install, and start the public Tristr Flow release normally.",
       "setup_instrumentation": [
-        "Use an injected PostHog client to inspect exact capture payloads.",
-        "Attempt unknown events, secret-like properties, and unapproved string values."
+        "Download the published DMG from the public release URL after the signed release completes.",
+        "Preserve normal download quarantine metadata or explicitly assess the mounted app with Gatekeeper."
       ],
       "steps": [
-        "Capture all approved event/property combinations used by the application.",
-        "Attempt an unknown event name and arbitrary free-form properties.",
-        "Inspect every emitted payload."
+        "Verify the downloaded DMG checksum and disk image integrity.",
+        "Mount the DMG and assess the application with codesign, spctl, and stapler.",
+        "Launch the app and request the localhost /ping endpoint."
       ],
       "expected_results": [
-        "Only catalogued events are emitted.",
-        "Only typed and allowlisted properties survive validation.",
-        "Person profiles and IP geolocation remain disabled."
+        "The downloaded artifact matches the published checksum.",
+        "Gatekeeper accepts the application without a right-click bypass.",
+        "The app launches and returns a healthy ping."
       ],
       "proof_to_capture": [
-        "Passing analytics contract test output",
-        "Event taxonomy documentation"
+        "Public download response and checksum",
+        "Gatekeeper assessment output",
+        "Healthy packaged-app /ping response"
       ],
-      "actual_results": [
-        "Unknown event names never reached the injected PostHog client.",
-        "Selected text, clipboard content, HTML, email, service tokens, arbitrary properties, secret-like error names, and out-of-range numeric data were rejected.",
-        "All emitted payloads retained person-profile and GeoIP disabling flags."
-      ],
-      "evidence": [
-        "test/analytics.test.js",
-        "docs/analytics.md",
-        "20-test passing suite"
-      ],
-      "status": "passed"
+      "status": "pending",
+      "notes": "Awaiting tagged release publication and fresh public DMG verification."
     },
     {
-      "id": "E2E-AN-04",
-      "title": "Browser-extension reading is represented in desktop analytics",
-      "user_story": "As the product owner, I can distinguish extension reading from native desktop reading without collecting page URLs or selected text.",
+      "id": "E2E-SIGN-04",
+      "title": "Local packaging fallback stays usable",
+      "user_story": "As a developer, I can still package and run Tristr Flow locally without production credentials.",
       "setup_instrumentation": [
-        "Start the localhost bridge with an injected analytics recorder and stubbed synthesizer.",
-        "Send authenticated success and failure requests without contacting a real TTS provider."
+        "Run the ordinary local arm64 packaging command with no CSC or Apple notarization environment variables."
       ],
       "steps": [
-        "Submit one valid extension read request and complete the stream.",
-        "Submit a request when no provider key is available.",
-        "Inspect emitted event names and properties."
+        "Build the local app through the existing afterPack hook.",
+        "Verify its complete ad-hoc signature.",
+        "Launch it and request the localhost /ping endpoint."
       ],
       "expected_results": [
-        "Request, completion, and failure events distinguish the extension surface.",
-        "Only character count, segment count, duration, provider, outcome, and reason are captured.",
-        "No origin, URL, page title, or selected text is captured."
+        "The local build remains ad-hoc signed and launchable.",
+        "Production signing requirements are confined to the release workflow."
       ],
       "proof_to_capture": [
-        "Passing localhost bridge telemetry test output"
-      ],
-      "actual_results": [
-        "An ephemeral localhost bridge completed an authenticated stubbed read and reported request plus completion events.",
-        "The missing-provider path reported request plus failure events.",
-        "No origin, URL, selected text, or voice identifier appeared in any recorded properties."
-      ],
-      "evidence": [
-        "test/localserver-analytics.test.js",
-        "Passing tracks extension reads without page or selected-text data test"
-      ],
-      "status": "passed"
-    },
-    {
-      "id": "E2E-REL-01",
-      "title": "Tagged macOS release produces usable arm64 artifacts",
-      "user_story": "As the product owner, I can tag a version and receive a GitHub Release containing a launchable Mac app.",
-      "setup_instrumentation": [
-        "Use the pinned GitHub Actions release workflow and package version 0.1.1.",
-        "Build the same arm64 DMG and ZIP locally without publishing."
-      ],
-      "steps": [
-        "Install exactly from package-lock.json.",
-        "Run lint and all tests.",
-        "Build the arm64 DMG and ZIP.",
-        "Launch the packaged app and request its localhost ping endpoint."
-      ],
-      "expected_results": [
-        "Both distributable artifacts are generated at version 0.1.1.",
-        "The exact packaged application starts and answers its health ping."
-      ],
-      "proof_to_capture": [
-        "electron-builder output",
-        "Artifact checksums",
-        "Packaged-app PID and localhost ping"
-      ],
-      "actual_results": [
-        "Generated a 117 MB DMG and 115 MB ZIP for arm64 macOS.",
-        "The exact packaged application launched and returned HTTP 200 from /ping.",
-        "The release workflow validates that the v-tag matches package.json before publishing."
-      ],
-      "evidence": [
-        ".github/workflows/release.yml",
-        "test/release-workflow.test.js",
-        "Local SHA-256 checksums for both artifacts"
-      ],
-      "status": "passed"
-    },
-    {
-      "id": "E2E-REL-02",
-      "title": "macOS trust and notarization",
-      "user_story": "As a customer, I can open the downloaded app without an unidentified-developer warning.",
-      "setup_instrumentation": [
-        "Provide an Apple Developer ID Application certificate and notarization credentials through GitHub Actions secrets."
-      ],
-      "steps": [
-        "Sign the hardened app.",
-        "Notarize and staple the DMG.",
-        "Install on a clean Mac and verify Gatekeeper acceptance."
-      ],
-      "expected_results": [
-        "Gatekeeper accepts the release without a bypass workflow."
-      ],
-      "proof_to_capture": [
+        "Local electron-builder output",
         "codesign verification",
-        "spctl assessment",
-        "notarytool result"
+        "Healthy local /ping response"
       ],
-      "actual_results": [
-        "electron-builder found no valid Developer ID identity, so the local package is unsigned."
-      ],
-      "evidence": [
-        "Local electron-builder signing output"
-      ],
-      "status": "blocked"
+      "status": "partial",
+      "notes": "Packaging and signature/integrity checks pass. Fresh launch and ping blocked by an existing listener on port 8757."
     }
+  ],
+  "validation_notes": [
+    "2026-09-16: npm ci completed and enabled Husky; ESLint and all 25 tests pass.",
+    "Production dependency audit reports zero vulnerabilities; npm ci reports seven development-dependency findings.",
+    "Husky pre-commit entry point passed; changes remain uncommitted pending credentials and full release validation.",
+    "Local arm64 DMG/ZIP packaging, plutil validation, deep strict ad-hoc codesign, and DMG integrity checks pass.",
+    "A fresh local launch test was not started because port 8757 was already occupied; no existing app was stopped.",
+    "Developer ID Application certificate issued after action-time approval; G2 issuer, expiration 2031-09-16. Private key remains in the protected temporary credential directory.",
+    "App Store Connect internal-use terms accepted and access approved after action-time approval.",
+    "Certificate was saved, matches the prepared private key, and was packaged into an encrypted PKCS12 with the official Apple Developer ID G2 intermediate.",
+    "Local Developer ID signed arm64 app build passed after adding the missing G2 intermediate to the certificate export.",
+    "Application and native media helper both pass deep strict codesign verification with expected Developer ID authority, hardened runtime, and secure timestamp. Signed main-app Electron and Apple Events entitlements verified.",
+    "No commit, tag, push, PR, or new public release has been created.",
+    "Final local recheck: npm ci enabled Husky; all 25 tests, ESLint, production dependency audit, and git diff --check pass. Remote main and v0.1.2 tag state remain unchanged.",
+    "New API private key found at the user-specified location, validated without displaying contents, and matched to the approved Apple API key ID. A protected credential copy was saved; all five encrypted GitHub Actions secrets are now present."
   ]
 }

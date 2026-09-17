@@ -7,3 +7,7 @@ npm-debug.log*
 .gstack/
 fish.audio.key
 *.key
+*.key.pem
+*.p8
+*.p12
+*.pfx

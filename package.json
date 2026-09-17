@@ -1,6 +1,6 @@
 {
   "name": "tristr-flow",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Press a hotkey to read your selected text aloud with ElevenLabs, with a karaoke-style overlay.",
   "main": "src/main.js",
   "author": "Pazi",
@@ -54,6 +54,7 @@
         "zip"
       ],
       "hardenedRuntime": false,
+      "entitlements": "build/entitlements.mac.plist",
       "extendInfo": {
         "NSAppleEventsUsageDescription": "Tristr Flow sends a Copy command to the active app so it can read your highlighted text aloud.",
         "NSMicrophoneUsageDescription": "Not used."

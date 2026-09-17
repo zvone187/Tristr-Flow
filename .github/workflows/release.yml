@@ -14,9 +14,9 @@ concurrency:
 
 jobs:
   release:
-    name: Build and publish arm64 macOS release
+    name: Build, notarize, and publish arm64 macOS release
     runs-on: macos-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -39,7 +39,89 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Build and publish GitHub release
-        run: npx electron-builder --mac --arm64 --publish always
+      - name: Validate Apple release secrets
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          node <<'NODE'
+          const required = [
+            'CSC_LINK',
+            'CSC_KEY_PASSWORD',
+            'APPLE_API_KEY_BASE64',
+            'APPLE_API_KEY_ID',
+            'APPLE_API_ISSUER',
+          ];
+          const missing = required.filter((name) => !process.env[name]);
+          if (missing.length > 0) {
+            throw new Error(`Missing required Apple release secrets: ${missing.join(', ')}`);
+          }
+          NODE
+
+      - name: Prepare App Store Connect API key
+        env:
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = `${process.env.RUNNER_TEMP}/AuthKey_${process.env.APPLE_API_KEY_ID}.p8`;
+          const contents = Buffer.from(process.env.APPLE_API_KEY_BASE64, 'base64');
+          if (contents.length === 0) throw new Error('Decoded App Store Connect API key is empty');
+          fs.writeFileSync(path, contents, { mode: 0o600 });
+          NODE
+
+      - name: Build signed and notarized release
+        run: npx electron-builder --mac --arm64 --publish never --config.mac.hardenedRuntime=true --config.forceCodeSigning=true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY: ${{ runner.temp }}/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+
+      - name: Verify Developer ID signature and notarization ticket
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          app_path="dist/mac-arm64/Tristr Flow.app"
+          dmg_path="$(find dist -maxdepth 1 -name 'Tristr-Flow-*-arm64.dmg' -print -quit)"
+          test -d "$app_path"
+          test -f "$dmg_path"
+
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          spctl --assess --type execute --verbose=4 "$app_path"
+          xcrun stapler validate "$app_path"
+          hdiutil verify "$dmg_path"
+
+          mount_dir="$(mktemp -d "${RUNNER_TEMP}/tristr-flow-dmg.XXXXXX")"
+          cleanup() {
+            hdiutil detach "$mount_dir" >/dev/null 2>&1 || true
+            rmdir "$mount_dir" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          hdiutil attach "$dmg_path" -nobrowse -readonly -mountpoint "$mount_dir"
+          mounted_app="$mount_dir/Tristr Flow.app"
+          codesign --verify --deep --strict --verbose=2 "$mounted_app"
+          spctl --assess --type execute --verbose=4 "$mounted_app"
+          xcrun stapler validate "$mounted_app"
+          shasum -a 256 "$dmg_path"
+
+      - name: Publish verified GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          artifacts=(dist/Tristr-Flow-*-arm64.dmg dist/Tristr-Flow-*-arm64.zip)
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${artifacts[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "${artifacts[@]}" --title "$GITHUB_REF_NAME" --generate-notes
+          fi

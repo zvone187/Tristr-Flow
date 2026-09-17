@@ -5,3 +5,5 @@
 - Install dependencies so Husky is active, then run the pre-commit hook and focused release checks.
 - Once the change is tested and ready, fast-forward it directly to `main` and push `main`.
 - Never force-push.
+- Release tags must match the package version. The release workflow requires Developer ID signing and Apple notarization, and publishes only after signature, Gatekeeper, and stapler checks pass.
+- Keep the Apple Developer ID G2 intermediate in the exported signing certificate bundle. Store private keys and export passwords only in protected local credential storage and encrypted GitHub Actions secrets; never commit them.
