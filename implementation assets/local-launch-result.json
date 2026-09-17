@@ -1,0 +1,24 @@
+{
+  "kind": "local-ad-hoc",
+  "listenerMatchesNewProcess": true,
+  "isolatedProfileVerified": true,
+  "ping": {
+    "ok": true,
+    "app": "tristr-flow"
+  },
+  "nativeWelcomeUiVerified": true,
+  "screenshotCapturedInConversation": true,
+  "installedAppRestored": true,
+  "status": "passed",
+  "adHocSignatureVerified": true,
+  "analyticsDisabledForTest": true,
+  "isolatedSettingsCreated": true,
+  "testApplicationQuit": true,
+  "installedExecutablePathVerified": true,
+  "restoredInstalledAppPingHealthy": true,
+  "screenshotSavedToFile": false,
+  "screenshotEvidence": "Native Welcome to Tristr Flow screenshot is inline in the conversation; no filesystem-save capability was exposed.",
+  "inAppBrowserPingNavigation": "ERR_BLOCKED_BY_CLIENT",
+  "uiValidation": "Actual native Electron welcome window inspected from the temporary application path.",
+  "scope": "Local ad-hoc packaging fallback. Public signed-release proof is recorded separately in public-release-verification.json."
+}

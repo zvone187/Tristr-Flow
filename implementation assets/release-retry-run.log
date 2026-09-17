@@ -1,0 +1,24 @@
+Run: https://github.com/zvone187/Tristr-Flow/actions/runs/35175176892
+Workflow commit: 4555d5878c32edcb4d9928dc947a2f0caf172233
+Status: completed
+Conclusion: success
+completed: Set up job (success)
+completed: Validate release tag (success)
+completed: Check out repository (success)
+completed: Set up Node.js (success)
+completed: Install dependencies (success)
+completed: Verify tag matches package version (success)
+completed: Lint (success)
+completed: Test (success)
+completed: Validate Apple release secrets (success)
+completed: Prepare App Store Connect API key (success)
+completed: Build signed and notarized release (success)
+completed: Verify Developer ID signature and notarization ticket (success)
+completed: Publish verified GitHub release (success)
+completed: Post Set up Node.js (success)
+completed: Post Check out repository (success)
+completed: Complete job (success)
+Apple notarization: successful
+Runner Gatekeeper source: Notarized Developer ID
+Runner staple validation: passed
+Publication: verified DMG and ZIP uploaded
