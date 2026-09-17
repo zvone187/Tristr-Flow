@@ -26,7 +26,8 @@ const { synthesize, synthesizeStream, clampSpeed, clampStability } = require('./
 const { isFishVoice, synthesizeFish, synthesizeFishStream } = require('./fishaudio');
 const svc = require('./service');
 const updater = require('./update');
-const { listVoices, CURATED } = require('./voices');
+const { listVoices, mergeVoices, CURATED } = require('./voices');
+const { routeVoice } = require('./provider-routing');
 const settingsStore = require('./settings');
 const localserver = require('./localserver');
 const mediaCtl = require('./media');
@@ -645,10 +646,20 @@ function useService() {
   return !effectiveKey() && !!(state && state.serviceToken);
 }
 
-// Fish Audio is always called directly with its own key: the hosted service
-// proxies ElevenLabs only, so a Fish voice never routes through it.
+// A personal Fish key remains an optional direct-provider override. Otherwise,
+// signed-in users use the same authenticated service proxy as ElevenLabs.
 function effectiveFishKey() {
   return (state && state.fishKey) || config.fishApiKey || '';
+}
+
+function routeForVoice(voiceId) {
+  return routeVoice({
+    voiceId,
+    elevenKey: effectiveKey(),
+    fishKey: effectiveFishKey(),
+    serviceToken: (state && state.serviceToken) || '',
+    forceService: !!config.forceService,
+  });
 }
 
 // Can we speak at all right now? Either provider being usable is enough.
@@ -673,7 +684,8 @@ function streamSegment(text, gen, index) {
     const onEnd = () => { activeStream = null; resolve(); };
     const onError = (err) => { activeStream = null; reject(err); };
 
-    if (isFishVoice(state.voiceId)) {
+    const route = routeForVoice(state.voiceId);
+    if (route === 'fish-direct') {
       activeStream = synthesizeFishStream({
         apiKey: effectiveFishKey(),
         voiceId: state.voiceId,
@@ -681,7 +693,7 @@ function streamSegment(text, gen, index) {
         text,
         onLine, onEnd, onError,
       });
-    } else if (useService()) {
+    } else if (route === 'service') {
       activeStream = svc.serviceStream({
         baseUrl: config.serviceBaseUrl,
         token: state.serviceToken,
@@ -690,7 +702,7 @@ function streamSegment(text, gen, index) {
         text,
         onLine, onEnd, onError,
       });
-    } else {
+    } else if (route === 'elevenlabs-direct') {
       activeStream = synthesizeStream({
         apiKey: effectiveKey(),
         voiceId: state.voiceId,
@@ -699,6 +711,8 @@ function streamSegment(text, gen, index) {
         stability: state.stability,
         onLine, onEnd, onError,
       });
+    } else {
+      reject(new Error('Sign in to Tristr Flow or add an API key to use this voice.'));
     }
   });
 }
@@ -1183,8 +1197,9 @@ ipcMain.handle('settings:get', () => ({
   voiceName: state.voiceName,
   speed: state.speed,
   stability: state.stability,
-  apiKeyPresent: !!config.apiKey,
+  apiKeyPresent: !!effectiveKey(),
   fishKeyPresent: !!effectiveFishKey(),
+  fishServiceAvailable: !!state.serviceToken,
   model: config.modelId,
   speedSupported: true, // speed is now client-side playbackRate — works on every model
   hotkey: state.hotkey,
@@ -1336,9 +1351,9 @@ ipcMain.handle('account:logout', () => {
   return { ok: true };
 });
 
-// Static curated voice list for onboarding (works with or without a key/login,
-// unlike settings:listVoices which queries the ElevenLabs library).
-ipcMain.handle('voices:curated', () => CURATED);
+// Onboarding starts with the curated ElevenLabs voices, then refreshes after
+// authentication so account-backed Fish voices are available immediately.
+ipcMain.handle('voices:curated', () => availableVoices());
 
 ipcMain.on('onboarding:finish', () => {
   state.onboarded = true;
@@ -1354,8 +1369,8 @@ ipcMain.on('onboarding:finish', () => {
 // Lets a user run in direct mode with their own ElevenLabs key (no login),
 // without editing .env. Empty string clears it (falls back to env key if any).
 // Fish Audio key. Kept separate from the ElevenLabs own-key: a user can have
-// one, both, or neither, and this is the only way an installed build can get a
-// Fish key at all (the dev-machine file paths in config.js never exist there).
+// one, both, or neither. A local key is a direct-provider override; without it,
+// signed-in users use the service's Fish account.
 ipcMain.handle('account:setFishKey', (_e, { key, source = 'preferences' }) => {
   state.fishKey = String(key || '').trim();
   if (state.fishKey) state.onboarded = true;
@@ -1370,7 +1385,11 @@ ipcMain.handle('account:setFishKey', (_e, { key, source = 'preferences' }) => {
   });
   // voices.js keys its Fish cache on the key value, so the next listVoices()
   // refetches on its own.
-  return { ok: true, present: !!effectiveFishKey() };
+  return {
+    ok: true,
+    present: !!effectiveFishKey(),
+    serviceAvailable: !!state.serviceToken,
+  };
 });
 
 ipcMain.handle('account:setOwnKey', (_e, { key, source = 'preferences' }) => {
@@ -1458,10 +1477,25 @@ ipcMain.handle('settings:setHotkey', (_e, { which, accel, source = 'preferences'
   return { ok: true, hotkey: state.hotkey, hotkey2: state.hotkey2 || '' };
 });
 
+async function availableVoices() {
+  const localVoices = await listVoices(effectiveKey(), effectiveFishKey());
+  if (!state.serviceToken || effectiveFishKey()) return localVoices;
+  try {
+    const serviceVoices = await svc.listServiceVoices({
+      baseUrl: config.serviceBaseUrl,
+      token: state.serviceToken,
+    });
+    return mergeVoices(localVoices, serviceVoices);
+  } catch (error) {
+    console.warn('[voices] service catalogue unavailable:', error && error.message ? error.message : 'unknown error');
+    return localVoices;
+  }
+}
+
 ipcMain.handle('settings:listVoices', async (_e, { source = 'preferences' } = {}) => {
   const startedAt = Date.now();
   try {
-    const voices = await listVoices(config.apiKey, effectiveFishKey());
+    const voices = await availableVoices();
     captureAnalytics('voice_list_completed', {
       surface: source,
       outcome: 'success',
@@ -1482,36 +1516,58 @@ ipcMain.handle('settings:listVoices', async (_e, { source = 'preferences' } = {}
 
 ipcMain.handle('settings:preview', async (_e, { voiceId, speed, source = 'preferences' }) => {
   const startedAt = Date.now();
-  // Preview currently calls provider SDKs directly, even when full readings
-  // use the hosted service, so report the path actually exercised here.
   const provider = isFishVoice(voiceId) ? 'fish' : 'elevenlabs';
+  const route = routeForVoice(voiceId);
+  const text = "Hey! This is how I sound. I'll read your selected text aloud, just like this.";
   try {
-    if (isFishVoice(voiceId)) {
-      const fr = await synthesizeFish({
-        apiKey: effectiveFishKey(),
+    if (route === 'service') {
+      const result = await svc.serviceSynthesize({
+        baseUrl: config.serviceBaseUrl,
+        token: state.serviceToken,
         voiceId,
-        modelId: config.fishModelId,
-        text: "Hey! This is how I sound. I'll read your selected text aloud, just like this.",
+        stability: state.stability,
+        text,
       });
       captureAnalytics('voice_preview_completed', {
         surface: source,
         provider,
+        delivery: 'service',
+        outcome: 'success',
+        duration_ms: Date.now() - startedAt,
+      });
+      return result;
+    }
+    if (route === 'fish-direct') {
+      const fr = await synthesizeFish({
+        apiKey: effectiveFishKey(),
+        voiceId,
+        modelId: config.fishModelId,
+        text,
+      });
+      captureAnalytics('voice_preview_completed', {
+        surface: source,
+        provider,
+        delivery: 'direct',
         outcome: 'success',
         duration_ms: Date.now() - startedAt,
       });
       return { audioBase64: fr.audio_base64 };
     }
+    if (route !== 'elevenlabs-direct') {
+      throw new Error('Sign in to Tristr Flow or add an API key to preview this voice.');
+    }
     const result = await synthesize({
-      apiKey: config.apiKey,
+      apiKey: effectiveKey(),
       voiceId,
       modelId: config.modelId,
       speed: clampSpeed(speed),
       stability: state.stability,
-      text: "Hey! This is how I sound. I'll read your selected text aloud, just like this.",
+      text,
     });
     captureAnalytics('voice_preview_completed', {
       surface: source,
       provider,
+      delivery: 'direct',
       outcome: 'success',
       duration_ms: Date.now() - startedAt,
     });

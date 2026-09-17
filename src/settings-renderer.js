@@ -197,13 +197,8 @@ async function init() {
   setActiveStability(cfg.stability);
   speedEl.value = cfg.speed;
   speedValEl.textContent = speedLabel(cfg.speed);
-  setFishState(cfg.fishKeyPresent);
-  if (cfg.apiKeyPresent) {
-    keyStateEl.textContent = '✓ ElevenLabs connected';
-  } else {
-    keyStateEl.textContent = '⚠ No API key';
-    keyStateEl.classList.add('warn');
-  }
+  setFishState(cfg.fishKeyPresent, cfg.fishServiceAvailable);
+  setProviderState(cfg);
 
   voices = await window.prefs.listVoices();
   // Make sure the currently-selected voice is visible even if not curated.
@@ -212,6 +207,7 @@ async function init() {
       voice_id: selectedId,
       name: cfg.voiceName || 'Current voice',
       description: '',
+      provider: selectedId.startsWith('fish:') ? 'fish' : 'elevenlabs',
     });
   }
   render('');
@@ -408,8 +404,8 @@ function acctMsg(text, isErr) {
 }
 
 function renderAccount(a) {
-  const signedIn = a.mode === 'service';
-  const ownKey = a.mode === 'direct';
+  const signedIn = !!a.signedIn;
+  const ownKey = !!a.hasOwnKey;
   acctSignedOutEl.hidden = signedIn || ownKey;
   acctSignedInEl.hidden = !(signedIn || ownKey);
   if (signedIn) {
@@ -417,9 +413,10 @@ function renderAccount(a) {
       ? ` · ~${a.minutesLeft} min left`
       : (a.creditsDollars != null ? ` · $${a.creditsDollars} left` : '');
     const planTag = a.plan === 'pro' ? ' · Pro' : '';
-    acctInfoEl.textContent = `Signed in as ${a.email}${planTag}${left}`;
+    const directTag = ownKey ? ' · personal ElevenLabs key' : '';
+    acctInfoEl.textContent = `Signed in as ${a.email}${planTag}${left}${directTag}`;
     btnLogout.hidden = false;
-    btnClearKey.hidden = true;
+    btnClearKey.hidden = !ownKey || a.ownKeyFromEnv;
     btnUpgrade.hidden = a.plan === 'pro';  // offer upgrade only on the free plan
     btnBilling.hidden = a.plan !== 'pro';  // manage only when subscribed
   } else if (ownKey) {
@@ -461,13 +458,22 @@ async function doAuth(fn, action) {
   btnLogin.disabled = btnSignup.disabled = true;
   const r = await fn(email, pass);
   btnLogin.disabled = btnSignup.disabled = false;
-  if (r && r.ok) { acctPassEl.value = ''; acctMsg(''); await loadAccount(); }
+  if (r && r.ok) {
+    acctPassEl.value = '';
+    acctMsg('');
+    await loadAccount();
+    await refreshVoiceAccess();
+  }
   else { acctMsg((r && r.error) || 'Could not sign in.', true); }
 }
 
 if (btnLogin) btnLogin.addEventListener('click', () => doAuth(window.prefs.login, 'login'));
 if (btnSignup) btnSignup.addEventListener('click', () => doAuth(window.prefs.signup, 'signup'));
-if (btnLogout) btnLogout.addEventListener('click', async () => { await window.prefs.logout(); await loadAccount(); });
+if (btnLogout) btnLogout.addEventListener('click', async () => {
+  await window.prefs.logout();
+  await loadAccount();
+  await refreshVoiceAccess();
+});
 if (btnOwnKey) btnOwnKey.addEventListener('click', async () => {
   const key = (ownKeyEl.value || '').trim();
   if (!key) {
@@ -483,10 +489,41 @@ if (btnOwnKey) btnOwnKey.addEventListener('click', async () => {
   await window.prefs.setOwnKey(key);
   ownKeyEl.value = '';
   await loadAccount();
+  await refreshVoiceAccess();
 });
-function setFishState(present) {
-  if (fishStateEl) fishStateEl.textContent = present ? '✓ connected' : 'not connected';
+function setProviderState(cfg) {
+  if (!keyStateEl) return;
+  keyStateEl.classList.remove('warn');
+  if (cfg.apiKeyPresent) keyStateEl.textContent = '✓ personal ElevenLabs key';
+  else if (cfg.fishServiceAvailable) keyStateEl.textContent = '✓ ElevenLabs + Fish included';
+  else {
+    keyStateEl.textContent = '⚠ Sign in or add a key';
+    keyStateEl.classList.add('warn');
+  }
+}
+function setFishState(present, serviceAvailable) {
+  if (fishStateEl) {
+    fishStateEl.textContent = present
+      ? '✓ personal key'
+      : (serviceAvailable ? '✓ included with account' : 'sign in or add a key');
+  }
   if (fishKeyEl) fishKeyEl.placeholder = present ? 'Key saved — paste a new one to replace' : 'Fish Audio API key (sk-…)';
+}
+
+async function refreshVoiceAccess() {
+  const cfg = await window.prefs.get();
+  setProviderState(cfg);
+  setFishState(cfg.fishKeyPresent, cfg.fishServiceAvailable);
+  voices = await window.prefs.listVoices();
+  if (selectedId && !voices.some((v) => v.voice_id === selectedId)) {
+    voices.unshift({
+      voice_id: selectedId,
+      name: cfg.voiceName || 'Current voice',
+      description: '',
+      provider: selectedId.startsWith('fish:') ? 'fish' : 'elevenlabs',
+    });
+  }
+  render(searchEl.value || '');
 }
 
 // Saving a Fish key changes which voices exist, so refresh the list in place
@@ -495,11 +532,11 @@ if (btnFishKey) btnFishKey.addEventListener('click', async () => {
   const key = (fishKeyEl.value || '').trim();
   const r = await window.prefs.setFishKey(key);
   fishKeyEl.value = '';
-  setFishState(r && r.present);
+  setFishState(r && r.present, r && r.serviceAvailable);
   if (fishMsgEl) {
     fishMsgEl.textContent = key
       ? (r && r.present ? 'Saved. Loading Fish Audio voices…' : 'Could not save that key.')
-      : 'Fish Audio key removed.';
+      : (r && r.serviceAvailable ? 'Personal key removed — using Fish Audio through your account.' : 'Fish Audio key removed.');
     fishMsgEl.classList.toggle('err', !!key && !(r && r.present));
   }
   voices = await window.prefs.listVoices();
@@ -510,7 +547,11 @@ if (btnFishKey) btnFishKey.addEventListener('click', async () => {
   }
 });
 
-if (btnClearKey) btnClearKey.addEventListener('click', async () => { await window.prefs.setOwnKey(''); await loadAccount(); });
+if (btnClearKey) btnClearKey.addEventListener('click', async () => {
+  await window.prefs.setOwnKey('');
+  await loadAccount();
+  await refreshVoiceAccess();
+});
 if (btnUpgrade) btnUpgrade.addEventListener('click', () => window.prefs.openBilling());
 if (btnBilling) btnBilling.addEventListener('click', () => window.prefs.openBilling());
 [acctEmailEl, acctPassEl].forEach((el) => el && el.addEventListener('keydown', (e) => {

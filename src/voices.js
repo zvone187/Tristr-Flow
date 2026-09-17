@@ -124,4 +124,15 @@ async function listVoices(apiKey, fishKey) {
   return merged;
 }
 
-module.exports = { listVoices, CURATED };
+function mergeVoices(localVoices, serviceVoices) {
+  const merged = [];
+  const seen = new Set();
+  for (const voice of [...(localVoices || []), ...(serviceVoices || [])]) {
+    if (!voice || !voice.voice_id || seen.has(voice.voice_id)) continue;
+    seen.add(voice.voice_id);
+    merged.push(voice);
+  }
+  return merged;
+}
+
+module.exports = { listVoices, mergeVoices, CURATED };

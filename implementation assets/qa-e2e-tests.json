@@ -1,168 +1,58 @@
 {
-  "version": 5,
-  "task": "Developer ID signing and Apple notarization",
-  "status": "passed",
-  "pass_criteria": [
-    "The tagged release job fails closed when Developer ID signing credentials are missing or invalid.",
-    "The production app is signed with the current organization's Developer ID Application certificate and hardened runtime.",
-    "Apple notarization succeeds and the ticket is stapled before GitHub Release publication.",
-    "The published DMG passes codesign, Gatekeeper, and stapler validation after a fresh download.",
-    "Local unsigned development packaging remains launchable through the existing ad-hoc fallback."
-  ],
-  "tests": [
+  "project": "Tristr Flow desktop",
+  "branch": "codex/fish-backend-proxy",
+  "date": "2026-09-17",
+  "status": "PENDING_IMPLEMENTATION",
+  "cases": [
     {
-      "id": "E2E-SIGN-01",
-      "title": "Release pipeline fails closed without Apple credentials",
-      "user_story": "As the product owner, I never publish an unsigned production release by accident.",
-      "setup_instrumentation": [
-        "Run the release workflow contract tests against the committed GitHub Actions YAML.",
-        "Keep the local ad-hoc packaging path separate from the tag-driven production job."
-      ],
-      "steps": [
-        "Confirm the workflow imports a Developer ID Application certificate from encrypted GitHub secrets.",
-        "Confirm the workflow reconstructs the App Store Connect API key in the runner's temporary directory.",
-        "Confirm electron-builder is invoked with hardened runtime and forceCodeSigning enabled."
-      ],
-      "expected_results": [
-        "The job cannot silently fall back to an unsigned build.",
-        "No certificate, password, API key, key ID, issuer ID, or team ID is committed to Git."
-      ],
-      "proof_to_capture": [
-        "Passing release workflow contract test",
-        "GitHub Actions log showing signing identity discovery without secret values"
-      ],
-      "status": "passed",
-      "notes": "Required-secret, forced-signing, workflow, and entitlement contracts pass. The initial signing-tool failure stopped publication. Recovery passed all 26 tests, lint, and normal Husky hooks; corrected release run 35175176892 completed successfully. The actual Actions success summary and completed job were verified in the browser, with an inline screenshot."
+      "id": "E2E-FISH-VOICES-01",
+      "title": "A signed-in DMG user sees ElevenLabs and Fish voices without provider keys",
+      "userStory": "As a Tristr Flow customer, I can choose either provider after signing in.",
+      "setupInstrumentation": ["Fresh installed build", "Disposable Tristr account", "No local ElevenLabs or Fish keys", "Backend request log with secrets redacted"],
+      "steps": ["Sign in", "Open onboarding voice choice and Preferences", "Observe GET /api/voices", "Search for Fish and ElevenLabs voices"],
+      "expectedResults": ["Curated ElevenLabs and backend Fish voices appear", "Fish voices retain fish: namespacing", "No provider key appears in desktop storage, requests, or responses"],
+      "proofToCapture": ["Voice picker screenshot", "Redacted /api/voices response fields and status"],
+      "status": "pending"
     },
     {
-      "id": "E2E-SIGN-02",
-      "title": "Tagged build is signed, notarized, and stapled",
-      "user_story": "As a Mac user, I can open Tristr Flow without an unidentified-developer warning.",
-      "setup_instrumentation": [
-        "Developer ID Application certificate issued to the current Apple organization.",
-        "App Store Connect API key with the minimum role required for notarization.",
-        "CI credentials stored in the GitHub repository Actions secrets; protected local credential copies are retained separately."
-      ],
-      "steps": [
-        "Push a release tag matching package.json.",
-        "Build the arm64 app with hardened runtime and Developer ID signing.",
-        "Inspect signed main-app entitlements and verify the Apple Events entitlement and Electron runtime entitlements remain enabled.",
-        "Submit the app to Apple's notary service and wait for acceptance.",
-        "Staple the ticket, mount the DMG, and run codesign, spctl, and stapler validation on the packaged app."
-      ],
-      "expected_results": [
-        "codesign verification succeeds with the Developer ID chain.",
-        "spctl reports the application is accepted.",
-        "stapler validates the embedded notarization ticket.",
-        "Only verified artifacts are published to the GitHub Release.",
-        "Hardened runtime retains the Apple Events capability required by the existing media-control fallback."
-      ],
-      "proof_to_capture": [
-        "Successful GitHub Actions release run",
-        "codesign, spctl, and stapler output",
-        "Published artifact checksum"
-      ],
-      "status": "passed",
-      "notes": "Corrected release run 35175176892 completed successfully in 37m13s and published v0.1.2 at 2026-09-17T03:15:33Z. Developer ID signing, hardened runtime, notarization, stapling, and pre-publication trust gates passed. Fresh public artifact inspection also verified the expected organization authority, secure timestamp, app version 0.1.2, all four required entitlements, and native-helper signature. Tag v0.1.2 remains at 7c67667; workflow recovery commit 4555d58 supplies electron-builder 26.16.1. Evidence: public-release-verification.json and the release run URL. The Actions success summary was visually verified and captured inline."
+      "id": "E2E-FISH-READ-01",
+      "title": "Fish reading streams through Render and consumes Tristr credits once",
+      "userStory": "As a signed-in user, I can hear a Fish voice with synchronized highlighting using my Tristr credits.",
+      "setupInstrumentation": ["Signed-in disposable account", "Selected Fish voice", "Before/after credits and Usage row", "Provider and service request logs"],
+      "steps": ["Record credits", "Read known text with a Fish voice", "Observe progressive audio and highlighting", "Reload account balance", "Inspect the persisted usage"],
+      "expectedResults": ["Only /api/tts is called by the DMG", "Backend calls Fish Audio", "Audio begins before completion", "Characters align", "Credits decrement exactly once", "Usage voiceId begins fish:"],
+      "proofToCapture": ["Reading overlay screenshot", "Redacted provider path", "Before/after credit values and usage fields"],
+      "status": "pending"
     },
     {
-      "id": "E2E-SIGN-03",
-      "title": "Fresh public DMG passes Gatekeeper and launches",
-      "user_story": "As a new customer, I can download, install, and start the public Tristr Flow release normally.",
-      "setup_instrumentation": [
-        "Download the published DMG from the public release URL after the signed release completes.",
-        "Preserve normal download quarantine metadata or explicitly assess the mounted app with Gatekeeper."
-      ],
-      "steps": [
-        "Download the public DMG without authentication and compare its size and SHA-256 with the published asset.",
-        "Verify disk image integrity, mount read-only, and assess the contained app with codesign, spctl, and stapler.",
-        "Inspect the expected Developer ID authority, hardened runtime, secure timestamp, required entitlements, app version, and native helper signature.",
-        "Copy the public app to a temporary path, reassess codesign and Gatekeeper, and launch with analytics disabled and an isolated user-data directory.",
-        "Attribute port 8757 to the new executable, verify its profile, request /ping, and inspect the actual native Welcome to Tristr Flow interface.",
-        "Quit the test app, restore and verify the installed app, and detach the DMG."
-      ],
-      "expected_results": [
-        "The downloaded artifact matches the published checksum.",
-        "Gatekeeper accepts the application without a right-click bypass.",
-        "The app launches and returns a healthy ping."
-      ],
-      "proof_to_capture": [
-        "Unauthenticated HTTP 200 download, matching published size and SHA-256, and public release page verification",
-        "Disk integrity, codesign, Gatekeeper, stapler, authority, runtime, timestamp, entitlement, version, and native-helper results",
-        "Process-attributed isolated launch and exact healthy /ping, native welcome UI, and installed-app restoration",
-        "Sanitized public-release-verification.json; public release and native welcome screenshots inline in the conversation"
-      ],
-      "status": "passed",
-      "notes": "Fresh unauthenticated public download returned HTTP 200 and matched the published size (124201252 bytes) and SHA-256 9004c301b89da7f5e3024e913f40d7281b89c407ea4b1fd2b8cd9f3e521d3432. DMG integrity and the contained app's codesign, Gatekeeper, stapler, Developer ID authority, hardened runtime, secure timestamp, four entitlements, version 0.1.2, and helper signature passed. The copied app passed codesign and Gatekeeper again, then exclusively owned port 8757 from its verified temporary executable with an isolated profile and analytics disabled. Its ping was exactly {\"ok\":true,\"app\":\"tristr-flow\"}. Native welcome UI and the public release page, including tag and assets, were inspected and captured inline. The test app quit, the installed app was restored with its expected executable and healthy ping, and the DMG was detached. No quarantine removal or security bypass was used. Evidence: public-release-verification.json."
+      "id": "E2E-FISH-PREVIEW-01",
+      "title": "Account-backed Fish and ElevenLabs previews use the service",
+      "userStory": "As a signed-in user, I can preview either provider before choosing a voice.",
+      "setupInstrumentation": ["Preferences voice picker", "Network request observation", "No local provider keys"],
+      "steps": ["Preview one ElevenLabs voice", "Preview one Fish voice", "Switch providers repeatedly"],
+      "expectedResults": ["Both previews play", "Both requests use /api/tts", "Provider errors remain visible and do not hang the UI"],
+      "proofToCapture": ["Preview UI states", "Redacted request voiceId values"],
+      "status": "pending"
     },
     {
-      "id": "E2E-SIGN-04",
-      "title": "Local packaging fallback stays usable",
-      "user_story": "As a developer, I can still package and run Tristr Flow locally without production credentials.",
-      "setup_instrumentation": [
-        "Run the ordinary local arm64 packaging command with no CSC or Apple notarization environment variables.",
-        "Extract the locally packaged ZIP into a temporary application path and prepare a fresh isolated user-data directory.",
-        "Disable PostHog for the test process and capture the existing installed app listener before temporarily quitting it."
-      ],
-      "steps": [
-        "Build the local app through the existing afterPack hook and extract its ZIP.",
-        "Verify its complete ad-hoc signature.",
-        "Gracefully quit the exact installed application process, then launch the extracted application with --user-data-dir pointing to the isolated profile.",
-        "Confirm the new process alone owns port 8757, verify settings were created in the isolated profile, and request localhost /ping.",
-        "Inspect the native Electron Welcome to Tristr Flow window at the temporary application path and capture its screenshot in the conversation.",
-        "Gracefully quit the test application, reopen the installed application, and verify its executable path and healthy /ping response."
-      ],
-      "expected_results": [
-        "The local build remains ad-hoc signed and launchable.",
-        "Production signing requirements are confined to the release workflow.",
-        "The isolated test process returns the exact healthy ping object and displays its native welcome interface.",
-        "The previously installed application is restored and healthy after the test."
-      ],
-      "proof_to_capture": [
-        "Local electron-builder output and complete ad-hoc codesign verification",
-        "Sanitized process-attributed launch, isolated-profile, ping, and restoration evidence in local-launch-result.json",
-        "Native welcome-window screenshot captured inline in the conversation; no screenshot file was saved"
-      ],
-      "status": "passed",
-      "notes": "The extracted local ad-hoc application passed signature verification, launched with an isolated user-data directory, and exclusively owned port 8757. Its /ping response was exactly {\"ok\":true,\"app\":\"tristr-flow\"}. Native computer-use inspection displayed Welcome to Tristr Flow from the temporary application path; the screenshot is inline in the conversation because no filesystem-save capability was exposed. The in-app browser navigation to /ping returned ERR_BLOCKED_BY_CLIENT, so the native Electron interface supplied the real UI check. The test process quit cleanly and the original installed application was restored with a verified executable path and healthy ping. Evidence: local-launch-result.json. Separate public signed-release validation also passed, as recorded in E2E-SIGN-03."
+      "id": "E2E-BYOK-FALLBACK-01",
+      "title": "Local provider keys remain an explicit direct-mode override",
+      "userStory": "As an advanced user, I can use my own Fish or ElevenLabs account without spending Tristr credits.",
+      "setupInstrumentation": ["Test provider keys", "Network observation", "Before/after Tristr credits"],
+      "steps": ["Save a local Fish key", "Read with Fish", "Save a local ElevenLabs key", "Read with ElevenLabs", "Remove keys and repeat"],
+      "expectedResults": ["BYOK calls providers directly", "Tristr credits do not change in direct mode", "Removing keys restores backend routing"],
+      "proofToCapture": ["Routing destinations with credentials redacted", "Unchanged and changed credit balances"],
+      "status": "pending"
+    },
+    {
+      "id": "E2E-FISH-SECURITY-01",
+      "title": "Fish endpoints fail closed and never expose the service key",
+      "userStory": "As the operator, I can safely fund Fish centrally without shipping the credential.",
+      "setupInstrumentation": ["Anonymous requests", "Invalid voice IDs", "Provider failure fixture", "Desktop package inspection"],
+      "steps": ["Call voice and TTS endpoints anonymously", "Send a malformed fish: ID", "Simulate Fish 401/402", "Inspect responses and packaged sources"],
+      "expectedResults": ["Anonymous requests return 401", "Malformed IDs return 400", "Errors are sanitized", "FISH_API_KEY never appears in payloads or the DMG"],
+      "proofToCapture": ["HTTP statuses", "Secret scan output", "Sanitized error body"],
+      "status": "pending"
     }
-  ],
-  "validation_notes": [
-    "Initial local validation: npm ci enabled Husky; lint and all 25 tests passed. The production dependency audit reported zero vulnerabilities; the initial install reported seven development-dependency findings.",
-    "Local arm64 DMG/ZIP packaging, plist validation, complete ad-hoc codesign, and DMG integrity checks passed. An initial launch conflict on port 8757 was resolved by the later controlled isolated launch and restoration.",
-    "The issued Developer ID certificate matched the prepared private key. Adding the official G2 intermediate to the protected encrypted PKCS12 fixed the initial local trust error. The local Developer ID app and helper then passed signature, hardened-runtime, secure-timestamp, and entitlement checks.",
-    "App Store Connect access was approved; the new API private key was validated without displaying contents and matched the approved key ID. All five encrypted Actions secrets were verified present. Protected local copies remain separate from CI storage.",
-    "Implementation commit 7c67667 passed normal hooks; main was fast-forwarded and v0.1.2 was pushed. No pull request or force push was used.",
-    "Initial run 35174556374 failed before signing, notarization, or publication because electron-builder 26.15.3 supplied the PKCS12 password instead of the temporary keychain password.",
-    "Recovery commit 4555d5878c32edcb4d9928dc947a2f0caf172233 pins official electron-builder 26.16.1 and dispatches the immutable existing tag. The regression contract failed before the fix; all 26 tests, lint, and normal Husky hooks passed before the recovery commit was pushed to main. Tag v0.1.2 remains at 7c67667.",
-    "The local ad-hoc ZIP app passed an analytics-disabled isolated launch, exclusive port ownership, exact healthy ping, and actual native welcome UI inspection. The installed app was restored and verified healthy; local-launch-result.json contains sanitized evidence.",
-    "The in-app browser navigation to local /ping returned ERR_BLOCKED_BY_CLIENT. Direct HTTP verification and actual native Electron welcome UI inspection supplied the endpoint and UI checks.",
-    "Corrected run 35175176892 completed successfully in 37m13s. Its actual Actions summary and completed build/notarize/publish job were verified in the browser and captured inline. Release v0.1.2 published at 2026-09-17T03:15:33Z.",
-    "Fresh unauthenticated public DMG download returned HTTP 200 and matched the published size and digest. Disk integrity, contained-app codesign, Gatekeeper, stapler, expected organization authority, hardened runtime, secure timestamp, four required entitlements, version 0.1.2, and native-helper signature all passed.",
-    "The copied public app passed codesign and Gatekeeper, then launched with analytics disabled and isolated user data. The verified new process exclusively owned port 8757 and returned the exact healthy ping. Native welcome UI and the public release page with tag, asset names, and digests were verified.",
-    "Public test cleanup completed: the test app quit, the installed app was restored with its correct executable and healthy ping, and the DMG was detached. No quarantine removal or security bypass was used.",
-    "GitHub Actions summary, public release page, and native welcome screenshots were captured inline in the conversation. No screenshot files were saved because a filesystem-save capability was not exposed.",
-    "All five pass criteria and all four E2E cases passed. Sanitized proof is linked in public-release-verification.json and local-launch-result.json. The release monitor is confirmed paused; report and evidence are included in final delivery."
-  ],
-  "release": {
-    "tag": "v0.1.2",
-    "source_commit": "7c67667",
-    "recovery_commit": "4555d5878c32edcb4d9928dc947a2f0caf172233",
-    "url": "https://github.com/zvone187/Tristr-Flow/releases/tag/v0.1.2",
-    "run_url": "https://github.com/zvone187/Tristr-Flow/actions/runs/35175176892",
-    "run_conclusion": "success",
-    "run_duration": "37m13s",
-    "published_at": "2026-09-17T03:15:33Z",
-    "artifact_url": "https://github.com/zvone187/Tristr-Flow/releases/download/v0.1.2/Tristr-Flow-0.1.2-arm64.dmg",
-    "sha256": "9004c301b89da7f5e3024e913f40d7281b89c407ea4b1fd2b8cd9f3e521d3432"
-  },
-  "evidence": {
-    "public_release": "public-release-verification.json",
-    "local_fallback": "local-launch-result.json",
-    "screenshots": "GitHub Actions success summary, public release page, and native welcome UI screenshots are inline in the conversation; no screenshot files were saved because a filesystem-save capability was not exposed."
-  },
-  "handoff": {
-    "evidence_delivery": "Report and sanitized evidence are included in final delivery.",
-    "monitor": "Paused after successful public-release verification."
-  }
+  ]
 }

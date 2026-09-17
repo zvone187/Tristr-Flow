@@ -81,6 +81,17 @@ async function me({ baseUrl, token }) {
   throw new Error(json.error || `Could not load account (${status}).`);
 }
 
+// GET /api/voices -> { voices }. The service returns a deliberately public
+// Fish catalogue; it never exposes voices private to the operator account.
+async function listServiceVoices({ baseUrl, token }) {
+  if (!token) throw new Error('Not signed in to Tristr Flow.');
+  const { status, json } = await jsonRequest({
+    baseUrl, path: '/api/voices', method: 'GET', token,
+  });
+  if (status >= 200 && status < 300 && Array.isArray(json.voices)) return json.voices;
+  throw new Error(json.error || `Could not load service voices (${status}).`);
+}
+
 function ttsHttpError(status, body) {
   let msg = body;
   try { const j = JSON.parse(body); msg = j.error || j.message || body; } catch { /* keep raw */ }
@@ -127,7 +138,9 @@ function serviceStream({ baseUrl, token, voiceId, stability = 0.5, text, onLine,
         let o;
         try { o = JSON.parse(line); } catch { return; }
         if (o.type === 'error' || o.error) { onError(new Error(o.message || o.error || 'Service error.')); return; }
-        if (o.audio) onLine({ audio_base64: o.audio, alignment: o.alignment || null });
+        if (o.audio || o.alignment) {
+          onLine({ audio_base64: o.audio || null, alignment: o.alignment || null });
+        }
       };
       res.on('data', (d) => {
         buf += d;
@@ -151,4 +164,34 @@ function serviceStream({ baseUrl, token, voiceId, stability = 0.5, text, onLine,
   return { abort() { try { req.destroy(); } catch { /* ignore */ } } };
 }
 
-module.exports = { login, signup, me, serviceStream };
+// One-shot wrapper used by the voice preview UI. The backend still streams,
+// but the short preview is collected into one MP3 data URL for the renderer.
+function serviceSynthesize({ baseUrl, token, voiceId, stability = 0.5, text }) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let settled = false;
+    serviceStream({
+      baseUrl,
+      token,
+      voiceId,
+      stability,
+      text,
+      onLine(line) {
+        if (line.audio_base64) chunks.push(Buffer.from(line.audio_base64, 'base64'));
+      },
+      onEnd() {
+        if (settled) return;
+        settled = true;
+        if (!chunks.length) return reject(new Error('Service returned no preview audio.'));
+        resolve({ audioBase64: Buffer.concat(chunks).toString('base64') });
+      },
+      onError(error) {
+        if (settled) return;
+        settled = true;
+        reject(error);
+      },
+    });
+  });
+}
+
+module.exports = { login, signup, me, listServiceVoices, serviceStream, serviceSynthesize };

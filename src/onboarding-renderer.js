@@ -65,6 +65,7 @@ function acctMsg(text, isErr) {
 async function goStep2() {
   const a = await window.onb.account().catch(() => ({}));
   whoEl.textContent = a && a.email ? a.email.split('@')[0] : '';
+  await loadStep2Data();
   step1.hidden = true;
   step2.hidden = false;
   dots.forEach((d) => d.classList.toggle('active', d.dataset.step === '2'));

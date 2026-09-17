@@ -2,7 +2,7 @@
 
 A tiny macOS menu-bar app. Select text **anywhere** — a browser, your terminal,
 Claude Code, a PDF — press the hotkey, and it reads the selection aloud with an
-ElevenLabs voice while a floating overlay **karaoke-highlights the exact word
+ElevenLabs or Fish Audio voice while a floating overlay **karaoke-highlights the exact word
 being spoken**.
 
 ## How it works
@@ -13,9 +13,10 @@ being spoken**.
    **Edit → Copy** menu item via Accessibility (works in Chrome, Safari, native
    apps and is immune to held modifier keys), and falls back to a clean
    synthetic ⌘C for apps with non-standard menus. (See *Chrome note* below.)
-3. **Speak (streaming)** — the text goes to ElevenLabs' `stream/with-timestamps`
-   endpoint. Audio **starts playing before the whole thing is generated**, with
-   per-character timings arriving alongside.
+3. **Speak (streaming)** — signed-in users send the text through the Tristr Flow
+   service to the selected provider (ElevenLabs or Fish Audio). Users who add
+   their own provider key call that provider directly. Audio **starts playing
+   before the whole thing is generated**, with timing data arriving alongside.
 4. **Highlight** — a frameless always-on-top overlay plays the audio and lights
    up each word in sync, auto-scrolling as it reads.
 
@@ -65,9 +66,10 @@ text aloud** remains a separate action and never attempts selection capture.
 
 Open **Preferences — Voice & Stability…** from the menu-bar menu (or ⌘,):
 
-- Pick from a list of voices — the two **Hope** voices are pinned at the top
-  (default: *Hope — Clear, Relatable & Charismatic*), followed by your full
-  ElevenLabs library. **▶ Preview** any voice before choosing.
+- Pick from ElevenLabs and Fish Audio voices — the two **Hope** voices are pinned
+  at the top (default: *Hope — Clear, Relatable & Charismatic*). Signed-in users
+  get both providers through their Tristr Flow account. **▶ Preview** any voice
+  before choosing.
 - **Stability** (Creative / Natural / Robust) — the one setting the v3 model
   actually honors. Lower = more expressive but can sound *weird/unstable*;
   higher = steadier. **If a voice sounds off, bump it to Natural or Robust.**
@@ -100,8 +102,9 @@ identically no matter which app the text came from.
 
 ## First run
 
-The API key is read automatically from `~/Development/pazi/api/.env`
-(`ELEVENLABS_API_KEY`). Nothing to configure.
+Sign in to a Tristr Flow account to use the hosted, credit-metered ElevenLabs
+and Fish Audio service. For development or bring-your-own-key use, provider keys
+can also be loaded from `.env` or saved in Preferences.
 
 ### Run from source
 
@@ -167,6 +170,9 @@ project; the default is the US ingestion host.
 | `src/main.js` | App lifecycle, global hotkey, tray, orchestration |
 | `src/selection.js` | Captures the current selection via ⌘C (clipboard-safe) |
 | `src/elevenlabs.js` | Calls the ElevenLabs with-timestamps TTS endpoint |
+| `src/fishaudio.js` | Calls Fish Audio directly for bring-your-own-key users |
+| `src/service.js` | Calls the authenticated Tristr Flow voice and TTS endpoints |
+| `src/provider-routing.js` | Chooses hosted or direct-provider delivery per voice |
 | `src/overlay.{html,css,js}` | The floating karaoke overlay |
 | `src/config.js` | Loads the API key + settings |
 | `src/preload.js` | Secure IPC bridge to the overlay |

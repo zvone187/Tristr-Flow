@@ -332,6 +332,47 @@ function synthesizeFish({ apiKey, voiceId, modelId, text }) {
 // times are relative to that chunk, offset by chunk_audio_offset_sec.
 const STREAM_PATH = '/v1/tts/stream/with-timestamp';
 
+function isWordCharacter(character) {
+  return /[\p{L}\p{N}]/u.test(character);
+}
+
+// Fish normalizes punctuation inside words (for example “I've” may be reported
+// as “Ive”). Find the corresponding source span without crossing whitespace.
+function findWordSpan(text, cursor, spoken) {
+  const exact = spoken ? text.indexOf(spoken, cursor) : -1;
+  if (exact >= 0) return { start: exact, end: exact + spoken.length };
+
+  const target = [...String(spoken || '')]
+    .filter(isWordCharacter)
+    .map((character) => character.toLocaleLowerCase());
+  if (!target.length) return null;
+
+  for (let candidate = cursor; candidate < text.length;) {
+    const first = String.fromCodePoint(text.codePointAt(candidate));
+    const firstEnd = candidate + first.length;
+    if (!isWordCharacter(first) || first.toLocaleLowerCase() !== target[0]) {
+      candidate = firstEnd;
+      continue;
+    }
+
+    let matched = 0;
+    let index = candidate;
+    while (index < text.length && matched < target.length) {
+      const character = String.fromCodePoint(text.codePointAt(index));
+      const next = index + character.length;
+      if (/\s/u.test(character)) break;
+      if (isWordCharacter(character)) {
+        if (character.toLocaleLowerCase() !== target[matched]) break;
+        matched++;
+        if (matched === target.length) return { start: candidate, end: next };
+      }
+      index = next;
+    }
+    candidate = firstEnd;
+  }
+  return null;
+}
+
 // Fish reports words without the punctuation attached to them, so the timeline
 // converts word spans into the per-character times the renderer indexes by:
 // characters inside a word are spread across its span, and the characters
@@ -349,8 +390,9 @@ CharTimeline.prototype.commit = function (words) {
   const starts = [];
   const ends = [];
   for (const w of words) {
-    const at = w.text ? this.text.indexOf(w.text, this.cursor) : -1;
-    if (at < 0) continue; // never seen in the text (normalised away) — skip it
+    const spanInText = findWordSpan(this.text, this.cursor, w.text);
+    if (!spanInText) continue; // never seen in the text (normalised away) — skip it
+    const at = spanInText.start;
     // Reported spans can overlap slightly, most often across a chunk seam
     // (measured: an 80ms backstep on a 61s read). The renderer binary-searches
     // these arrays, so they have to be non-decreasing or it lands on the wrong
@@ -365,14 +407,14 @@ CharTimeline.prototype.commit = function (words) {
       ends.push(this.lastEnd + (w.start - this.lastEnd) * ((k - this.cursor + 1) / Math.max(1, at - this.cursor)));
     }
     // Characters of the word itself, spread evenly across its span.
-    const n = w.text.length;
+    const n = spanInText.end - at;
     const span = Math.max(0, w.end - w.start);
     for (let k = 0; k < n; k++) {
       chars.push(this.text[at + k]);
       starts.push(w.start + (span * k) / n);
       ends.push(w.start + (span * (k + 1)) / n);
     }
-    this.cursor = at + n;
+    this.cursor = spanInText.end;
     this.lastEnd = w.end;
   }
   if (!chars.length) return null;
