@@ -1,6 +1,6 @@
 {
   "name": "tristr-flow",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Press a hotkey to read selected text aloud with ElevenLabs or Fish Audio and a karaoke-style overlay.",
   "main": "src/main.js",
   "author": "Pazi",
