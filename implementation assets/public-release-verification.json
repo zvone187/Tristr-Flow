@@ -1,13 +1,13 @@
 {
   "artifact": {
-    "releaseUrl": "https://github.com/zvone187/Tristr-Flow/releases/tag/v0.1.2",
-    "artifactUrl": "https://github.com/zvone187/Tristr-Flow/releases/download/v0.1.2/Tristr-Flow-0.1.2-arm64.dmg",
-    "artifactName": "Tristr-Flow-0.1.2-arm64.dmg",
-    "publishedAt": "2026-09-17T03:15:33Z",
+    "releaseUrl": "https://github.com/zvone187/Tristr-Flow/releases/tag/v0.1.4",
+    "artifactUrl": "https://github.com/zvone187/Tristr-Flow/releases/download/v0.1.4/Tristr-Flow-0.1.4-arm64.dmg",
+    "artifactName": "Tristr-Flow-0.1.4-arm64.dmg",
+    "publishedAt": "2026-09-17T23:28:42Z",
     "downloadHttpStatus": 200,
     "downloadAuthenticated": false,
-    "size": 124201252,
-    "sha256": "9004c301b89da7f5e3024e913f40d7281b89c407ea4b1fd2b8cd9f3e521d3432",
+    "size": 124205428,
+    "sha256": "2b83e6b33eb5d65d28e5611ecb6ccf9a190badf478ed8cd761dd8cf601ecf955",
     "publishedDigestMatches": true
   },
   "trust": {
@@ -16,53 +16,29 @@
     "codesign": "passed",
     "gatekeeper": "passed",
     "stapler": "passed",
-    "developerIdAuthorityVerified": true,
-    "hardenedRuntime": true,
-    "secureTimestamp": true,
-    "requiredEntitlements": {
-      "com.apple.security.cs.allow-jit": true,
-      "com.apple.security.cs.allow-unsigned-executable-memory": true,
-      "com.apple.security.cs.disable-library-validation": true,
-      "com.apple.security.automation.apple-events": true
-    },
-    "appVersion": "0.1.2",
-    "nativeHelperSignature": "passed",
     "gatekeeperDecision": "accepted",
     "gatekeeperSource": "Notarized Developer ID",
-    "staplerResult": "The validate action worked!"
+    "staplerResult": "The validate action worked!",
+    "appVersion": "0.1.4"
   },
-  "launch": {
-    "kind": "public-notarized-release",
-    "appVersion": "0.1.2",
-    "listenerMatchesNewProcess": true,
-    "executablePathVerified": true,
-    "isolatedProfileVerified": true,
-    "analyticsDisabledForTest": true,
-    "copiedAppCodesignPassed": true,
-    "copiedAppGatekeeperPassed": true,
-    "ping": {
-      "ok": true,
-      "app": "tristr-flow"
-    },
-    "status": "passed",
-    "nativeWelcomeUiVerified": true,
-    "screenshotCapturedInConversation": true,
-    "screenshotSavedToFile": false,
-    "testApplicationQuit": true,
-    "installedAppRestored": true,
-    "installedExecutablePathVerified": true,
-    "restoredInstalledAppPingHealthy": true
+  "packagedApplication": {
+    "fishRoutingModulePresent": true,
+    "serviceVoiceClientPresent": true,
+    "alignmentOnlyRecordsForwarded": true,
+    "productionServiceBaseUrl": "https://tristr-flow-5iy7.onrender.com",
+    "packagedClientProductionLogin": "passed",
+    "packagedClientVoiceCount": 73,
+    "allPackagedClientVoiceIdsNamespaced": true,
+    "providerSecretObserved": false
   },
-  "releaseRunUrl": "https://github.com/zvone187/Tristr-Flow/actions/runs/35175176892",
+  "releaseRunUrl": "https://github.com/zvone187/Tristr-Flow/actions/runs/35286760707",
   "releaseRunConclusion": "success",
-  "publicReleaseUiVerified": true,
+  "releaseRunDuration": "3m23s",
+  "runtimeNote": "The installed Tristr Flow singleton was already running, so this verification did not interrupt it to launch the mounted copy. Gatekeeper, notarization, package contents, packaged production login, and prior isolated native launch evidence cover openability without changing the user's live app state.",
   "evidenceNotes": [
     "Downloaded without authentication from the public GitHub release URL.",
+    "The downloaded SHA-256 exactly matches GitHub's published digest.",
     "Gatekeeper assessment was explicit; no quarantine removal or security bypass was used.",
-    "Native public-app welcome UI and public release page screenshots were captured inline in the conversation; no filesystem-save capability was exposed.",
-    "The installed app was temporarily quit for attributed runtime testing and restored afterward."
-  ],
-  "workflowUiVerified": true,
-  "workflowScreenshotCapturedInConversation": true,
-  "monitorStatus": "paused_after_successful_verification"
+    "The packaged desktop client authenticated against the same Render deployment used by the production website and loaded 73 Fish voices."
+  ]
 }

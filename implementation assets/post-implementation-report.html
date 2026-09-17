@@ -1,243 +1,26 @@
 <!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>Apple Notarization — Verified Release Report</title>
-		<style>
-			:root {
-				--canvas: #f6f2e8;
-				--ink: #172026;
-				--muted: #65727a;
-				--border: #2c3338;
-				--paper: #ffffff;
-				--blue: #d9ecff;
-				--green: #dff5df;
-				--yellow: #fff1b8;
-				--pink: #ffe2eb;
-				--purple: #eadfff;
-				--shadow: 7px 7px 0 rgba(23, 32, 38, 0.18);
-				font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-			}
-
-			* { box-sizing: border-box; }
-
-			body {
-				background:
-					linear-gradient(90deg, rgba(47, 58, 66, 0.07) 1px, transparent 1px),
-					linear-gradient(rgba(47, 58, 66, 0.07) 1px, transparent 1px),
-					var(--canvas);
-				background-size: 28px 28px;
-				color: var(--ink);
-				line-height: 1.45;
-				margin: 0;
-			}
-
-			main {
-				margin: 0 auto;
-				padding: 30px 22px 52px;
-				width: min(1240px, 100%);
-			}
-
-			header {
-				display: grid;
-				gap: 18px;
-				grid-template-columns: 1.4fr 0.8fr;
-				margin-bottom: 22px;
-			}
-
-			h1, h2, h3, p { margin: 0; }
-			h1 { font-size: clamp(2rem, 5vw, 4.4rem); letter-spacing: 0; line-height: 0.96; }
-			h2 { font-size: 1.1rem; letter-spacing: 0; text-transform: uppercase; }
-			a { color: #0f5f85; font-weight: 750; text-decoration: none; }
-			code { background: rgba(255,255,255,0.72); border: 1px solid rgba(47,58,66,0.24); border-radius: 6px; padding: 2px 5px; }
-
-			.hero, .card, details, .sticky {
-				border: 2px solid var(--border);
-				box-shadow: var(--shadow);
-			}
-
-			.hero, .card, details {
-				background: var(--paper);
-				border-radius: 16px;
-			}
-
-			.hero { padding: 26px; }
-			.hero p { color: var(--muted); margin-top: 12px; max-width: 760px; }
-			.meta-stack, .grid { display: grid; gap: 14px; }
-			.grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-			.grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-
-			.card { padding: 16px; }
-			.card small {
-				color: var(--muted);
-				display: block;
-				font-size: 0.78rem;
-				font-weight: 850;
-				text-transform: uppercase;
-			}
-			.card strong {
-				display: block;
-				font-size: 1.3rem;
-				line-height: 1.1;
-				margin-top: 4px;
-			}
-
-			.tag, .pill {
-				border: 2px solid var(--border);
-				border-radius: 999px;
-				display: inline-flex;
-				font-size: 0.78rem;
-				font-weight: 900;
-				padding: 5px 9px;
-				text-transform: uppercase;
-			}
-
-			.tag { background: var(--yellow); margin-bottom: 12px; }
-			.pill { margin: 0 6px 6px 0; }
-			.board-section { margin-top: 24px; }
-			.section-title { align-items: center; display: flex; gap: 10px; margin-bottom: 12px; }
-			.pin { background: #ff6b57; border: 2px solid var(--border); border-radius: 50%; height: 16px; width: 16px; }
-
-			.sticky {
-				border-radius: 3px;
-				min-height: 128px;
-				padding: 16px;
-				transform: rotate(-0.7deg);
-			}
-			.sticky:nth-child(even) { transform: rotate(0.7deg); }
-			.sticky h3 { font-size: 1.1rem; margin-bottom: 8px; }
-			.sticky p, .sticky li { color: #334148; font-size: 0.94rem; }
-			.sticky ul { margin: 8px 0 0; padding-left: 18px; }
-			.bg-blue { background: var(--blue); }
-			.bg-green { background: var(--green); }
-			.bg-yellow { background: var(--yellow); }
-			.bg-pink { background: var(--pink); }
-			.bg-purple { background: var(--purple); }
-
-			summary { cursor: pointer; font-weight: 850; list-style: none; padding: 14px 16px; }
-			summary::-webkit-details-marker { display: none; }
-			summary:before { content: "+"; display: inline-block; font-weight: 900; margin-right: 10px; width: 14px; }
-			details[open] summary:before { content: "-"; }
-			.detail-body { border-top: 2px solid var(--border); color: #334148; padding: 14px 16px 16px; }
-			.detail-body ul { margin: 8px 0 0; padding-left: 18px; }
-
-			@media (max-width: 900px) {
-				header, .grid.two, .grid.three { grid-template-columns: 1fr; }
-			}
-		</style>
-	</head>
-	<body>
-		<main>
-			<header>
-				<section class="hero" aria-labelledby="title">
-					<span class="tag" style="background:var(--green)">Post-Implementation · Verified</span>
-					<h1 id="title">Apple Notarization</h1>
-					<p>Branch <code>codex/apple-notarization</code> · reviewed base <code>c9a09d0</code> · source commit <code>4555d58</code> · no PR requested or created.</p>
-					<p><strong>ALL RELEASE CHECKS PASSED.</strong> v0.1.2 is published. A fresh public arm64 DMG passed checksum and integrity checks; its app passed signature, Gatekeeper, and stapler validation. The copied app launched with isolated user data, displayed its welcome UI, and returned a verified healthy /ping.</p>
-				</section>
-				<aside class="meta-stack" aria-label="Report metadata">
-					<div class="card bg-green"><small>Verification status</small><strong>5 criteria · 4 E2E cases · passed</strong></div>
-					<div class="card bg-blue"><small>Release source</small><strong>v0.1.2 · 7c67667 · arm64</strong></div>
-					<div class="card bg-green"><small>Published</small><strong>2026-09-17 · 03:15:33 UTC</strong></div>
-				</aside>
-			</header>
-
-			<section class="board-section" aria-labelledby="fast-answer">
-				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="fast-answer">Fast Answer</h2></div>
-				<div class="grid three">
-					<div class="sticky bg-green"><h3>Published and verified</h3><p><a href="https://github.com/zvone187/Tristr-Flow/releases/tag/v0.1.2">Release v0.1.2</a> is public. <a href="https://github.com/zvone187/Tristr-Flow/actions/runs/35175176892">Run 35175176892</a> succeeded in 37m13s.</p></div>
-					<div class="sticky bg-green"><h3>Public download passed</h3><p>The unauthenticated DMG download returned HTTP 200 and matched the published size and SHA-256. Its app passed all trust and isolated launch checks.</p></div>
-					<div class="sticky bg-green"><h3>Runtime restored</h3><p>The test copy quit, the original installed app was restored with healthy /ping, and the DMG was detached. The release monitor is paused.</p></div>
-				</div>
-			</section>
-
-			<section class="board-section" aria-labelledby="implementation">
-				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="implementation">Implementation</h2></div>
-				<div class="grid three">
-					<div class="sticky bg-blue"><h3>Verified release pipeline</h3><p>Required credentials, forced Developer ID signing, hardened runtime, notarization, and trust gates protect publication. Recovery pins electron-builder 26.16.1.</p></div>
-					<div class="sticky bg-purple"><h3>Runtime entitlements</h3><p>Electron runtime permissions and Apple Events access remain enabled. The public app and native media helper passed signature inspection.</p></div>
-					<div class="sticky bg-blue"><h3>Immutable tag preserved</h3><p>Implementation commit 4555d58 is on main. The recovery workflow built existing tag v0.1.2 at 7c67667. No tag move, force push, or PR was used.</p></div>
-				</div>
-			</section>
-
-			<section class="board-section" aria-labelledby="criteria">
-				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="criteria">Pass Criteria</h2></div>
-				<div class="grid three">
-					<div class="sticky bg-green"><h3>Passed · Fail closed</h3><p>Credential and signing contracts pass. The initial keychain failure prevented publication; only the verified retry published artifacts.</p></div>
-					<div class="sticky bg-green"><h3>Passed · Developer ID</h3><p>The public app has the expected organization authority, hardened runtime, secure timestamp, and required entitlements. Its helper signature also passes.</p></div>
-					<div class="sticky bg-green"><h3>Passed · Apple ticket</h3><p>The signed release completed notarization and pre-publication checks. Stapler validates the ticket on the app from the public DMG.</p></div>
-					<div class="sticky bg-green"><h3>Passed · Public DMG</h3><p>Published size and digest match. Disk integrity, contained-app trust, copied-app launch, native UI, and process-attributed /ping pass.</p></div>
-					<div class="sticky bg-green"><h3>Passed · Local fallback</h3><p>Local packaging, ad-hoc signature, disk integrity, isolated launch, native welcome UI, and healthy /ping remain usable.</p></div>
-					<div class="sticky bg-green"><h3>Verified evidence</h3><p><a href="qa-e2e-tests.json">QA record</a>, <a href="public-release-verification.json">public release proof</a>, and <a href="local-launch-result.json">local launch proof</a> accompany this report.</p></div>
-				</div>
-			</section>
-
-			<section class="board-section" aria-labelledby="e2e">
-				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="e2e">End-to-End Verification</h2></div>
-				<div class="grid two">
-					<div class="sticky bg-green"><h3>E2E-SIGN-01 · Passed</h3><p>Required-secret, forced-signing, entitlement, and recovery contracts pass. The successful Actions summary and completed job were verified in the browser.</p></div>
-					<div class="sticky bg-green"><h3>E2E-SIGN-02 · Passed</h3><p>Retry 35175176892 completed signing, notarization, stapling, trust verification, and publication. The release page confirms v0.1.2 at 7c67667.</p></div>
-					<div class="sticky bg-green"><h3>E2E-SIGN-03 · Passed</h3><p>The fresh public arm64 DMG passed integrity and app trust checks. Its copied app launched with an isolated profile, showed the native welcome UI, and returned the exact healthy ping.</p></div>
-					<div class="sticky bg-green"><h3>E2E-SIGN-04 · Passed</h3><p>The local ad-hoc ZIP app independently passed isolated launch, native welcome UI, and attributed /ping. The installed app was restored after both launch tests.</p></div>
-				</div>
-			</section>
-
-			<section class="board-section" aria-labelledby="checks">
-				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="checks">Checks and Evidence</h2></div>
-				<div class="grid two">
-					<div class="sticky bg-green"><h3>26 tests and normal hooks</h3><p>Recovery passed all 26 tests, lint, and normal Husky hooks before commit. Production dependency audit passed. Final source review found no release blockers.</p></div>
-					<div class="sticky bg-green"><h3>Actual UI verified</h3><p>Actions success summary, public release page, and native welcome UI were inspected and captured inline. Screenshots are in the conversation; no screenshot files were saved.</p></div>
-				</div>
-			</section>
-
-			<section class="board-section" aria-labelledby="details">
-				<div class="section-title"><span class="pin" aria-hidden="true"></span><h2 id="details">Evidence and Delivery</h2></div>
-				<details open><summary>Public artifact and checksum</summary><div class="detail-body"><ul>
-					<li><a href="https://github.com/zvone187/Tristr-Flow/releases/download/v0.1.2/Tristr-Flow-0.1.2-arm64.dmg">Download Tristr-Flow-0.1.2-arm64.dmg</a> · 124,201,252 bytes · unauthenticated HTTP 200.</li>
-					<li>SHA-256 matches the published digest: <code style="overflow-wrap:anywhere">9004c301b89da7f5e3024e913f40d7281b89c407ea4b1fd2b8cd9f3e521d3432</code>.</li>
-					<li>Publication: <code>2026-09-17T03:15:33Z</code>. <a href="https://github.com/zvone187/Tristr-Flow/releases/tag/v0.1.2">Release page</a> tag, asset names, and digests were verified through the actual browser UI.</li>
-					<li><a href="public-release-verification.json">Sanitized public-release evidence</a> records the artifact, trust, launch, and restoration results.</li>
-				</ul></div></details>
-				<details open><summary>Public app trust and isolated launch</summary><div class="detail-body"><ul>
-					<li>Disk image integrity and read-only mounting passed. The contained application passed deep strict codesign, explicit Gatekeeper assessment, and stapler validation.</li>
-					<li>Expected organization Developer ID authority, hardened runtime, secure timestamp, app version 0.1.2, and native media-helper signature were verified.</li>
-					<li>All four entitlements are enabled: JIT, unsigned executable memory, disabled library validation, and Apple Events automation.</li>
-					<li>The app was copied to a temporary path and passed codesign and Gatekeeper again. No quarantine removal or security bypass was used.</li>
-					<li>The copied public app launched with analytics disabled and an isolated user-data directory. Its verified executable was the sole owner of port 8757 and returned exactly <code>{&quot;ok&quot;:true,&quot;app&quot;:&quot;tristr-flow&quot;}</code>.</li>
-					<li>Actual native <strong>Welcome to Tristr Flow</strong> UI was inspected from the public test-copy path and captured inline.</li>
-					<li>The test copy quit, the original installed app was restored with its correct executable and healthy ping, and the DMG was detached. The installed app was not replaced by the test copy.</li>
-				</ul></div></details>
-				<details><summary>Implementation files and checks</summary><div class="detail-body"><ul>
-					<li><a href="../.github/workflows/release.yml">Release workflow</a>: signing, notarization, unchanged-tag recovery, and trust gates before publication.</li>
-					<li><a href="../build/entitlements.mac.plist">Main-app entitlements</a> and <a href="../package.json">package configuration</a>: preserve runtime/media capability and pin the corrected signing tool.</li>
-					<li><a href="../test/release-workflow.test.js">Release tests</a>: six focused cases included in the 26-test recovery suite. Lint and normal Husky hooks passed.</li>
-					<li><a href="../scripts/after-pack.js">Local afterPack hook</a>: retains ad-hoc development packaging. Plist, complete signature, and local DMG integrity checks passed.</li>
-					<li><a href="../.gitignore">Credential exclusions</a> and <a href="../AGENTS.md">delivery instructions</a>: protect key material and document certificate-chain and recovery requirements.</li>
-					<li>Production dependency audit reported zero vulnerabilities. The initial dependency installation reported seven development-dependency findings. Final review found no concrete release blocker or detected credential material in the reviewed changes.</li>
-				</ul></div></details>
-				<details><summary>Initial failures and successful recovery</summary><div class="detail-body"><ul>
-					<li>The initial local certificate trust error was resolved by including the official Apple Developer ID G2 intermediate in the encrypted PKCS12. Local Developer ID app and helper verification then passed.</li>
-					<li><a href="https://github.com/zvone187/Tristr-Flow/actions/runs/35174556374">Initial run 35174556374</a> failed before signing or publication: electron-builder 26.15.3 supplied the certificate password where macOS required the temporary keychain password.</li>
-					<li><a href="https://github.com/electron-userland/electron-builder/pull/10172">Upstream fix #10172</a> is included in <a href="https://github.com/electron-userland/electron-builder/releases/tag/electron-builder%4026.16.1">electron-builder 26.16.1</a>.</li>
-					<li>Implementation commit <code>4555d5878c32edcb4d9928dc947a2f0caf172233</code> pins the corrected tool and permits dispatch against the immutable existing tag. Tag <code>v0.1.2</code> remains at <code>7c67667</code>.</li>
-					<li><a href="https://github.com/zvone187/Tristr-Flow/actions/runs/35175176892">Corrected run 35175176892</a> succeeded in 37m13s. Its Actions success summary and completed build/notarize/publish job were inspected and captured inline.</li>
-				</ul></div></details>
-				<details><summary>Local fallback and screenshot evidence</summary><div class="detail-body"><ul>
-					<li>The local ad-hoc ZIP app passed complete signature verification, isolated profile creation, exclusive port 8757 ownership, exact healthy ping, and native welcome UI inspection.</li>
-					<li>The local test process quit cleanly and the installed app was restored and verified healthy. <a href="local-launch-result.json">Sanitized local evidence</a> omits process IDs and temporary paths.</li>
-					<li>The in-app browser's local /ping navigation returned <code>ERR_BLOCKED_BY_CLIENT</code>. Direct HTTP and actual native Electron UI supplied the endpoint and interface checks.</li>
-					<li>Actions summary, public release page, and native welcome screenshots are inline in the conversation. No screenshot files were saved because a filesystem-save capability was not exposed; no older images are presented as current proof.</li>
-					<li>The exercised product flow is launch, native welcome UI, and /ping. Public artifact verification covers the arm64 DMG and its app.</li>
-				</ul></div></details>
-				<details><summary>Credential handling and final delivery</summary><div class="detail-body"><ul>
-					<li>All five required CI credentials are stored in encrypted Actions secrets. Protected local credential copies remain separate; no secret values are included in this report.</li>
-					<li>The validated API private key is protected with mode 0600 and excluded from Git. The certificate bundle includes the required G2 intermediate.</li>
-					<li>All release criteria and E2E checks passed. The same-task release monitor is confirmed paused after verification.</li>
-					<li>Report and sanitized evidence are included in final delivery. No PR, tag move, or force push was used.</li>
-					<li><a href="qa-e2e-tests.json">Final QA record</a> · <a href="public-release-verification.json">Public release proof</a> · <a href="local-launch-result.json">Local fallback proof</a> · <a href="pre-implementation-report.html">Initial readiness report</a>.</li>
-				</ul></div></details>
-			</section>
-		</main>
-	</body>
-</html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tristr Flow Fish backend release — post-implementation</title><style>
+:root{--canvas:#f6f2e8;--ink:#172026;--muted:#65727a;--border:#2c3338;--paper:#fff;--blue:#d9ecff;--green:#dff5df;--yellow:#fff1b8;--pink:#ffe2eb;--purple:#eadfff;--shadow:7px 7px 0 rgba(23,32,38,.18);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}body{background:linear-gradient(90deg,rgba(47,58,66,.07) 1px,transparent 1px),linear-gradient(rgba(47,58,66,.07) 1px,transparent 1px),var(--canvas);background-size:28px 28px;color:var(--ink);line-height:1.45;margin:0}main{margin:0 auto;padding:30px 22px 52px;width:min(1240px,100%)}header{display:grid;gap:18px;grid-template-columns:1.4fr .8fr;margin-bottom:22px}h1,h2,h3,p{margin:0}h1{font-size:clamp(2rem,5vw,4.4rem);line-height:.96}h2{font-size:1.1rem;text-transform:uppercase}a{color:#0f5f85;font-weight:750;text-decoration:none}code{background:#ffffffb8;border:1px solid #2f3a423d;border-radius:6px;padding:2px 5px}.hero,.card,details,.sticky{border:2px solid var(--border);box-shadow:var(--shadow)}.hero,.card,details{background:var(--paper);border-radius:16px}.hero{padding:26px}.hero p{color:var(--muted);margin-top:12px}.meta-stack,.grid{display:grid;gap:14px}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.card,.sticky{padding:16px}.card small{color:var(--muted);display:block;font-size:.78rem;font-weight:850;text-transform:uppercase}.card strong{display:block;font-size:1.25rem;margin-top:4px}.tag{background:var(--yellow);border:2px solid var(--border);border-radius:999px;display:inline-flex;font-size:.78rem;font-weight:900;margin-bottom:12px;padding:5px 9px;text-transform:uppercase}.board-section{margin-top:24px}.section-title{align-items:center;display:flex;gap:10px;margin-bottom:12px}.pin{background:#ff6b57;border:2px solid var(--border);border-radius:50%;height:16px;width:16px}.sticky{border-radius:3px;min-height:128px;transform:rotate(-.7deg)}.sticky:nth-child(even){transform:rotate(.7deg)}.sticky h3{margin-bottom:8px}.sticky p,.sticky li{color:#334148;font-size:.94rem}.sticky ul{margin:8px 0 0;padding-left:18px}.bg-blue{background:var(--blue)}.bg-green{background:var(--green)}.bg-yellow{background:var(--yellow)}.bg-pink{background:var(--pink)}.bg-purple{background:var(--purple)}summary{cursor:pointer;font-weight:850;padding:14px 16px}.detail-body{border-top:2px solid var(--border);padding:14px 16px 16px}.detail-body ul{margin:8px 0 0;padding-left:18px}@media(max-width:900px){header,.grid.two,.grid.three{grid-template-columns:1fr}}
+</style></head><body><main>
+<header><section class="hero"><span class="tag">Post-implementation</span><h1>Fish Audio through Tristr accounts</h1><p>The desktop now discovers Fish voices and streams Fish readings and previews through the production Render backend. Provider credentials never ship in the DMG.</p></section><aside class="meta-stack"><div class="card bg-green"><small>Desktop release</small><strong>v0.1.4</strong></div><div class="card bg-blue"><small>Desktop revision</small><strong>16b7db3</strong></div><div class="card bg-yellow"><small>Launch caveat</small><strong>ElevenLabs billing</strong></div></aside></header>
+<section class="board-section"><div class="section-title"><span class="pin"></span><h2>Fast Answer</h2></div><div class="grid three">
+<div class="sticky bg-green"><h3>Fish is account-backed</h3><p>Signed-in users no longer need a Fish key. The desktop receives 73 namespaced public voices and calls only the authenticated Tristr service.</p></div>
+<div class="sticky bg-green"><h3>Streaming contract passed</h3><p>The shipped client transport received progressive audio plus alignment for exact source text and debited the expected credit amount once.</p></div>
+<div class="sticky bg-yellow"><h3>ElevenLabs needs funding</h3><p>The provider returns HTTP 402. Tristr now charges zero on that rejection, but ElevenLabs audio cannot be called launch-ready until the provider account is funded.</p></div>
+</div></section>
+<section class="board-section"><div class="section-title"><span class="pin"></span><h2>Production Evidence</h2></div><div class="grid three">
+<div class="sticky bg-green"><h3>Desktop client · Passed</h3><p><code>src/service.js</code> logged into production, loaded 73 Fish voices, streamed 29,256 audio bytes with exact alignment, and produced a 12,119-byte preview.</p></div>
+<div class="sticky bg-green"><h3>Metering · Passed</h3><p>“Desktop client Fish.” cost exactly 4,000 micros. “Preview.” cost exactly 1,600. Malformed Fish and rejected ElevenLabs requests cost zero.</p></div>
+<div class="sticky bg-green"><h3>Render identity · Corrected</h3><p>Release v0.1.4 hardcodes <code>tristr-flow-5iy7.onrender.com</code>, the same deployment and database used by the public signup/account site.</p></div>
+</div></section>
+<section class="board-section"><div class="section-title"><span class="pin"></span><h2>Implementation</h2></div><div class="grid two">
+<div class="sticky bg-green"><h3>Shipped</h3><ul><li>Central route policy for Fish, ElevenLabs, service, and BYOK.</li><li>Authenticated service voice catalogue merged into onboarding and Preferences.</li><li>Service-backed Fish read and preview paths.</li><li>Alignment-only NDJSON forwarding for synchronized highlighting.</li><li>Punctuation-normalized Fish word mapping.</li><li>Settings states that explain account-backed versus local-key routing.</li></ul></div>
+<div class="sticky bg-blue"><h3>Release discipline</h3><ul><li>Changes were implemented in a worktree and fast-forwarded to <code>main</code> without switching the user’s branch.</li><li>Normal Husky hooks, lint, tests, dependency audit, signing, notarization, stapling, and Gatekeeper verification protect publication.</li><li>The generated QA bundle was moved to Trash after testing and is recoverable.</li></ul></div>
+</div></section>
+<section class="board-section"><div class="section-title"><span class="pin"></span><h2>Verification</h2></div><div class="grid three">
+<div class="sticky bg-green"><h3>37 / 37 tests</h3><p>Routing, voice loading, previews, service streaming, Fish timing, PostHog privacy, shortcuts, release metadata, and packaging checks pass.</p></div>
+<div class="sticky bg-green"><h3>Public artifact</h3><p>The release workflow validates Developer ID signing, Apple notarization, stapling, DMG integrity, and immutable package version before publication.</p></div>
+<div class="sticky bg-blue"><h3>Visible web QA</h3><p>Production homepage, signup, login, and account screens were inspected in the browser. The page visibly names both providers.</p></div>
+</div></section>
+<section class="board-section"><details open><summary>Launch decision</summary><div class="detail-body"><ul><li>Fish Audio: production-ready for signed-in v0.1.4 users.</li><li>Authentication and account-backed credit metering: production verified.</li><li>ElevenLabs: safely fails without a charge, but provider billing must be restored before launch claims include working ElevenLabs audio.</li><li>BYOK routing is covered by automated policy tests; live disposable provider keys were not exercised.</li></ul></div></details><details><summary>Artifacts</summary><div class="detail-body"><a href="qa-e2e-tests.json">QA source of truth</a> · <a href="public-release-verification.json">Public release proof</a> · <a href="pre-implementation-report.html">Pre-implementation report</a> · <a href="https://github.com/zvone187/Tristr-Flow/releases/tag/v0.1.4">Release v0.1.4</a></div></details></section>
+</main></body></html>
