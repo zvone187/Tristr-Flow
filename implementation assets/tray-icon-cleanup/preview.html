@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tristr Flow tray icon QA</title>
+    <style>
+      :root { font-family: -apple-system, BlinkMacSystemFont, sans-serif; color: #252525; }
+      body { margin: 0; padding: 36px; background: #f3f1ed; }
+      h1 { margin: 0 0 8px; font-size: 22px; }
+      p { margin: 0 0 24px; color: #5b5b5b; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(320px, 1fr)); gap: 24px; max-width: 900px; }
+      .card { padding: 20px; border: 1px solid #c9c7c2; border-radius: 16px; background: #fff; }
+      h2 { margin: 0 0 12px; font-size: 15px; }
+      .bar { height: 28px; display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 0 12px; border-radius: 7px; font-size: 12px; }
+      .light { background: #f8f8f8; color: #222; }
+      .dark { background: #252525; color: #fff; }
+      .icon { display: inline-block; width: 18px; height: 18px; flex: none; background: currentColor; -webkit-mask: url('../../assets/trayTemplate@2x.png') center / contain no-repeat; mask: url('../../assets/trayTemplate@2x.png') center / contain no-repeat; }
+      .icon.one { -webkit-mask-image: url('../../assets/trayTemplate.png'); mask-image: url('../../assets/trayTemplate.png'); }
+      .inspection { display: flex; align-items: center; gap: 24px; padding: 24px 6px 4px; }
+      .zoom { display: inline-block; width: 180px; height: 180px; background: #252525; -webkit-mask: url('../../assets/trayTemplate@2x.png') center / contain no-repeat; mask: url('../../assets/trayTemplate@2x.png') center / contain no-repeat; image-rendering: pixelated; }
+      .dark-zoom { background: #fff; }
+      .caption { font-size: 12px; color: #666; }
+    </style>
+  </head>
+  <body>
+    <h1>Tristr Flow tray icon</h1>
+    <p>Actual 1x and 2x transparent assets, tinted like macOS template images. The upper horizontal line should be absent.</p>
+    <div class="grid">
+      <section class="card">
+        <h2>Light menu bar</h2>
+        <div class="bar light"><span>Sep 20</span><span class="icon one" title="1x asset"></span><span class="icon" title="2x asset"></span></div>
+        <div class="inspection"><span class="zoom"></span><span class="caption">2x source enlarged for inspection</span></div>
+      </section>
+      <section class="card">
+        <h2>Dark menu bar</h2>
+        <div class="bar dark"><span>Sep 20</span><span class="icon one" title="1x asset"></span><span class="icon" title="2x asset"></span></div>
+        <div class="inspection"><span class="zoom dark-zoom"></span><span class="caption">2x source enlarged with template tint</span></div>
+      </section>
+    </div>
+  </body>
+</html>

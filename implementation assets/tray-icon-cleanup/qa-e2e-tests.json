@@ -1,0 +1,45 @@
+{
+  "scope": "Tray template icon visual change",
+  "tests": [
+    {
+      "id": "TRAY-01",
+      "title": "Light menu bar preview has no line above the logo",
+      "userStory": "As a macOS user in light appearance, I see only the centered Tristr Flow symbol in the menu bar.",
+      "setupInstrumentation": "Serve the generated preview.html with the actual 18px and 36px tray PNGs in a real browser at 100% zoom.",
+      "steps": ["Open the preview page.", "Inspect the light menu bar mockup at normal size and enlarged inspection size."],
+      "expectedResults": ["The symbol is centered and no detached horizontal line appears above it."],
+      "proofToCapture": ["Browser screenshot of the light mockup and enlarged inspection."],
+      "status": "blocked",
+      "notes": "The in-app browser blocked the local file URL under its URL policy; no alternate browser route was attempted. A direct local image inspection of visual-preview.png showed no top line on the light treatment.",
+      "screenshots": [],
+      "alternativeEvidence": "visual-preview.png"
+    },
+    {
+      "id": "TRAY-02",
+      "title": "Dark menu bar template remains legible without the line",
+      "userStory": "As a macOS user in dark appearance, the template symbol adapts to a light tint without the stray line.",
+      "setupInstrumentation": "Use the same preview page with CSS mask treatment to simulate the macOS template tint.",
+      "steps": ["Inspect the dark menu bar mockup at normal size and enlarged inspection size."],
+      "expectedResults": ["Only the intended logo body is visible, without a bar above it."],
+      "proofToCapture": ["Browser screenshot of the dark mockup and enlarged inspection."],
+      "status": "blocked",
+      "notes": "The in-app browser blocked the local file URL under its URL policy; no alternate browser route was attempted. A direct local image inspection of visual-preview.png showed no top line on the dark treatment.",
+      "screenshots": [],
+      "alternativeEvidence": "visual-preview.png"
+    },
+    {
+      "id": "TRAY-03",
+      "title": "Retina asset and dimensions remain valid",
+      "userStory": "As a user on a Retina display, the menu bar uses a crisp 36px source at an 18px display size.",
+      "setupInstrumentation": "Run test/tray-icon.test.js, and compare both PNGs in the browser preview.",
+      "steps": ["Verify both PNG dimensions and RGBA transparency with the automated test.", "Inspect the 2x image rendered at 18 CSS pixels."],
+      "expectedResults": ["Assets stay 18x18 and 36x36, preserve the logo body, and contain no wide top-row rule."],
+      "proofToCapture": ["Passing automated test and browser screenshot of the Retina mockup."],
+      "status": "blocked",
+      "notes": "The automated 1x/2x PNG checks passed and both corrected files exactly matched the packaged app.asar, but the planned browser inspection was blocked by the local URL policy.",
+      "automatedStatus": "passed",
+      "screenshots": [],
+      "alternativeEvidence": "visual-preview.png"
+    }
+  ]
+}
