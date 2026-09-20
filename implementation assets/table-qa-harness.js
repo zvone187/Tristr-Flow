@@ -80,6 +80,7 @@ async function run() {
     },
   });
   await win.loadFile(path.join(root, 'src/overlay.html'));
+  await win.webContents.insertCSS('* { animation: none !important; transition: none !important; scroll-behavior: auto !important; }');
 
   const clipboardPayload = readClipboardContent({
     readText: () => 'Here is the table. Options selected Users Share 1 160 17.7% 2 85 9.4% After the table.',
