@@ -1,0 +1,27 @@
+{
+  "scope": "Documentation-only: no app or browser behavior changes",
+  "browserQaApplicable": false,
+  "tests": [
+    {
+      "id": "DOC-AX-01",
+      "title": "Future agent can recover a stale Tristr Flow Accessibility grant",
+      "userStory": "As a maintainer, I can distinguish an enabled-but-stale macOS grant from a shortcut-registration failure and recover without changing unrelated permissions.",
+      "setupInstrumentation": "Read the committed AGENTS.md and run the targeted documentation regression test.",
+      "steps": [
+        "Confirm the note explains code-signature mismatch and the risk of installing ad-hoc builds.",
+        "Confirm recovery resets only ai.pazi.tristrflow, then relaunches and re-enables its entry.",
+        "Confirm verification calls for a physical shortcut test and an Allowed result in tccd logs."
+      ],
+      "expectedResults": [
+        "The instruction is concise, actionable, and does not tell agents to broaden permissions or replace a working app with an ad-hoc build."
+      ],
+      "proofToCapture": [
+        "Passing test/agents-accessibility-guidance.test.js",
+        "Reviewed AGENTS.md diff"
+      ],
+      "status": "passed",
+      "notes": "AGENTS.md diff reviewed; targeted regression test passed. Browser QA is not applicable because only repository instructions and their regression test changed.",
+      "screenshots": []
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Accessibility guidance handoff</title>
+    <style>
+      :root { --canvas:#f6f2e8; --ink:#172026; --muted:#65727a; --border:#2c3338; --paper:#fff; --blue:#d9ecff; --green:#dff5df; --yellow:#fff1b8; --pink:#ffe2eb; --shadow:7px 7px 0 rgba(23,32,38,.18); font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+      * { box-sizing:border-box; }
+      body { margin:0; color:var(--ink); line-height:1.45; background:linear-gradient(90deg,rgba(47,58,66,.07) 1px,transparent 1px),linear-gradient(rgba(47,58,66,.07) 1px,transparent 1px),var(--canvas); background-size:28px 28px; }
+      main { margin:0 auto; padding:30px 22px 52px; width:min(1240px,100%); }
+      header,.grid { display:grid; gap:18px; grid-template-columns:1.4fr .8fr; } .grid.three { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      h1,h2,h3,p { margin:0; } h1 { font-size:clamp(2rem,5vw,4.4rem); line-height:.96; } h2 { font-size:1.1rem; text-transform:uppercase; }
+      a { color:#0f5f85; font-weight:750; text-decoration:none; } code { background:rgba(255,255,255,.72); border:1px solid rgba(47,58,66,.24); border-radius:6px; padding:2px 5px; }
+      .hero,.card,details,.sticky { border:2px solid var(--border); box-shadow:var(--shadow); } .hero,.card,details { background:var(--paper); border-radius:16px; }
+      .hero { padding:26px; } .hero p { color:var(--muted); margin-top:12px; }
+      .meta-stack { display:grid; gap:14px; } .card { padding:16px; } .card small { color:var(--muted); display:block; font-size:.78rem; font-weight:850; text-transform:uppercase; } .card strong { display:block; font-size:1.3rem; margin-top:4px; }
+      .tag { display:inline-flex; border:2px solid var(--border); border-radius:999px; background:var(--yellow); font-size:.78rem; font-weight:900; padding:5px 9px; margin-bottom:12px; text-transform:uppercase; }
+      .board-section { margin-top:24px; } .section-title { display:flex; gap:10px; align-items:center; margin-bottom:12px; } .pin { background:#ff6b57; border:2px solid var(--border); border-radius:50%; width:16px; height:16px; }
+      .sticky { border-radius:3px; min-height:128px; padding:16px; transform:rotate(-.7deg); } .sticky:nth-child(even) { transform:rotate(.7deg); } .sticky h3 { margin-bottom:8px; } .sticky p,.sticky li { color:#334148; font-size:.94rem; } .sticky ul { margin:8px 0 0; padding-left:18px; }
+      .bg-blue { background:var(--blue); } .bg-green { background:var(--green); } .bg-yellow { background:var(--yellow); } .bg-pink { background:var(--pink); }
+      details { margin-top:14px; } summary { cursor:pointer; font-weight:850; padding:14px 16px; } .detail-body { border-top:2px solid var(--border); padding:14px 16px; }
+      @media (max-width:900px) { header,.grid,.grid.three { grid-template-columns:1fr; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <section class="hero"><span class="tag">Post-implementation</span><h1>The fix is documented</h1><p>Future agents now have the exact signature-mismatch diagnosis, app-only recovery, and verification rule in AGENTS.md.</p></section>
+        <aside class="meta-stack" aria-label="Report metadata">
+          <div class="card bg-green"><small>Status</small><strong>Validated</strong></div>
+          <div class="card bg-blue"><small>Scope</small><strong>Documentation only</strong></div>
+          <div class="card bg-yellow"><small>Date</small><strong>2026-09-20</strong></div>
+        </aside>
+      </header>
+      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Fast Answer</h2></div><div class="grid three">
+        <div class="sticky bg-green"><h3>What changed</h3><p><a href="../../AGENTS.md">AGENTS.md</a> records why an enabled switch can fail and how to safely repair it.</p></div>
+        <div class="sticky bg-blue"><h3>How it stays checked</h3><p><a href="../../test/agents-accessibility-guidance.test.js">A regression test</a> asserts that the key recovery instructions remain present.</p></div>
+        <div class="sticky bg-yellow"><h3>Main caveat</h3><p>The installed ad-hoc app works now, but a future differently signed replacement may require a new grant. Ship stable Developer ID releases.</p></div>
+      </div></section>
+      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Pass criteria</h2></div><div class="grid three">
+        <div class="sticky bg-green"><h3>Explain · met</h3><p>Guidance names code-signing requirement mismatch even when the switch reads on.</p></div>
+        <div class="sticky bg-green"><h3>Recover · met</h3><p>It resets only <code>ai.pazi.tristrflow</code> and re-enables the new entry.</p></div>
+        <div class="sticky bg-green"><h3>Verify · met</h3><p>It requires a physical shortcut test and an allowed result in macOS logs.</p></div>
+      </div></section>
+      <section class="board-section"><div class="section-title"><span class="pin"></span><h2>End-to-end evidence</h2></div><div class="grid three">
+        <div class="sticky bg-green"><h3>DOC-AX-01 · passed</h3><p>Reviewed the note against the recovery test plan. The targeted Node test passed after failing before the edit.</p></div>
+        <div class="sticky bg-blue"><h3>Automated checks</h3><p><code>npm test</code>: 41/41 passed. <code>npm run lint</code>: passed. <code>git diff --check</code>: passed.</p></div>
+        <div class="sticky bg-yellow"><h3>Browser QA</h3><p>Not applicable to a document-only change. No browser screenshots were needed or captured.</p></div>
+      </div></section>
+      <details><summary>Implementation and review</summary><div class="detail-body"><p>Added two AGENTS.md bullets: prevent ad-hoc installs over working apps; detect stale Accessibility grants via tccd; reset only the app bundle ID; regrant and verify. The final diff was reviewed against <code>origin/main</code> at <code>708a1f4</code>. No runtime code, settings, installed app, secrets, or unrelated files changed. A first review refined the wording to say that only local builds without signing credentials are ad-hoc signed.</p></div></details>
+      <details><summary>Branch, artifacts, and follow-up</summary><div class="detail-body"><p>Branch: <code>codex/accessibility-permission-guide</code> (change commit at branch HEAD). No PR was requested or created. Worktree: /Users/zvonimirsabljic/Development/Trister Flow Worktrees/codex/accessibility-permission-guide. QA plan: <a href="qa-e2e-tests.json">qa-e2e-tests.json</a>. No runnable URL applies to this instructions-only update. The app’s working installation was not touched.</p></div></details>
+    </main>
+  </body>
+</html>
