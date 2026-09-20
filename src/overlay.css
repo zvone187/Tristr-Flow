@@ -422,6 +422,41 @@ body.rz-active #card {
   border-radius: 8px;
   margin: 0.4em 0;
 }
+.rich .table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0.55em 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.rich table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: 0.86em;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: normal;
+}
+.rich caption {
+  caption-side: top;
+  text-align: left;
+  font-weight: 600;
+  padding: 0.4em 0.6em;
+}
+.rich th, .rich td {
+  min-width: 5ch;
+  max-width: 28ch;
+  padding: 0.35em 0.6em;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.rich th { font-weight: 600; background: var(--soft); }
+.rich tr > :last-child { border-right: 0; }
+.rich tbody tr:last-child > *, .rich tfoot tr:last-child > * { border-bottom: 0; }
 .rich .word { display: inline; }
 
 #text.loading { color: var(--muted); font-style: italic; }

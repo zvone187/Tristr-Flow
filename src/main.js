@@ -22,6 +22,7 @@ const path = require('path');
 
 const { loadConfig } = require('./config');
 const { getSelectedText, getFrontmostApplicationPid } = require('./selection');
+const { readClipboardContent } = require('./clipboard-content');
 const { synthesize, synthesizeStream, clampSpeed, clampStability } = require('./elevenlabs');
 const { isFishVoice, synthesizeFish, synthesizeFishStream } = require('./fishaudio');
 const svc = require('./service');
@@ -918,13 +919,13 @@ async function onHotkey(trigger = 'shortcut', { targetPid = 0 } = {}) {
 
 async function speakFromClipboard() {
   captureAnalytics('read_requested', { trigger: 'clipboard_menu' });
-  const text = clipboard.readText().trim();
-  if (!text) {
+  const { text, html } = readClipboardContent(clipboard);
+  if (!text && !html) {
     captureAnalytics('read_rejected', { trigger: 'clipboard_menu', reason: 'empty-clipboard' });
     notify('Clipboard is empty', 'Copy some text, then use this menu item.');
     return;
   }
-  await speakText(text, null, { trigger: 'clipboard_menu' });
+  await speakText(text, html, { trigger: 'clipboard_menu' });
 }
 
 function setVoice(voiceId, voiceName, source = 'preferences') {

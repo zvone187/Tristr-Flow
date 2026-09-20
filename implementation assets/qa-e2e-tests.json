@@ -1,110 +1,42 @@
 {
-  "project": "Tristr Flow desktop",
-  "branch": "codex/fish-backend-proxy",
-  "release": "v0.1.4",
-  "date": "2026-09-17",
-  "status": "PRODUCTION_VERIFIED_WITH_ELEVENLABS_PROVIDER_BLOCKER",
-  "cases": [
+  "feature": "Overlay table rendering",
+  "base": "origin/main@f9b0e6f",
+  "tests": [
     {
-      "id": "E2E-FISH-VOICES-01",
-      "title": "A signed-in DMG user receives backend Fish voices without provider keys",
-      "expectedResults": ["Desktop login succeeds against the same Render deployment as the public site", "The client receives namespaced Fish voices", "No provider key is sent to the desktop"],
-      "result": {
-        "desktopServiceClientLogin": true,
-        "productionService": "https://tristr-flow-5iy7.onrender.com",
-        "voiceCount": 73,
-        "allVoiceIdsNamespaced": true,
-        "safeResponseFields": ["description", "name", "provider", "voice_id"],
-        "credentialMaterialObserved": false
-      },
-      "proof": ["Production execution through src/service.js", "Voice-loading and merge integration tests", "Public package source inspection"],
-      "status": "passed"
-    },
-    {
-      "id": "E2E-FISH-READ-01",
-      "title": "Fish reading streams through Render and consumes Tristr credits once",
-      "expectedResults": ["The desktop service client receives progressive audio and alignment", "Aligned characters reproduce the input", "Credits decrement exactly once"],
-      "result": {
-        "inputAndAlignedText": "Desktop client Fish.",
-        "audioLines": 5,
-        "alignmentLines": 4,
-        "decodedAudioBytes": 29256,
-        "creditDeltaMicros": "4000",
-        "expectedCreditDeltaMicros": "4000"
-      },
-      "proof": ["Production stream exercised through the shipped desktop transport module", "Alignment-only forwarding regression test", "Provider routing tests"],
-      "status": "passed"
-    },
-    {
-      "id": "E2E-FISH-PREVIEW-01",
-      "title": "Account-backed Fish previews use the service",
-      "expectedResults": ["A Fish preview is collected from the backend into playable MP3 data", "Provider errors settle without hanging the UI"],
-      "result": {
-        "fishPreviewDecodedBytes": 12119,
-        "fishPreviewCreditDeltaMicros": "1600",
-        "fishPreviewExpectedDeltaMicros": "1600",
-        "elevenLabsProviderResult": "HTTP 402",
-        "elevenLabsCreditDeltaMicros": "0"
-      },
-      "proof": ["Production serviceSynthesize execution", "Preview success and error unit tests"],
-      "status": "blocked",
-      "blocker": "Fish preview passed. ElevenLabs preview cannot produce audio until the configured ElevenLabs provider account is funded."
-    },
-    {
-      "id": "E2E-BYOK-FALLBACK-01",
-      "title": "Local provider keys remain an explicit direct-mode override",
-      "expectedResults": ["A local Fish key chooses fish-direct", "A local ElevenLabs key chooses elevenlabs-direct", "Removing keys restores account-backed service routing"],
-      "result": {
-        "routingPolicyTests": "passed",
-        "liveProviderKeyExercise": "not run"
-      },
-      "proof": ["provider-routing.test.js covers every direct/service/unavailable branch"],
+      "id": "E2E-TABLE-01",
+      "title": "Copied HTML table displays as columns in the reading pop-up",
+      "userStory": "A user copies a table from a browser and invokes Read clipboard text aloud.",
+      "setupInstrumentation": "Put a three-column HTML table with two data rows on the macOS clipboard in both text/plain and text/html flavors; launch the local Electron app and invoke the tray action.",
+      "steps": ["Copy the table", "Choose Read clipboard text aloud", "Inspect the visible overlay table and its accessible rows/cells", "Confirm displayed words match the speech text"],
+      "expectedResults": ["Header and data cells occupy three aligned columns", "Rows stay grouped", "The pop-up remains usable at its normal width", "Spoken/alignment text contains each cell once in reading order"],
+      "proofToCapture": ["Overlay screenshot", "DOM row/cell structure", "Canonical text and alignment assertions"],
       "status": "partial",
-      "blocker": "No disposable local provider keys were used for this release QA; the policy is fully automated but direct provider billing was not exercised live."
+      "evidence": "Local Electron Chromium loaded the real overlay page and preload. Three aligned columns, row grouping, canonical reading order, and wide-table scrolling passed in table-qa-results.json. Screenshot: qa-screenshots/table-three-columns.png. The production app's native tray action was not clicked because it was actively reading the user's document.",
+      "remaining": "Run the packaged build's Read clipboard text aloud action with a copied table after the current reading finishes."
     },
     {
-      "id": "E2E-FISH-SECURITY-01",
-      "title": "Fish endpoints fail closed and the service key is absent from the DMG",
-      "expectedResults": ["Anonymous requests return 401", "Malformed Fish IDs return 400 without a debit", "Provider errors are sanitized", "The server key is absent from the public package"],
-      "result": {
-        "anonymousVoiceCatalogueStatus": 401,
-        "malformedVoiceStatus": 400,
-        "malformedVoiceError": "invalid_fish_voice",
-        "malformedVoiceCreditDeltaMicros": "0",
-        "desktopProductionDependenciesVulnerabilities": 0,
-        "serviceSecretScan": "passed"
-      },
-      "proof": ["Production HTTP captures", "Public app.asar inspection", "Backend secret scan and provider-failure fixtures"],
-      "status": "passed"
+      "id": "E2E-TABLE-02",
+      "title": "Selected-text capture preserves the same table layout",
+      "userStory": "A user selects browser content containing a table and starts reading via the selected-text action.",
+      "setupInstrumentation": "Open a local browser fixture with prose before and after a table; select all relevant content; use Read selected text or the shortcut with Accessibility permission.",
+      "steps": ["Select fixture content", "Invoke Read selected text", "Inspect the overlay from first paragraph through the table and following paragraph"],
+      "expectedResults": ["Table headers and values remain in rows and columns", "Prose and inline formatting remain legible", "No cell text is lost or duplicated"],
+      "proofToCapture": ["Overlay screenshot", "Text/DOM inspection"],
+      "status": "blocked",
+      "evidence": "The selected-text JXA code passes HTML to the same speakText/overlay renderer, whose table layout passed in local Electron Chromium. The production app was observed actively reading the screenshot's content, so a new native capture would interrupt it.",
+      "remaining": "Select a table in a frontmost source app and invoke Read selected text in the packaged build after playback ends."
     },
     {
-      "id": "E2E-DMG-RELEASE-01",
-      "title": "The public v0.1.4 DMG is immutable, notarized, and wired to production Render",
-      "expectedResults": ["Unauthenticated public download succeeds", "Published digest matches", "Gatekeeper accepts a notarized Developer ID app", "The packaged app reports v0.1.4 and contains the Fish service route", "The packaged default backend accepts production accounts"],
-      "result": {
-        "releaseStatus": "published",
-        "releaseRunConclusion": "success",
-        "downloadHttpStatus": 200,
-        "downloadBytes": 124205428,
-        "sha256": "2b83e6b33eb5d65d28e5611ecb6ccf9a190badf478ed8cd761dd8cf601ecf955",
-        "publishedDigestMatches": true,
-        "diskImageIntegrity": "passed",
-        "codesign": "passed",
-        "gatekeeper": "accepted — Notarized Developer ID",
-        "stapler": "passed",
-        "packagedVersion": "0.1.4",
-        "packagedDefaultService": "https://tristr-flow-5iy7.onrender.com",
-        "packagedClientProductionLogin": true,
-        "packagedClientVoiceCount": 73
-      },
-      "proof": ["Public unauthenticated DMG download", "Independent SHA-256 and hdiutil verification", "codesign, spctl, and stapler validation", "Extracted public app.asar executed against production auth and voices"],
-      "status": "passed"
+      "id": "E2E-TABLE-03",
+      "title": "Plain text and hostile HTML remain safe",
+      "userStory": "A user can still read plain clipboard text, and copied markup cannot execute in the pop-up.",
+      "setupInstrumentation": "Test a plain-text-only clipboard item, then a controlled HTML table containing script/style/event-handler/link/image markup; inspect the sandboxed overlay.",
+      "steps": ["Read plain text and verify it appears", "Read the controlled HTML item", "Inspect DOM and check for script execution, navigation, and external requests"],
+      "expectedResults": ["Plain text still reads", "Only allowed table and text nodes render", "No script, image, link target, or arbitrary attribute survives"],
+      "proofToCapture": ["Plain-text screenshot", "Sanitized table screenshot", "DOM/security assertion output"],
+      "status": "passed",
+      "evidence": "Local Electron Chromium screenshots qa-screenshots/plain-text-regression.png and qa-screenshots/table-sanitized.png. DOM inspection found zero active/attribute nodes, no script execution, and zero external HTTP(S) requests; plain text rendered unchanged.",
+      "limitation": "Clipboard input was controlled in memory so the user's real pasteboard was not modified."
     }
-  ],
-  "browserEvidence": {
-    "liveHomepage": "Captured inline in the Codex task with Fish Audio visibly named.",
-    "signup": "Captured inline in the Codex task.",
-    "loginAndAccount": "A disposable production account completed login and reached /account in the visible browser.",
-    "filesystemScreenshotNote": "The browser controller exposed inline image evidence but no filesystem-save operation."
-  }
+  ]
 }

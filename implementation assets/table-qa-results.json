@@ -1,0 +1,246 @@
+{
+  "checks": {
+    "tableRows": true,
+    "alignedColumns": true,
+    "rowOrder": true,
+    "spokenOrder": true,
+    "wideScrollable": true,
+    "hostileSafe": true,
+    "plainUnchanged": true
+  },
+  "normal": {
+    "text": "Here is the table.Options selectedUsersShare116017.7%2859.4%After the table.",
+    "tableCount": 1,
+    "rows": [
+      [
+        {
+          "tag": "TH",
+          "text": "Options selected",
+          "x": 34,
+          "y": 201
+        },
+        {
+          "tag": "TH",
+          "text": "Users",
+          "x": 394,
+          "y": 201
+        },
+        {
+          "tag": "TH",
+          "text": "Share",
+          "x": 551,
+          "y": 201
+        }
+      ],
+      [
+        {
+          "tag": "TD",
+          "text": "1",
+          "x": 34,
+          "y": 238
+        },
+        {
+          "tag": "TD",
+          "text": "160",
+          "x": 394,
+          "y": 238
+        },
+        {
+          "tag": "TD",
+          "text": "17.7%",
+          "x": 551,
+          "y": 238
+        }
+      ],
+      [
+        {
+          "tag": "TD",
+          "text": "2",
+          "x": 34,
+          "y": 275
+        },
+        {
+          "tag": "TD",
+          "text": "85",
+          "x": 394,
+          "y": 275
+        },
+        {
+          "tag": "TD",
+          "text": "9.4%",
+          "x": 551,
+          "y": 275
+        }
+      ]
+    ],
+    "overflowX": "auto",
+    "scrollWidth": 673,
+    "clientWidth": 673,
+    "hostileNodes": 0,
+    "pwned": false,
+    "canonical": "Here is the table. Options selected Users Share 1 160 17.7% 2 85 9.4% After the table.",
+    "screenshot": "qa-screenshots/table-three-columns.png"
+  },
+  "wide": {
+    "text": "Wide table:Column 1Column 2Column 3Column 4Column 5Column 6Column 7Column 8Column 9Value 1Value 2Value 3Value 4Value 5Value 6Value 7Value 8Value 9",
+    "tableCount": 1,
+    "rows": [
+      [
+        {
+          "tag": "TH",
+          "text": "Column 1",
+          "x": 34,
+          "y": 201
+        },
+        {
+          "tag": "TH",
+          "text": "Column 2",
+          "x": 129,
+          "y": 201
+        },
+        {
+          "tag": "TH",
+          "text": "Column 3",
+          "x": 227,
+          "y": 201
+        },
+        {
+          "tag": "TH",
+          "text": "Column 4",
+          "x": 326,
+          "y": 201
+        },
+        {
+          "tag": "TH",
+          "text": "Column 5",
+          "x": 425,
+          "y": 201
+        },
+        {
+          "tag": "TH",
+          "text": "Column 6",
+          "x": 523,
+          "y": 201
+        },
+        {
+          "tag": "TH",
+          "text": "Column 7",
+          "x": 622,
+          "y": 201
+        },
+        {
+          "tag": "TH",
+          "text": "Column 8",
+          "x": 720,
+          "y": 201
+        },
+        {
+          "tag": "TH",
+          "text": "Column 9",
+          "x": 818,
+          "y": 201
+        }
+      ],
+      [
+        {
+          "tag": "TD",
+          "text": "Value 1",
+          "x": 34,
+          "y": 238
+        },
+        {
+          "tag": "TD",
+          "text": "Value 2",
+          "x": 129,
+          "y": 238
+        },
+        {
+          "tag": "TD",
+          "text": "Value 3",
+          "x": 227,
+          "y": 238
+        },
+        {
+          "tag": "TD",
+          "text": "Value 4",
+          "x": 326,
+          "y": 238
+        },
+        {
+          "tag": "TD",
+          "text": "Value 5",
+          "x": 425,
+          "y": 238
+        },
+        {
+          "tag": "TD",
+          "text": "Value 6",
+          "x": 523,
+          "y": 238
+        },
+        {
+          "tag": "TD",
+          "text": "Value 7",
+          "x": 622,
+          "y": 238
+        },
+        {
+          "tag": "TD",
+          "text": "Value 8",
+          "x": 720,
+          "y": 238
+        },
+        {
+          "tag": "TD",
+          "text": "Value 9",
+          "x": 818,
+          "y": 238
+        }
+      ]
+    ],
+    "overflowX": "auto",
+    "scrollWidth": 883,
+    "clientWidth": 673,
+    "hostileNodes": 0,
+    "pwned": false,
+    "screenshot": "qa-screenshots/table-wide-scroll.png"
+  },
+  "hostile": {
+    "text": "Safe introHeaderSafe cell",
+    "tableCount": 1,
+    "rows": [
+      [
+        {
+          "tag": "TH",
+          "text": "Header",
+          "x": 34,
+          "y": 201
+        },
+        {
+          "tag": "TD",
+          "text": "Safe cell",
+          "x": 358,
+          "y": 201
+        }
+      ]
+    ],
+    "overflowX": "auto",
+    "scrollWidth": 673,
+    "clientWidth": 673,
+    "hostileNodes": 0,
+    "pwned": false,
+    "externalRequests": 0,
+    "screenshot": "qa-screenshots/table-sanitized.png"
+  },
+  "plain": {
+    "text": "Plain clipboard text still reads.",
+    "tableCount": 0,
+    "rows": [],
+    "overflowX": null,
+    "scrollWidth": 0,
+    "clientWidth": 0,
+    "hostileNodes": 0,
+    "pwned": false,
+    "screenshot": "qa-screenshots/plain-text-regression.png"
+  }
+}

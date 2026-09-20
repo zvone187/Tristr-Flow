@@ -27,7 +27,9 @@
     ['UL', 'ul'], ['OL', 'ol'], ['LI', 'li'],
     ['H1', 'h1'], ['H2', 'h2'], ['H3', 'h3'], ['H4', 'h4'], ['H5', 'h5'], ['H6', 'h6'],
     ['BLOCKQUOTE', 'blockquote'], ['PRE', 'pre'],
-    ['TABLE', 'div'], ['THEAD', 'div'], ['TBODY', 'div'], ['TR', 'div'], ['TD', 'div'], ['TH', 'div'],
+    ['TABLE', 'table'], ['CAPTION', 'caption'],
+    ['THEAD', 'thead'], ['TBODY', 'tbody'], ['TFOOT', 'tfoot'],
+    ['TR', 'tr'], ['TD', 'td'], ['TH', 'th'],
   ]);
   // subtrees to drop entirely
   const DROP = new Set([
@@ -111,7 +113,14 @@
           endWord(st);
           st.pendingSep = true;
           const el = document.createElement(BLOCK.get(tag));
-          outParent.appendChild(el);
+          if (tag === 'TABLE') {
+            const scroll = document.createElement('div');
+            scroll.className = 'table-scroll';
+            scroll.appendChild(el);
+            outParent.appendChild(scroll);
+          } else {
+            outParent.appendChild(el);
+          }
           const saved = st.blockHasContent;
           st.blockHasContent = false;
           walk(child, el, fmt, st);
