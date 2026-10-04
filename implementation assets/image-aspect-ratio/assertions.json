@@ -1,0 +1,227 @@
+{
+  "feature": "Original image aspect ratio",
+  "tests": {
+    "article-image": {
+      "status": "passed",
+      "checks": {
+        "actualRichCopy": true,
+        "relativeURLResolvedByChromium": true,
+        "selectedImageDecoded": true,
+        "unrelatedContentAbsent": true,
+        "captionInDocumentOrder": true,
+        "exactCanonicalAndWordMapping": true,
+        "imageFitsNormalWindow": true,
+        "safeImageAttributes": true,
+        "sourceAndOverlayMatchUntouchedOriginalAspect": true
+      }
+    },
+    "resize-repeat": {
+      "status": "passed",
+      "checks": {
+        "imageFitsNarrowWindow": true,
+        "repeatHasOnlyNewImages": true,
+        "fallbackAndEmbeddedImagesDecoded": true,
+        "repeatedImagesFitNarrowWindow": true,
+        "exactCanonicalAndWordMapping": true,
+        "copiedSourceAndSrcsetExcluded": true,
+        "untouchedOriginalAspectAtNarrowWidth": true,
+        "repeatedSourceAndOverlayMatchOriginalAspects": true,
+        "actualShapeArticleCopy": true,
+        "sourceAndNormalOverlayMatchOriginalAspects": true,
+        "sourceAndNarrowOverlayMatchOriginalAspects": true,
+        "tableImagesRetainOriginalAspects": true,
+        "tableWrapperContainsPageOverflow": true,
+        "safeCopiedAttributesAndSourceURLs": true,
+        "shapeCanonicalAndWordMapping": true
+      }
+    },
+    "safety-regression": {
+      "status": "passed",
+      "checks": {
+        "onlyAllowedImageSources": true,
+        "HTTPAndHTTPSAllowedAndProtocolRelativeIsHTTPS": true,
+        "handlersScriptsAndCopiedAttributesRemoved": true,
+        "noUntrustedResourceRequests": true,
+        "imagesOmitReferrers": true,
+        "brokenImageHiddenAndTextIntact": true,
+        "localAndEmbeddedImagesStillVisible": true,
+        "hostileDimensionsCannotStretchOriginalImages": true,
+        "tableRetainsRowsAndColumns": true,
+        "exactCanonicalAndWordMapping": true,
+        "plainTextClearsImagesAndRetainsWordMap": true,
+        "productionIsolationAndCSP": true
+      }
+    }
+  },
+  "originalSource": {
+    "path": "assets/logo.png",
+    "width": 1024,
+    "height": 1024,
+    "servedWithoutTransformation": true
+  },
+  "landscapeSize": {
+    "width": 600,
+    "height": 300
+  },
+  "portraitSize": {
+    "width": 200,
+    "height": 400
+  },
+  "thumbnailSize": {
+    "width": 100,
+    "height": 100
+  },
+  "clipboardRestored": true,
+  "measurements": {
+    "squareNormal": {
+      "x": 32.5,
+      "y": 253,
+      "width": 667,
+      "height": 667,
+      "right": 699.5,
+      "bottom": 920
+    },
+    "squareNarrow": {
+      "x": 32.5,
+      "y": 253,
+      "width": 357,
+      "height": 357,
+      "right": 389.5,
+      "bottom": 610
+    },
+    "shapeNormal": [
+      {
+        "naturalWidth": 600,
+        "naturalHeight": 300,
+        "bounds": {
+          "x": 66,
+          "y": 212,
+          "width": 600,
+          "height": 300,
+          "right": 666,
+          "bottom": 512
+        },
+        "inTable": false
+      },
+      {
+        "naturalWidth": 200,
+        "naturalHeight": 400,
+        "bounds": {
+          "x": 266,
+          "y": 565.1953125,
+          "width": 200,
+          "height": 400,
+          "right": 466,
+          "bottom": 965.1953125
+        },
+        "inTable": false
+      },
+      {
+        "naturalWidth": 1024,
+        "naturalHeight": 1024,
+        "bounds": {
+          "x": 215.890625,
+          "y": 1073.6953125,
+          "width": 472.296875,
+          "height": 472.296875,
+          "right": 688.1875,
+          "bottom": 1545.9921875
+        },
+        "inTable": true
+      },
+      {
+        "naturalWidth": 600,
+        "naturalHeight": 300,
+        "bounds": {
+          "x": 215.890625,
+          "y": 1581.3828125,
+          "width": 472.296875,
+          "height": 236.1484375,
+          "right": 688.1875,
+          "bottom": 1817.53125
+        },
+        "inTable": true
+      },
+      {
+        "naturalWidth": 200,
+        "naturalHeight": 400,
+        "bounds": {
+          "x": 352.0390625,
+          "y": 1852.921875,
+          "width": 200,
+          "height": 400,
+          "right": 552.0390625,
+          "bottom": 2252.921875
+        },
+        "inTable": true
+      }
+    ],
+    "shapeNarrow": [
+      {
+        "naturalWidth": 600,
+        "naturalHeight": 300,
+        "bounds": {
+          "x": 32.5,
+          "y": -556,
+          "width": 357,
+          "height": 178.5,
+          "right": 389.5,
+          "bottom": -377.5
+        },
+        "inTable": false
+      },
+      {
+        "naturalWidth": 200,
+        "naturalHeight": 400,
+        "bounds": {
+          "x": 111,
+          "y": -324.3046875,
+          "width": 200,
+          "height": 400,
+          "right": 311,
+          "bottom": 75.6953125
+        },
+        "inTable": false
+      },
+      {
+        "naturalWidth": 1024,
+        "naturalHeight": 1024,
+        "bounds": {
+          "x": 149.765625,
+          "y": 184.1953125,
+          "width": 282.1171875,
+          "height": 282.1171875,
+          "right": 431.8828125,
+          "bottom": 466.3125
+        },
+        "inTable": true
+      },
+      {
+        "naturalWidth": 600,
+        "naturalHeight": 300,
+        "bounds": {
+          "x": 149.765625,
+          "y": 501.703125,
+          "width": 282.109375,
+          "height": 141.0546875,
+          "right": 431.875,
+          "bottom": 642.7578125
+        },
+        "inTable": true
+      },
+      {
+        "naturalWidth": 200,
+        "naturalHeight": 400,
+        "bounds": {
+          "x": 190.8203125,
+          "y": 678.1484375,
+          "width": 200,
+          "height": 400,
+          "right": 390.8203125,
+          "bottom": 1078.1484375
+        },
+        "inTable": true
+      }
+    ]
+  }
+}

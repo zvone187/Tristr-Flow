@@ -1,0 +1,18 @@
+{
+  "original": {
+    "width": 1024,
+    "height": 1024
+  },
+  "previousWideFixture": {
+    "width": 1400,
+    "height": 600
+  },
+  "previousSmallFixture": {
+    "width": 100,
+    "height": 44
+  },
+  "checks": {
+    "wideFixtureMatchesOriginalAspect": false,
+    "smallFixtureMatchesOriginalAspect": false
+  }
+}
