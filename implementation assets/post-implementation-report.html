@@ -1,58 +1,122 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Overlay tables — implementation report</title>
-  <style>
-    :root { --canvas:#f6f2e8; --ink:#172026; --muted:#65727a; --border:#2c3338; --paper:#fff; --blue:#d9ecff; --green:#dff5df; --yellow:#fff1b8; --pink:#ffe2eb; --purple:#eadfff; --shadow:7px 7px 0 rgba(23,32,38,.18); font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-    * { box-sizing:border-box; } body { background:linear-gradient(90deg,rgba(47,58,66,.07) 1px,transparent 1px),linear-gradient(rgba(47,58,66,.07) 1px,transparent 1px),var(--canvas); background-size:28px 28px; color:var(--ink); line-height:1.45; margin:0; }
-    main { margin:0 auto; padding:30px 22px 52px; width:min(1240px,100%); } header { display:grid; gap:18px; grid-template-columns:1.4fr .8fr; margin-bottom:22px; }
-    h1,h2,h3,p { margin:0; } h1 { font-size:clamp(2rem,5vw,4.4rem); line-height:.96; } h2 { font-size:1.1rem; text-transform:uppercase; } a { color:#0f5f85; font-weight:750; text-decoration:none; }
-    code { background:rgba(255,255,255,.72); border:1px solid rgba(47,58,66,.24); border-radius:6px; padding:2px 5px; }
-    .hero,.card,details,.sticky { border:2px solid var(--border); box-shadow:var(--shadow); } .hero,.card,details { background:var(--paper); border-radius:16px; } .hero { padding:26px; } .hero p { color:var(--muted); margin-top:12px; }
-    .meta-stack,.grid { display:grid; gap:14px; } .grid.two { grid-template-columns:repeat(2,minmax(0,1fr)); } .grid.three { grid-template-columns:repeat(3,minmax(0,1fr)); }
-    .card { padding:16px; } .card small { color:var(--muted); display:block; font-size:.78rem; font-weight:850; text-transform:uppercase; } .card strong { display:block; font-size:1.3rem; line-height:1.1; margin-top:4px; }
-    .tag { background:var(--yellow); border:2px solid var(--border); border-radius:999px; display:inline-flex; font-size:.78rem; font-weight:900; margin-bottom:12px; padding:5px 9px; text-transform:uppercase; }
-    .board-section { margin-top:24px; } .section-title { align-items:center; display:flex; gap:10px; margin-bottom:12px; } .pin { background:#ff6b57; border:2px solid var(--border); border-radius:50%; height:16px; width:16px; }
-    .sticky { border-radius:3px; min-height:120px; padding:16px; transform:rotate(-.7deg); } .sticky:nth-child(even) { transform:rotate(.7deg); } .sticky h3 { font-size:1.1rem; margin-bottom:8px; } .sticky p,.sticky li { color:#334148; font-size:.94rem; } .sticky ul { margin:8px 0 0; padding-left:18px; }
-    .bg-blue { background:var(--blue); } .bg-green { background:var(--green); } .bg-yellow { background:var(--yellow); } .bg-pink { background:var(--pink); } .bg-purple { background:var(--purple); }
-    summary { cursor:pointer; font-weight:850; list-style:none; padding:14px 16px; } summary::-webkit-details-marker { display:none; } summary:before { content:"+"; display:inline-block; font-weight:900; margin-right:10px; width:14px; } details[open] summary:before { content:"-"; } .detail-body { border-top:2px solid var(--border); color:#334148; padding:14px 16px 16px; }
-    .shots { display:grid; gap:12px; grid-template-columns:repeat(2,minmax(0,1fr)); margin-top:12px; } .shots img { border:1px solid var(--border); border-radius:10px; max-width:100%; }
-    @media(max-width:900px) { header,.grid.two,.grid.three,.shots { grid-template-columns:1fr; } }
-  </style>
-</head>
-<body><main>
-  <header>
-    <section class="hero"><span class="tag">Post-implementation</span><h1>Tables stay in columns</h1><p>Done with one verification limit: real Chromium overlay tests passed, while native tray/shortcut replay was deferred to avoid interrupting the user's currently playing installed app.</p></section>
-    <aside class="meta-stack">
-      <div class="card bg-yellow"><small>Status</small><strong>Done with concerns</strong></div>
-      <div class="card bg-blue"><small>Implementation</small><strong>codex/overlay-tables<br />6e5033d · base f9b0e6f</strong></div>
-      <div class="card bg-green"><small>Date</small><strong>2026-09-20</strong></div>
-    </aside>
-  </header>
-  <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Fast Answer</h2></div><div class="grid three">
-    <div class="sticky bg-pink"><h3>Root cause</h3><p>The rich-text allowlist replaced every table tag with <code>div</code>. The clipboard-menu path discarded its HTML flavor before rendering.</p></div>
-    <div class="sticky bg-green"><h3>What changed</h3><p>Safe semantic <code>table</code>/<code>tr</code>/<code>th</code>/<code>td</code> elements, readable cell styling and horizontal overflow, plus clipboard HTML forwarding.</p></div>
-    <div class="sticky bg-yellow"><h3>Release boundary</h3><p>The installed v0.1.4 app has not been replaced. This code needs a signed/notarized desktop release before downloaded users see the fix.</p></div>
-  </div></section>
-  <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Pass criteria</h2></div><div class="grid three">
-    <div class="sticky bg-green"><h3>Layout · Met</h3><p>Three aligned columns and ordered rows confirmed by DOM geometry and screenshot. A nine-column table scrolls horizontally.</p></div>
-    <div class="sticky bg-yellow"><h3>Both paths · Partial</h3><p>Clipboard helper and shared overlay path passed. Native tray and selected-text actions were not replayed while the current app was reading.</p></div>
-    <div class="sticky bg-green"><h3>Safety &amp; sync · Met</h3><p>Canonical speech order matches the fixture; hostile markup yielded zero unsafe nodes, zero script effects, and zero external requests.</p></div>
-  </div></section>
-  <section class="board-section"><div class="section-title"><span class="pin"></span><h2>End-to-end evidence</h2></div><div class="grid three">
-    <div class="sticky bg-yellow"><h3>E2E-TABLE-01 · Partial</h3><p>Real Electron overlay and clipboard-content helper passed, with screenshot and row geometry. The native clipboard tray click remains unrun.</p></div>
-    <div class="sticky bg-pink"><h3>E2E-TABLE-02 · Blocked</h3><p>The selected-text HTML path is unchanged and shares this renderer. A live native replay would interrupt the user's current reading.</p></div>
-    <div class="sticky bg-green"><h3>E2E-TABLE-03 · Passed</h3><p>Plain text displayed unchanged. Inert table markup rendered, while active HTML and outbound requests were absent.</p></div>
-  </div></section>
-  <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Checks and evidence</h2></div><div class="grid two">
-    <div class="sticky bg-green"><h3>Automated</h3><ul><li>3 new regression tests went red before the fix, then green.</li><li>40/40 project tests and ESLint passed through the Husky commit hook.</li><li><code>npm run pack</code> produced the arm64 macOS app with the new files inside <code>app.asar</code>.</li><li>Production dependency audit: zero findings.</li></ul></div>
-    <div class="sticky bg-blue"><h3>Real Chromium pop-up</h3><ul><li>7/7 visual/DOM/security assertions passed in <code>table-qa-results.json</code>.</li><li>Four screenshots under <code>qa-screenshots/</code>.</li><li>No system clipboard write, provider call, or user playback interruption.</li></ul></div>
-  </div></section>
-  <section class="board-section"><div class="section-title"><span class="pin"></span><h2>Open the cards</h2></div>
-    <details open><summary>Visual comparison and QA artifacts</summary><div class="detail-body"><p><a href="qa-e2e-tests.json">QA plan and status</a> · <a href="table-qa-results.json">assertion output</a> · <a href="table-qa-harness.js">repeatable Electron harness</a></p><div class="shots"><figure><img src="qa-screenshots/table-three-columns.png" alt="Three aligned columns in the overlay" /><figcaption>Three-column table</figcaption></figure><figure><img src="qa-screenshots/table-wide-scroll.png" alt="Wide table scrolls within overlay" /><figcaption>Wide table overflow</figcaption></figure><figure><img src="qa-screenshots/table-sanitized.png" alt="Sanitized table" /><figcaption>Hostile HTML remains inert</figcaption></figure><figure><img src="qa-screenshots/plain-text-regression.png" alt="Plain text still renders" /><figcaption>Plain-text regression</figcaption></figure></div></div></details>
-    <details><summary>Implementation and decisions</summary><div class="detail-body"><p><code>src/richtext.js</code> rebuilds table structure with first-party elements only; it still drops all clipboard attributes and active subtrees. <code>src/overlay.css</code> styles a scrollable table inside the card. <code>src/clipboard-content.js</code> reads text and HTML together, and <code>src/main.js</code> sends both through the existing sanitizer/spoken-text handshake. No legacy path or provider routing changed.</p></div></details>
-    <details><summary>Limits and delivery</summary><div class="detail-body"><p>The user's installed app was observed actively reading the same flattened table from the screenshot. It was intentionally left running. Native menu and shortcut E2E need a repeat when playback finishes. No PR was requested or created. The repository's AGENTS.md directs validated work to fast-forward into <code>main</code>; packaging here is ad-hoc for local QA, not a public notarized release.</p></div></details>
-  </section>
-</main></body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Selected article images: verification report</title><style>
+			:root {
+				--canvas: #f6f2e8;
+				--ink: #172026;
+				--muted: #65727a;
+				--border: #2c3338;
+				--paper: #ffffff;
+				--blue: #d9ecff;
+				--green: #dff5df;
+				--yellow: #fff1b8;
+				--pink: #ffe2eb;
+				--purple: #eadfff;
+				--shadow: 7px 7px 0 rgba(23, 32, 38, 0.18);
+				font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+			}
+
+			* { box-sizing: border-box; }
+
+			body {
+				background:
+					linear-gradient(90deg, rgba(47, 58, 66, 0.07) 1px, transparent 1px),
+					linear-gradient(rgba(47, 58, 66, 0.07) 1px, transparent 1px),
+					var(--canvas);
+				background-size: 28px 28px;
+				color: var(--ink);
+				line-height: 1.45;
+				margin: 0;
+			}
+
+			main {
+				margin: 0 auto;
+				padding: 30px 22px 52px;
+				width: min(1240px, 100%);
+			}
+
+			header {
+				display: grid;
+				gap: 18px;
+				grid-template-columns: 1.4fr 0.8fr;
+				margin-bottom: 22px;
+			}
+
+			h1, h2, h3, p { margin: 0; }
+			h1 { font-size: clamp(2rem, 5vw, 4.4rem); letter-spacing: 0; line-height: 0.96; }
+			h2 { font-size: 1.1rem; letter-spacing: 0; text-transform: uppercase; }
+			a { color: #0f5f85; font-weight: 750; text-decoration: none; }
+			code { background: rgba(255,255,255,0.72); border: 1px solid rgba(47,58,66,0.24); border-radius: 6px; padding: 2px 5px; }
+
+			.hero, .card, details, .sticky {
+				border: 2px solid var(--border);
+				box-shadow: var(--shadow);
+			}
+
+			.hero, .card, details {
+				background: var(--paper);
+				border-radius: 16px;
+			}
+
+			.hero { padding: 26px; }
+			.hero p { color: var(--muted); margin-top: 12px; max-width: 760px; }
+			.meta-stack, .grid { display: grid; gap: 14px; }
+			.grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+			.grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+			.card { padding: 16px; }
+			.card small {
+				color: var(--muted);
+				display: block;
+				font-size: 0.78rem;
+				font-weight: 850;
+				text-transform: uppercase;
+			}
+			.card strong {
+				display: block;
+				font-size: 1.3rem;
+				line-height: 1.1;
+				margin-top: 4px;
+			}
+
+			.tag, .pill {
+				border: 2px solid var(--border);
+				border-radius: 999px;
+				display: inline-flex;
+				font-size: 0.78rem;
+				font-weight: 900;
+				padding: 5px 9px;
+				text-transform: uppercase;
+			}
+
+			.tag { background: var(--yellow); margin-bottom: 12px; }
+			.pill { margin: 0 6px 6px 0; }
+			.board-section { margin-top: 24px; }
+			.section-title { align-items: center; display: flex; gap: 10px; margin-bottom: 12px; }
+			.pin { background: #ff6b57; border: 2px solid var(--border); border-radius: 50%; height: 16px; width: 16px; }
+
+			.sticky {
+				border-radius: 3px;
+				min-height: 128px;
+				padding: 16px;
+				transform: rotate(-0.7deg);
+			}
+			.sticky:nth-child(even) { transform: rotate(0.7deg); }
+			.sticky h3 { font-size: 1.1rem; margin-bottom: 8px; }
+			.sticky p, .sticky li { color: #334148; font-size: 0.94rem; }
+			.sticky ul { margin: 8px 0 0; padding-left: 18px; }
+			.bg-blue { background: var(--blue); }
+			.bg-green { background: var(--green); }
+			.bg-yellow { background: var(--yellow); }
+			.bg-pink { background: var(--pink); }
+			.bg-purple { background: var(--purple); }
+
+			summary { cursor: pointer; font-weight: 850; list-style: none; padding: 14px 16px; }
+			summary::-webkit-details-marker { display: none; }
+			summary:before { content: "+"; display: inline-block; font-weight: 900; margin-right: 10px; width: 14px; }
+			details[open] summary:before { content: "-"; }
+			.detail-body { border-top: 2px solid var(--border); color: #334148; padding: 14px 16px 16px; }
+			.detail-body ul { margin: 8px 0 0; padding-left: 18px; }
+
+			@media (max-width: 900px) {
+				header, .grid.two, .grid.three { grid-template-columns: 1fr; }
+			}
+		img.evidence { width: 100%; max-height: 560px; object-fit: contain; object-position: top; background: #fff; border-radius: 8px; margin-top: 12px; } li { margin-bottom: 6px; }</style></head><body><main><header><section class="hero"><span class="tag">Post-implementation</span><h1>Images in the pop-up</h1><p>Selected article images and captions render in order, resize proportionally, and leave speech highlighting aligned.</p></section><aside class="meta-stack"><div class="card bg-green"><small>Status</small><strong>Local checks passed</strong></div><div class="card bg-blue"><small>Implementation commit</small><strong>618c607</strong></div><div class="card bg-yellow"><small>Date</small><strong>2026-10-03</strong></div></aside></header><section class="board-section"><div class="section-title"><span class="pin"></span><h2>Fast Answer</h2></div><div class="grid three"><div class="sticky bg-green"><h3>Implemented</h3><p>The sanitizer rebuilds safe images, preserves figures and captions, and sizes images to the reading window. Broken images hide while text remains readable.</p></div><div class="sticky bg-blue"><h3>Verified</h3><p>All 50 automated tests and all three Chromium QA scenarios passed. Independent source review found no actionable issues.</p></div><div class="sticky bg-yellow"><h3>Delivery</h3><p>Branch codex/selection-images, based on origin/main e52ce13. Implementation commit 618c607103fabc39b47dea7d3981e2304bff2a95. No PR was requested or created. The repository workflow delivers by a fast-forward push to main.</p></div></div></section><section class="board-section"><div class="section-title"><span class="pin"></span><h2>Pass Criteria</h2></div><div class="card"><ul><li><strong>Met:</strong> Selected article images appear in document order in the real overlay.</li><li><strong>Met:</strong> Images fit the overlay at normal and narrow window sizes without distortion or horizontal page overflow.</li><li><strong>Met:</strong> Image alt text never enters speech; surrounding words and captions retain exact canonical character mapping.</li><li><strong>Met:</strong> Copied handlers, styles, navigation, unsafe URLs, SVG data, and unrelated source elements are excluded.</li><li><strong>Met:</strong> A second reading clears old images; plain text and tables still render correctly.</li></ul></div></section><section class="board-section"><div class="section-title"><span class="pin"></span><h2>End-To-End Evidence</h2></div><div class="grid three"><div class="sticky bg-green"><h3>article-image: passed</h3><p>Copy a selected article with a relative image and caption</p><ul><li><a href="selection-images/qa-screenshots/article-image-normal.png">article-image-normal.png</a></li><li><a href="selection-images/qa-screenshots/source-selected-article.png">source-selected-article.png</a></li></ul></div><div class="sticky bg-green"><h3>resize-repeat: passed</h3><p>Resize and read a new selection</p><ul><li><a href="selection-images/qa-screenshots/article-image-narrow.png">article-image-narrow.png</a></li><li><a href="selection-images/qa-screenshots/article-image-repeat.png">article-image-repeat.png</a></li></ul></div><div class="sticky bg-green"><h3>safety-regression: passed</h3><p>Unsafe and broken images, plain text and tables</p><ul><li><a href="selection-images/qa-screenshots/article-image-hostile.png">article-image-hostile.png</a></li><li><a href="selection-images/qa-screenshots/article-image-plain.png">article-image-plain.png</a></li></ul></div></div><div class="grid two" style="margin-top:20px"><div class="card"><h3>Normal pop-up</h3><a href="selection-images/qa-screenshots/article-image-normal.png"><img class="evidence" src="selection-images/qa-screenshots/article-image-normal.png" alt="Selected article image and caption in the pop-up"></a></div><div class="card"><h3>Narrow pop-up</h3><a href="selection-images/qa-screenshots/article-image-narrow.png"><img class="evidence" src="selection-images/qa-screenshots/article-image-narrow.png" alt="The same image scales proportionally in a narrow pop-up"></a></div></div></section><section class="board-section"><details open><summary>Implementation and decisions</summary><div class="detail-body"><ul><li>src/richtext.js: preserve IMG, unwrap PICTURE, and rebuild FIGURE/FIGCAPTION. Copy only validated source and literal alt text. Ignore alt text for canonical speech, and split words at image boundaries.</li><li>Sources allow HTTP, HTTPS, protocol-relative HTTPS, and base64 PNG/JPEG/GIF/WebP/AVIF/BMP. Credentials, app-relative paths, file URLs, script URLs, blob URLs, inline SVG and HTML data are excluded.</li><li>Images set no-referrer and asynchronous decoding. Copied events, style, classes, IDs, dimensions and srcset are discarded. Rebuilt images hide on load failure.</li><li>src/overlay.html: allow HTTP(S) image loads while preserving restrictive defaults, script policy and production sandbox isolation.</li><li>src/overlay.css: fit images to content width without changing aspect ratio; style captions consistently.</li><li>README and AGENTS.md record image behavior and durable safety constraints.</li><li>No capture-layer changes were required. Actual Chromium Copy resolves selected relative image paths into absolute clipboard image URLs.</li></ul></div></details><details><summary>Automated tests and normal hooks</summary><div class="detail-body"><ul><li>Baseline: all 43 existing tests and lint passed after npm ci installed dependencies and Husky.</li><li>Before implementation: seven new image tests produced six expected failures and one pass.</li><li>test/image-rendering.test.js: seven cases cover network and embedded image sources, safe attributes, picture/figure/caption order, exact canonical character mapping, rejected unsafe sources and linked images without navigation.</li><li>Focused image/table tests: 10 passed. Full suite: 50 passed, zero failed. Lint and whitespace checks passed.</li><li>Implementation commit was created normally with the Husky pre-commit hook, which ran lint and all 50 tests successfully.</li><li>A separate hidden Chromium probe confirmed that parsing raw HTML made no resource requests, while appending sanitized output requested only the chosen image source and omitted Referer.</li></ul></div></details><details><summary>Browser instrumentation and limits</summary><div class="detail-body"><ul><li>The QA plan was created for this feature. All three test IDs are marked passed in <a href="qa-e2e-tests.json">the plan</a>.</li><li>A confirmed loopback HTTP server served source articles to a real Chromium window. The harness selected article contents, used actual browser Copy, checked the pasteboard change count, read the production clipboard reader, and sent captured HTML to the production overlay/preload.</li><li>The overlay used production CSP, context isolation, disabled Node integration and sandboxing. Assertions checked decoded images, document order, aspect ratio, normal/narrow bounds, exact word and character maps, repeat resets, safe attributes/requests, broken-image behavior, tables and plain text.</li><li>The original macOS clipboard was restored losslessly, including both original raw formats. Fixture server, windows and temporary clipboard data were cleaned up.</li><li>Provider audio was replaced by synthetic timing alignment. No paid TTS requests, physical global shortcut, installed-app replacement, signed packaging or release publishing were performed.</li><li>This source change requires a new app build to reach an installed packaged app. Keep releases signed and notarized with the existing identity.</li><li>Authenticated, expired, blocked or unavailable image URLs can fail to load. Blob and unsupported data images remain excluded. Captions are spoken; image alt descriptions are visual/accessibility metadata only.</li></ul></div></details><details><summary>Artifacts and local testing</summary><div class="detail-body"><ul><li><a href="pre-implementation-report.html">Readiness report</a></li><li><a href="selection-images/image-qa-results.json">Browser assertions and request evidence</a></li><li><a href="selection-images/image-qa-harness.js">Reproducible Chromium QA harness</a></li><li><a href="selection-images/qa-screenshots/source-selected-article.png">Selected source article preview</a></li><li>Source worktree: <a href="../">codex/selection-images</a>. Run npm start from this worktree to test the application from source. Existing account/provider configuration is needed for real speech; local renderer QA does not need credentials.</li></ul></div></details></section></main></body></html>
