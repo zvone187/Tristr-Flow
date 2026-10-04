@@ -4,10 +4,10 @@
 // first-party `.word` spans and (b) the canonical plain text that is sent to
 // ElevenLabs, with a char->word map so the streamed alignment highlights the
 // right word. Hardened per adversarial review:
-//   - ALLOWLIST rebuild via DOMParser (inert) + createElement — never innerHTML.
-//   - All attributes dropped (no class/id/style/href/src/on*). Links become
-//     plain styled text (no href => no navigation/exfil vector).
-//   - <script>/<style>/<svg>/<math>/<img>/<iframe>/etc. subtrees dropped.
+//   - ALLOWLIST rebuild via DOMParser (inert) + createElement, never innerHTML.
+//   - Copied attributes dropped except validated image sources and plain alt
+//     text. Links become styled text without navigation. Images omit referrers.
+//   - <script>/<style>/<svg>/<math>/<iframe>/etc. subtrees dropped.
 //   - The canonical text is derived from THIS rebuilt tree, so what is spoken ==
 //     what is shown == what the alignment indexes (no spoofing / drift).
 (function () {
@@ -24,6 +24,7 @@
   // tag -> safe block element to create
   const BLOCK = new Map([
     ['P', 'p'], ['DIV', 'div'], ['SECTION', 'div'], ['ARTICLE', 'div'],
+    ['FIGURE', 'figure'], ['FIGCAPTION', 'figcaption'],
     ['UL', 'ul'], ['OL', 'ol'], ['LI', 'li'],
     ['H1', 'h1'], ['H2', 'h2'], ['H3', 'h3'], ['H4', 'h4'], ['H5', 'h5'], ['H6', 'h6'],
     ['BLOCKQUOTE', 'blockquote'], ['PRE', 'pre'],
@@ -35,9 +36,25 @@
   const DROP = new Set([
     'SCRIPT', 'STYLE', 'SVG', 'MATH', 'IFRAME', 'OBJECT', 'EMBED', 'LINK', 'META',
     'BASE', 'FORM', 'INPUT', 'BUTTON', 'TEXTAREA', 'SELECT', 'OPTION', 'NOSCRIPT',
-    'TEMPLATE', 'IMG', 'PICTURE', 'SOURCE', 'VIDEO', 'AUDIO', 'CANVAS', 'HEAD',
+    'TEMPLATE', 'SOURCE', 'VIDEO', 'AUDIO', 'CANVAS', 'HEAD',
     'TITLE', 'AREA', 'MAP', 'FRAME', 'FRAMESET', 'APPLET',
   ]);
+
+  function imageSource(raw) {
+    const value = String(raw || '').trim();
+    // Embedded images must be raster data, never active SVG or HTML content.
+    if (/^data:image\/(?:png|jpe?g|gif|webp|avif|bmp);base64,[a-z0-9+/]+={0,2}$/i.test(value)) {
+      return value;
+    }
+    try {
+      // No document base: relative paths must not resolve against app files.
+      const url = new URL(value.startsWith('//') ? 'https:' + value : value);
+      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return null;
+      return url.href;
+    } catch {
+      return null;
+    }
+  }
 
   function build(html) {
     const root = document.createElement('div');
@@ -108,6 +125,20 @@
       } else if (child.nodeType === 1) {
         const tag = child.tagName;
         if (DROP.has(tag)) continue;
+        if (tag === 'IMG') {
+          const src = imageSource(child.getAttribute('src'));
+          if (!src) continue;
+          endWord(st);
+          st.pendingSep = true;
+          const img = document.createElement('img');
+          img.alt = child.getAttribute('alt') || '';
+          img.referrerPolicy = 'no-referrer';
+          img.decoding = 'async';
+          img.addEventListener('error', () => { img.hidden = true; });
+          img.src = src;
+          outParent.appendChild(img);
+          continue;
+        }
         if (tag === 'BR') { endWord(st); st.pendingSep = true; continue; }
         if (BLOCK.has(tag)) {
           endWord(st);

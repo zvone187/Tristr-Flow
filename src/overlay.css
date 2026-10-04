@@ -403,6 +403,16 @@ body.rz-active #card {
 .rich h3 { font-size: 1.15em; }
 .rich h4, .rich h5, .rich h6 { font-size: 1.04em; }
 .rich p { margin: 0.45em 0; }
+.rich figure { margin: 0.65em 0; }
+.rich figcaption { color: var(--muted); font-size: 0.85em; }
+.rich img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.65em auto;
+  border-radius: 8px;
+}
+.rich img[hidden] { display: none; }
 .rich ul, .rich ol { margin: 0.35em 0; padding-left: 1.5em; }
 .rich li { margin: 0.15em 0; }
 .rich ul { list-style: disc; }

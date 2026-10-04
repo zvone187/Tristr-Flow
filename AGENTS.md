@@ -11,3 +11,4 @@
 - Signed-in ElevenLabs and Fish Audio voices route through the hosted service. A locally saved provider key is an explicit direct-provider override; keep this routing policy centralized in `src/provider-routing.js`.
 - Keep the Apple Developer ID G2 intermediate in the exported signing certificate bundle. Store private keys and export passwords only in protected local credential storage and encrypted GitHub Actions secrets; never commit them.
 - Keep electron-builder at the workflow's pinned signing version. To recover a failed release, dispatch the release workflow from `main` with the existing tag; it checks out that immutable tag and uses the fixed build tool without retagging.
+- Clipboard images must be rebuilt from validated HTTP(S) or embedded raster sources, omit referrers, and stay outside canonical speech text. Never copy image event handlers, srcset, styling, or local file URLs into the overlay.

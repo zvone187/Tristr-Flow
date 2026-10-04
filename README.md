@@ -40,10 +40,16 @@ If the selection is **formatted** (bold, italics, bullet/numbered lists, heading
 code), the overlay shows it **with that formatting** — and the karaoke highlight
 maps onto the styled words. It reads the clipboard's HTML flavor, then renders it
 through a strict **allowlist sanitizer** (rebuilds the DOM from a safe tag list,
-drops all attributes, scripts, styles, images; links become plain text) with
+drops scripts, styles and unsafe copied attributes; links become plain text) with
 navigation guards and a sandboxed renderer — so HTML you copied from any page is
 shown safely. The spoken text is derived from the sanitized rendering, so what's
 read always matches what's shown.
+
+Images included in selected web articles appear in their original order and fit
+the pop-up width, with captions preserved. Image sources are restricted to HTTP,
+HTTPS, and embedded raster images; local file URLs and active content are dropped.
+Image descriptions stay out of the spoken text. Remote images load without a
+referrer and may be unavailable if their site requires a login or blocks embedding.
 
 **Resize** the overlay by dragging its edges; the size and position are
 **remembered** and restored next time it opens.
