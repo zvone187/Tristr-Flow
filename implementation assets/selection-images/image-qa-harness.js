@@ -11,9 +11,10 @@ const { execFileSync } = require('node:child_process');
 const { readClipboardContent } = require('../../src/clipboard-content');
 
 const root = path.resolve(__dirname, '../..');
-const screenshotDir = path.join(__dirname, 'qa-screenshots');
-const resultsPath = path.join(__dirname, 'image-qa-results.json');
-const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'qa-e2e-tests.json'), 'utf8'));
+const taskDir = path.join(__dirname, '../image-aspect-ratio');
+const screenshotDir = path.join(taskDir, 'qa-screenshots');
+const resultsPath = path.join(taskDir, 'image-qa-results.json');
+const manifestPath = path.join(taskDir, 'qa-e2e-tests.json');
 const temporaryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tristr-image-qa-'));
 app.setPath('userData', path.join(temporaryDir, 'electron-user-data'));
 
@@ -94,6 +95,12 @@ let fixtureServer;
 let origin;
 let largePng;
 let smallPng;
+let landscapePng;
+let portraitPng;
+let originalSize;
+let thumbnailSize;
+const landscapeSize = { width: 600, height: 300 };
+const portraitSize = { width: 200, height: 400 };
 const requestLog = [];
 const serverLog = [];
 const evidence = { tests: {}, checks: {}, screenshots: [], providerRequests: 0 };
@@ -147,8 +154,8 @@ function page(article) {
 
 function firstArticle() {
   return page(`<h1>Selected article</h1><p>Before <strong>the picture</strong>.</p>
-    <figure><img src="/article.png?case=selected" alt="ALT ARTICLE SHOULD NOT BE SPOKEN" width="1400" height="600"
-      style="border:8px solid red" id="copied-image"><figcaption>Caption follows the picture.</figcaption></figure>
+    <figure><img src="/article.png?case=selected" alt="ALT ARTICLE SHOULD NOT BE SPOKEN"
+      id="copied-image"><figcaption>Caption follows the picture.</figcaption></figure>
     <p>After the picture, continue reading.</p>`);
 }
 
@@ -182,22 +189,59 @@ function hostileArticle() {
     <tbody><tr><td>Images</td><td>Included</td></tr></tbody></table><p>Safe ending.</p>`;
 }
 
+function shapeArticle() {
+  return page(`<h1>Original image shapes</h1>
+    <figure><img src="/landscape.png?case=shapes" alt="ALT LANDSCAPE"><figcaption>Landscape stays wide.</figcaption></figure>
+    <figure><img src="/portrait.png?case=shapes" alt="ALT PORTRAIT"><figcaption>Portrait stays tall.</figcaption></figure>
+    <table><thead><tr><th>Shape</th><th>Image</th></tr></thead><tbody>
+    <tr><td>Square</td><td><img src="/article.png?case=table" alt="ALT TABLE SQUARE"></td></tr>
+    <tr><td>Landscape</td><td><img src="/landscape.png?case=table" alt="ALT TABLE LANDSCAPE"></td></tr>
+    <tr><td>Portrait</td><td><img src="/portrait.png?case=table" alt="ALT TABLE PORTRAIT"></td></tr>
+    </tbody></table><p>End of shapes.</p>`);
+}
+
+// Each rectangle is authored at its own native dimensions. Circular markings
+// make stretching visible, without resizing or altering the original logo.
+function rectanglePng(size) {
+  const bitmap = Buffer.alloc(size.width * size.height * 4);
+  const radius = Math.min(size.width, size.height) / 3;
+  for (let y = 0; y < size.height; y++) {
+    for (let x = 0; x < size.width; x++) {
+      const index = (y * size.width + x) * 4;
+      const circle = (x - size.width / 2) ** 2 + (y - size.height / 2) ** 2 <= radius ** 2;
+      const border = x < 4 || y < 4 || x >= size.width - 4 || y >= size.height - 4;
+      const color = border ? [45, 45, 45] : circle ? [170, 115, 45] : [215, 230, 245];
+      bitmap[index] = color[0]; bitmap[index + 1] = color[1]; bitmap[index + 2] = color[2]; bitmap[index + 3] = 255;
+    }
+  }
+  return nativeImage.createFromBitmap(bitmap, size).toPNG();
+}
+
 async function startFixture() {
   const logo = nativeImage.createFromPath(path.join(root, 'assets/logo.png'));
   if (logo.isEmpty()) throw new Error('Fixture logo image is missing or empty.');
-  largePng = logo.resize({ width: 1400, height: 600, quality: 'best' }).toPNG();
-  smallPng = logo.resize({ width: 100, height: 44, quality: 'best' }).toPNG();
+  originalSize = logo.getSize();
+  largePng = fs.readFileSync(path.join(root, 'assets/logo.png'));
+  const thumbnail = logo.resize({ width: 100, quality: 'best' });
+  thumbnailSize = thumbnail.getSize();
+  smallPng = thumbnail.toPNG();
+  landscapePng = rectanglePng(landscapeSize);
+  portraitPng = rectanglePng(portraitSize);
   fixtureServer = http.createServer((request, response) => {
     const pathname = new URL(request.url, origin || 'http://127.0.0.1').pathname;
     serverLog.push({ path: request.url, referer: request.headers.referer || '', method: request.method });
     response.setHeader('Cache-Control', 'no-store');
-    if (pathname === '/article' || pathname === '/repeat') {
+    if (['/article', '/repeat', '/aspects'].includes(pathname)) {
       response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      response.end(pathname === '/article' ? firstArticle() : secondArticle());
-    } else if (['/article.png', '/second.png'].includes(pathname)) {
+      response.end(pathname === '/article' ? firstArticle() : pathname === '/repeat' ? secondArticle() : shapeArticle());
+    } else if (pathname === '/article.png') {
       response.writeHead(200, { 'Content-Type': 'image/png' });
       response.end(largePng);
-    } else if (['/safe.png', '/unselected.png', '/unused-source.png', '/unused-srcset.png', '/unsafe-srcset.png'].includes(pathname)) {
+    } else if (['/second.png', '/landscape.png', '/unused-source.png', '/unused-srcset.png'].includes(pathname)) {
+      response.writeHead(200, { 'Content-Type': 'image/png' }); response.end(landscapePng);
+    } else if (pathname === '/portrait.png') {
+      response.writeHead(200, { 'Content-Type': 'image/png' }); response.end(portraitPng);
+    } else if (['/safe.png', '/unselected.png', '/unsafe-srcset.png'].includes(pathname)) {
       response.writeHead(200, { 'Content-Type': 'image/png' });
       response.end(smallPng);
     } else {
@@ -218,7 +262,9 @@ async function startFixture() {
       else response.on('end', resolve);
     }).once('error', reject);
   });
-  evidence.fixture = { origin, listenerVerified: true, largeImageSize: { width: 1400, height: 600 } };
+  evidence.fixture = { origin, listenerVerified: true,
+    originalAsset: { path: 'assets/logo.png', ...originalSize, servedWithoutTransformation: true },
+    thumbnailSize, thumbnailResizedByWidthOnly: true, landscapeSize, portraitSize };
 }
 
 async function selectAndCopy(route) {
@@ -235,6 +281,9 @@ async function selectAndCopy(route) {
     const selection = window.getSelection();
     selection.removeAllRanges(); selection.addRange(range);
     return { text: selection.toString(), imageCount: range.cloneContents().querySelectorAll('img').length,
+      images: [...article.querySelectorAll('img')].map(img => ({ src: img.src, currentSrc: img.currentSrc,
+        naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight,
+        width: img.getBoundingClientRect().width, height: img.getBoundingClientRect().height })),
       url: location.href, selectedArticle: article.contains(selection.anchorNode) && article.contains(selection.focusNode) };
   })()`);
   sourceWindow.webContents.copy();
@@ -253,8 +302,16 @@ async function selectAndCopy(route) {
 
 async function screenshot(window, filename) {
   const output = path.join(screenshotDir, filename);
-  fs.writeFileSync(output, (await window.webContents.capturePage()).toPNG());
-  const relative = path.relative(__dirname, output);
+  let capture;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try { capture = await window.webContents.capturePage(); break; }
+    catch (error) {
+      if (attempt === 2) throw new Error('Screenshot failed for ' + filename + ': ' + error.message);
+      await sleep(150);
+    }
+  }
+  fs.writeFileSync(output, capture.toPNG());
+  const relative = path.relative(taskDir, output);
   evidence.screenshots.push(relative);
   return relative;
 }
@@ -312,6 +369,7 @@ async function inspect(expectedText) {
     const images = [...root.querySelectorAll('img')].map(img => ({
       src: img.getAttribute('src'), naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight,
       complete: img.complete, hidden: img.hidden, display: getComputedStyle(img).display,
+      inTable: !!img.closest('table'),
       bounds: rect(img), attrs: Object.fromEntries([...img.attributes].map(a => [a.name, a.value])),
       referrerPolicy: img.referrerPolicy, decoding: img.decoding,
     }));
@@ -352,7 +410,28 @@ function imageAttributesSafe(result) {
     image.referrerPolicy === 'no-referrer' && image.decoding === 'async');
 }
 
+function originalRatiosMatch(source, overlay, sizes) {
+  if (source.images.length !== sizes.length || overlay.images.length !== sizes.length) return false;
+  return sizes.every((size, index) => {
+    const ratio = size.width / size.height;
+    const sourceImage = source.images[index];
+    const overlayImage = overlay.images[index];
+    return sourceImage.naturalWidth / sourceImage.naturalHeight === ratio &&
+      Math.abs(sourceImage.height - sourceImage.width / ratio) <= 1 &&
+      overlayImage.naturalWidth === size.width && overlayImage.naturalHeight === size.height &&
+      overlayImage.bounds.width > 0 && overlayImage.bounds.height > 0 && !overlayImage.hidden &&
+      Math.abs(overlayImage.bounds.height - overlayImage.bounds.width / ratio) <= 1;
+  });
+}
+
+async function screenshotAt(selector, filename) {
+  await overlayWindow.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(selector)}).scrollIntoView({ block: 'start' })`);
+  await sleep(80);
+  return screenshot(overlayWindow, filename);
+}
+
 async function runCases() {
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const partition = session.fromPartition('image-qa-' + Date.now());
   partition.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, (details, callback) => {
     const allowed = new URL(details.url).origin === origin;
@@ -384,11 +463,12 @@ async function runCases() {
     sourceScreenshot, canonical: firstReady.text, renderer: first, checks: {
       actualRichCopy: firstCopy.selection.selectedArticle && firstCopy.selection.imageCount === 1,
       relativeURLResolvedByChromium: firstCopy.html.includes(selectedAbsolute),
-      selectedImageDecoded: first.images.length === 1 && first.images[0].src === selectedAbsolute && first.images[0].naturalWidth === 1400,
+      selectedImageDecoded: first.images.length === 1 && first.images[0].src === selectedAbsolute && first.images[0].naturalWidth === originalSize.width,
       unrelatedContentAbsent: !firstCopy.html.includes('unselected.png') && !first.wordText.includes('Unselected') && !first.images.some(image => image.src.includes('unselected')),
       captionInDocumentOrder: first.captionAfterImage,
       exactCanonicalAndWordMapping: firstReady.text === firstExpected && exactMapping(first, firstExpected),
       imageFitsNormalWindow: fitImages(first), safeImageAttributes: imageAttributesSafe(first),
+      sourceAndOverlayMatchUntouchedOriginalAspect: originalRatiosMatch(firstCopy.selection, first, [originalSize]),
     } };
 
   overlayWindow.setResizable(true); overlayWindow.setSize(430, 680); overlayWindow.setResizable(false);
@@ -400,7 +480,7 @@ async function runCases() {
   const secondReady = await renderRich(secondCopy.html, 2);
   const repeat = await inspect(secondExpected);
   repeat.screenshot = await screenshot(overlayWindow, 'article-image-repeat.png');
-  evidence.tests['resize-repeat'] = { clipboardHTML: secondCopy.html, canonical: secondReady.text,
+  evidence.tests['resize-repeat'] = { clipboardHTML: secondCopy.html, canonical: secondReady.text, selection: secondCopy.selection,
     narrow, repeat, checks: {
       imageFitsNarrowWindow: fitImages(narrow),
       repeatHasOnlyNewImages: repeat.images.length === 2 && repeat.images[0].src === origin + '/second.png?case=repeat' &&
@@ -409,20 +489,52 @@ async function runCases() {
       repeatedImagesFitNarrowWindow: fitImages(repeat),
       exactCanonicalAndWordMapping: secondReady.text === secondExpected && exactMapping(repeat, secondExpected),
       copiedSourceAndSrcsetExcluded: repeat.unsafeNodeCount === 0 && imageAttributesSafe(repeat),
+      untouchedOriginalAspectAtNarrowWidth: originalRatiosMatch(firstCopy.selection, narrow, [originalSize]),
+      repeatedSourceAndOverlayMatchOriginalAspects: originalRatiosMatch(secondCopy.selection, repeat, [landscapeSize, thumbnailSize]),
     } };
 
   overlayWindow.setResizable(true); overlayWindow.setSize(740, 680); overlayWindow.setResizable(false);
+  const shapeCopy = await selectAndCopy('/aspects');
+  const shapeExpected = 'Original image shapes Landscape stays wide. Portrait stays tall. Shape Image Square Landscape Portrait End of shapes.';
+  const shapeReady = await renderRich(shapeCopy.html, 3);
+  const shapesNormal = await inspect(shapeExpected);
+  shapesNormal.screenshots = [await screenshotAt('#text figure', 'aspect-landscape-normal.png'),
+    await screenshotAt('#text figure:nth-of-type(2)', 'aspect-portrait-normal.png'),
+    await screenshotAt('#text table', 'aspect-table-normal.png')];
+  overlayWindow.setResizable(true); overlayWindow.setSize(430, 680); overlayWindow.setResizable(false);
+  await sleep(120);
+  const shapesNarrow = await inspect(shapeExpected);
+  shapesNarrow.screenshots = [await screenshotAt('#text figure', 'aspect-landscape-narrow.png'),
+    await screenshotAt('#text figure:nth-of-type(2)', 'aspect-portrait-narrow.png'),
+    await screenshotAt('#text table', 'aspect-table-narrow.png')];
+  const shapeSizes = [landscapeSize, portraitSize, originalSize, landscapeSize, portraitSize];
+  evidence.tests['resize-repeat'].aspectFixtures = { selection: shapeCopy.selection, canonical: shapeReady.text,
+    normal: shapesNormal, narrow: shapesNarrow, originalImageSizes: shapeSizes };
+  Object.assign(evidence.tests['resize-repeat'].checks, {
+      actualShapeArticleCopy: shapeCopy.selection.selectedArticle && shapeCopy.selection.imageCount === 5,
+      sourceAndNormalOverlayMatchOriginalAspects: originalRatiosMatch(shapeCopy.selection, shapesNormal, shapeSizes),
+      sourceAndNarrowOverlayMatchOriginalAspects: originalRatiosMatch(shapeCopy.selection, shapesNarrow, shapeSizes),
+      tableImagesRetainOriginalAspects: shapesNormal.images.filter(image => image.inTable).length === 3 &&
+        shapesNarrow.images.filter(image => image.inTable).length === 3 &&
+        originalRatiosMatch(shapeCopy.selection, shapesNormal, shapeSizes) && originalRatiosMatch(shapeCopy.selection, shapesNarrow, shapeSizes),
+      tableWrapperContainsPageOverflow: shapesNormal.wrapScrollWidth <= shapesNormal.wrapClientWidth + 1 &&
+        shapesNarrow.wrapScrollWidth <= shapesNarrow.wrapClientWidth + 1 && shapesNarrow.pageScrollWidth <= shapesNarrow.pageClientWidth + 1,
+      shapeCanonicalAndWordMapping: shapeReady.text === shapeExpected && exactMapping(shapesNormal, shapeExpected) && exactMapping(shapesNarrow, shapeExpected),
+      safeCopiedAttributesAndSourceURLs: shapesNormal.unsafeNodeCount === 0 && shapesNarrow.unsafeNodeCount === 0 && imageAttributesSafe(shapesNormal),
+    });
+
+  overlayWindow.setResizable(true); overlayWindow.setSize(740, 680); overlayWindow.setResizable(false);
   const hostileExpected = 'Safe introduction. Safe caption. Broken image leaves this sentence intact. Safe link text. Topic Value Images Included Safe ending.';
-  const hostileReady = await renderRich(hostileArticle(), 3);
+  const hostileReady = await renderRich(hostileArticle(), 4);
   const hostile = await inspect(hostileExpected);
   hostile.screenshot = await screenshot(overlayWindow, 'article-image-hostile.png');
   const plainExpected = 'Plain clipboard text still reads correctly.';
-  overlayWindow.webContents.send('overlay:loading', { gen: 4, voice: 'Local QA Voice', html: null, fontSize: 20, speed: 1 });
+  overlayWindow.webContents.send('overlay:loading', { gen: 5, voice: 'Local QA Voice', html: null, fontSize: 20, speed: 1 });
   await sleep(80); await sendAlignment(plainExpected);
   const plain = await inspect(plainExpected);
   plain.screenshot = await screenshot(overlayWindow, 'article-image-plain.png');
   const overlayRequests = requestLog.filter(request => request.webContentsId === overlayWindow.webContents.id);
-  const allowedPaths = new Set(['/article.png', '/second.png', '/safe.png', '/missing.png']);
+  const allowedPaths = new Set(['/article.png', '/second.png', '/landscape.png', '/portrait.png', '/safe.png', '/missing.png']);
   const allowedExternal = new Set(['https://qa.invalid/protocol-relative.png', 'http://qa.invalid/allowed-http.png', 'https://qa.invalid/allowed-https.png']);
   const unsanitizedRequests = overlayRequests.filter(request => new URL(request.url).origin === origin ?
     !allowedPaths.has(new URL(request.url).pathname) : !allowedExternal.has(request.url));
@@ -440,6 +552,9 @@ async function runCases() {
       serverLog.filter(request => request.path.includes('/safe.png?case=hostile') || request.path === '/missing.png').every(request => request.referer === ''),
     brokenImageHiddenAndTextIntact: !!broken && broken.hidden && broken.naturalWidth === 0 && hostile.wordText.includes('Broken image leaves this sentence intact.'),
     localAndEmbeddedImagesStillVisible: visibleHostile.length === 2 && visibleHostile.every(image => image.naturalWidth > 0),
+    hostileDimensionsCannotStretchOriginalImages: visibleHostile.length === 2 && visibleHostile.every(image =>
+      image.naturalWidth === thumbnailSize.width && image.naturalHeight === thumbnailSize.height &&
+      Math.abs(image.bounds.height - image.bounds.width * thumbnailSize.height / thumbnailSize.width) <= 1),
     tableRetainsRowsAndColumns: hostile.tableCount === 1 && hostile.tableRows.length === 2 && hostile.tableRows.every(row => row.length === 2) &&
       hostile.tableRows.every(row => row[0].bounds.x < row[1].bounds.x && row[0].bounds.y === row[1].bounds.y),
     exactCanonicalAndWordMapping: hostileReady.text === hostileExpected && exactMapping(hostile, hostileExpected),
@@ -480,4 +595,21 @@ async function run() {
   }
 }
 
-app.whenReady().then(run).catch(error => { console.error(error); app.exit(1); });
+function fixtureBaseline() {
+  const logo = nativeImage.createFromPath(path.join(root, 'assets/logo.png'));
+  const original = logo.getSize();
+  const wide = logo.resize({ width: 1400, height: 600, quality: 'best' }).getSize();
+  const small = logo.resize({ width: 100, height: 44, quality: 'best' }).getSize();
+  const ratio = size => size.width / size.height;
+  const result = { original, previousWideFixture: wide, previousSmallFixture: small,
+    checks: { wideFixtureMatchesOriginalAspect: ratio(wide) === ratio(original),
+      smallFixtureMatchesOriginalAspect: ratio(small) === ratio(original) } };
+  fs.mkdirSync(taskDir, { recursive: true });
+  fs.writeFileSync(path.join(taskDir, 'image-fixture-baseline.json'), JSON.stringify(result, null, 2));
+  fs.rmSync(temporaryDir, { recursive: true, force: true });
+  console.log(JSON.stringify(result));
+  app.exit(Object.values(result.checks).every(Boolean) ? 0 : 1);
+}
+
+app.whenReady().then(() => process.argv.includes('--fixture-baseline') ? fixtureBaseline() : run())
+  .catch(error => { console.error(error); app.exit(1); });

@@ -407,8 +407,11 @@ body.rz-active #card {
 .rich figcaption { color: var(--muted); font-size: 0.85em; }
 .rich img {
   display: block;
+  width: auto;
   max-width: 100%;
   height: auto;
+  aspect-ratio: auto;
+  object-fit: contain;
   margin: 0.65em auto;
   border-radius: 8px;
 }

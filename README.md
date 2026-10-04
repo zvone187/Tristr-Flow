@@ -46,7 +46,8 @@ shown safely. The spoken text is derived from the sanitized rendering, so what's
 read always matches what's shown.
 
 Images included in selected web articles appear in their original order and fit
-the pop-up width, with captions preserved. Image sources are restricted to HTTP,
+the pop-up width without changing their original proportions, with captions
+preserved. Image sources are restricted to HTTP,
 HTTPS, and embedded raster images; local file URLs and active content are dropped.
 Image descriptions stay out of the spoken text. Remote images load without a
 referrer and may be unavailable if their site requires a login or blocks embedding.
