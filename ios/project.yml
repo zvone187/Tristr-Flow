@@ -1,0 +1,90 @@
+name: TristrFlow
+options:
+  bundleIdPrefix: ai.pazi
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "2"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+
+targets:
+  TristrFlow:
+    type: application
+    platform: iOS
+    sources:
+      - path: TristrFlow
+      - path: ../src/analytics-project.json
+        buildPhase: resources
+    info:
+      path: TristrFlow/Info.plist
+      properties:
+        CFBundleDisplayName: Tristr Flow
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        # keep reading with the screen locked or the app in the background
+        UIBackgroundModes: [audio]
+        ITSAppUsesNonExemptEncryption: false
+        UISupportedInterfaceOrientations:
+          [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad:
+          [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown,
+           UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.pazi.tristrflow.ios
+        PRODUCT_NAME: TristrFlow
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: RM6AG38FWP
+
+  TristrFlowTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: TristrFlowTests
+    dependencies:
+      - target: TristrFlow
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.pazi.tristrflow.ios.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  TristrFlowUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: TristrFlowUITests
+      - path: TristrFlowTests/Fixtures/mp3_44100_64.ndjson
+        buildPhase: resources
+    dependencies:
+      - target: TristrFlow
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.pazi.tristrflow.ios.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: TristrFlow
+
+schemes:
+  TristrFlow:
+    build:
+      targets:
+        TristrFlow: all
+        TristrFlowTests: [test]
+        TristrFlowUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - TristrFlowTests
+        - TristrFlowUITests

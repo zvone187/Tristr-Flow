@@ -7,7 +7,7 @@ const path = require('path');
 // PostHog project tokens are intentionally public ingestion identifiers (the
 // same kind embedded in websites and desktop clients), not private API keys.
 // Keep the host overrideable so an EU project can use eu.i.posthog.com.
-const DEFAULT_POSTHOG_PROJECT_TOKEN = 'phc_wgzcLfm2CQrYydZJmRmPzHFSR6WykLhKAqrpF3GUdxCB';
+const { projectToken: DEFAULT_POSTHOG_PROJECT_TOKEN } = require('./analytics-project.json');
 const DEFAULT_SERVICE_BASE_URL = 'https://tristr-flow-5iy7.onrender.com';
 
 // Minimal .env parser (handles quotes; ignores comments / blank lines).

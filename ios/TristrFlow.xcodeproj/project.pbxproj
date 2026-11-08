@@ -1,0 +1,741 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		088F2D7BB0106C1BAAF021EF /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C891FAF9B91709C075B434CF /* KeychainStore.swift */; };
+		0AC4B3FB0785F0C3258EFC56 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64ACC3185C4280B9D1798EA /* SignInView.swift */; };
+		147A03EA1BC998F9E322E61F /* PCM16Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC74E909F756D1DFAB726238 /* PCM16Decoder.swift */; };
+		253CDABFB622FE7E034A1641 /* ReadingSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 280576E033053BEF0E0C11AD /* ReadingSessionTests.swift */; };
+		2875945D47CD779F0D92097C /* ProductAnalytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75A5250985FA4BAC0BB5C61D /* ProductAnalytics.swift */; };
+		29A007C5DA5C961E71F2931F /* AccountSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCB48E4E4A4A0F5CF065CA5C /* AccountSession.swift */; };
+		29D64835D93328E41CD8FC0B /* StreamModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 607A811EB3E7C164CA633F30 /* StreamModels.swift */; };
+		361717556C307A8F80D1E78F /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 706FB120FB63E341EB1A45AD /* Theme.swift */; };
+		378BB0F32F3D5601EFBB673A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = DE3ABF8843FF1E1903EE399A /* PrivacyInfo.xcprivacy */; };
+		3C30B99D6DF096415785D9D4 /* TextSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E118582160B3BCB0845D8447 /* TextSegmenter.swift */; };
+		42D3F9C3FF1B167F6B6F1A59 /* Timeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02B6BFB6F4AA7326C431F14C /* Timeline.swift */; };
+		45CBE2F28675ACD3A47333DF /* ComposeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0638F709AC27C1875175028 /* ComposeView.swift */; };
+		486B378BF18CEACFF4F8500D /* StreamFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E6BCF7ADF08305061D766D1 /* StreamFormat.swift */; };
+		49CEF129B30FE9ECFCAA2732 /* NowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5B3A273B332F54AE222A7EE /* NowPlaying.swift */; };
+		4A8EE0660315B2E4D587EE9C /* analytics-project.json in Resources */ = {isa = PBXBuildFile; fileRef = F3DCC05FF86F6BF93E037B59 /* analytics-project.json */; };
+		51004D42BB13E17ED1507063 /* StreamingPlayerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2CC53549EB40995FDAA175C /* StreamingPlayerTests.swift */; };
+		51A3FEFEBC914498AB2B15F0 /* Voice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6123AB90C9B84C8F65710236 /* Voice.swift */; };
+		58E588CD13E7456F48074DCE /* VoicePreviewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8AE11111FF26DD8833E0787 /* VoicePreviewer.swift */; };
+		63BE44631FE6F98356B5EB47 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2BB6B1616FAA179DEFF846CC /* Assets.xcassets */; };
+		6F2AA1F57A1C3C21321777FB /* mp3_44100_64.ndjson in Resources */ = {isa = PBXBuildFile; fileRef = B6846FC5740C75F571F2AE64 /* mp3_44100_64.ndjson */; };
+		74E4F2680BEEEFE1E4AFF4B6 /* mp3_22050_32.ndjson in Resources */ = {isa = PBXBuildFile; fileRef = 1E7D1F0F24C5FBF9DB0B70C0 /* mp3_22050_32.ndjson */; };
+		7FB06B1BA2FF3AF911C61131 /* ProductAnalyticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7A1F62C91B9484C5688029 /* ProductAnalyticsTests.swift */; };
+		8E15E979F0A2056016C64C39 /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42CA624297A75AB28818605E /* Log.swift */; };
+		961BEF213D395B610D8E0554 /* NDJSONLineSplitter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 523848BAC7824BF884C7F0EF /* NDJSONLineSplitter.swift */; };
+		9B18D5DBCBB554DCD4DF06B1 /* AccountSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63E19752DCBFD59EB1245C50 /* AccountSessionTests.swift */; };
+		9C80ABB51BE409BBD5F1A87D /* TimelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1FA816BB8EA7E4F3325B40C /* TimelineTests.swift */; };
+		AAB405D2FD584A244273C61A /* ServiceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC41C3B85681CEDB04DE6EE4 /* ServiceClient.swift */; };
+		AAD320C08D421FDE0FB3465B /* StreamingPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8AE3E4ACB9DCAD372A2F36D /* StreamingPlayer.swift */; };
+		AC781F064D7F7E60BE168F17 /* ReadAloudUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A18AB379EF288161280713 /* ReadAloudUITests.swift */; };
+		AD695434FEC65077CAE42951 /* ControlBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C6241226BD41AA88EC818A1 /* ControlBar.swift */; };
+		B023F8291EBAA70C6C03D6E5 /* TristrFlowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42D57D3626BA3F94C10247D0 /* TristrFlowApp.swift */; };
+		B4B7948B2E692F1783222A4F /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF0ED44F2E87ED8D1F5C4A58 /* AppSettings.swift */; };
+		B527F96F1C3EB5935482B6CF /* StreamParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8192DDBE8C497ACADFC79856 /* StreamParsingTests.swift */; };
+		B964C0D8938494A1A8F112F4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E1249876087F5A26981206 /* ContentView.swift */; };
+		C32DDA5D8360A95228761E13 /* mp3_44100_64.ndjson in Resources */ = {isa = PBXBuildFile; fileRef = B6846FC5740C75F571F2AE64 /* mp3_44100_64.ndjson */; };
+		D97739DB9B463551E55D867D /* AnalyticsDelivery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1627BF61D7E21445D820618B /* AnalyticsDelivery.swift */; };
+		DC763217327EB7AAC77B53DA /* ReadingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CE50D2AA8CB71A5A1C055B5 /* ReadingSession.swift */; };
+		DEC5FF1B6D7D7A9DBC1AB3CC /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62DE6961AABFA86ED54260DF /* SettingsView.swift */; };
+		F3B98EAF2EA88DC426BCAA33 /* ReaderTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3468E0FB826175A5CF842A /* ReaderTextView.swift */; };
+		FACB31E0FDE8B551B6FBFEEE /* MP3StreamDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B765C71ADCE0F2500842E86 /* MP3StreamDecoder.swift */; };
+		FF3E18BD5771533EAC83C197 /* MP3StreamDecoderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83ECAAEEFBB462057FDE4626 /* MP3StreamDecoderTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		098761E14DC94BA1A579705C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BE2CF19C249A2C0CFCC407CE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C7117D34EADBB55FD2F4AB15;
+			remoteInfo = TristrFlow;
+		};
+		548662BAB929625445BBE6DA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BE2CF19C249A2C0CFCC407CE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C7117D34EADBB55FD2F4AB15;
+			remoteInfo = TristrFlow;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		02B6BFB6F4AA7326C431F14C /* Timeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Timeline.swift; sourceTree = "<group>"; };
+		0E6BCF7ADF08305061D766D1 /* StreamFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamFormat.swift; sourceTree = "<group>"; };
+		1627BF61D7E21445D820618B /* AnalyticsDelivery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsDelivery.swift; sourceTree = "<group>"; };
+		1E7D1F0F24C5FBF9DB0B70C0 /* mp3_22050_32.ndjson */ = {isa = PBXFileReference; path = mp3_22050_32.ndjson; sourceTree = "<group>"; };
+		1F90BF037FDB8510804A4A07 /* TristrFlow.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TristrFlow.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		280576E033053BEF0E0C11AD /* ReadingSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingSessionTests.swift; sourceTree = "<group>"; };
+		2BB6B1616FAA179DEFF846CC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		42CA624297A75AB28818605E /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
+		42D57D3626BA3F94C10247D0 /* TristrFlowApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TristrFlowApp.swift; sourceTree = "<group>"; };
+		4B765C71ADCE0F2500842E86 /* MP3StreamDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MP3StreamDecoder.swift; sourceTree = "<group>"; };
+		4C6241226BD41AA88EC818A1 /* ControlBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlBar.swift; sourceTree = "<group>"; };
+		523848BAC7824BF884C7F0EF /* NDJSONLineSplitter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NDJSONLineSplitter.swift; sourceTree = "<group>"; };
+		607A811EB3E7C164CA633F30 /* StreamModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamModels.swift; sourceTree = "<group>"; };
+		6123AB90C9B84C8F65710236 /* Voice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Voice.swift; sourceTree = "<group>"; };
+		614567D87946F4570D6B034D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		62DE6961AABFA86ED54260DF /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		63E19752DCBFD59EB1245C50 /* AccountSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSessionTests.swift; sourceTree = "<group>"; };
+		6FCB5835F164727432D68976 /* TristrFlowUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TristrFlowUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		706FB120FB63E341EB1A45AD /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		75A5250985FA4BAC0BB5C61D /* ProductAnalytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductAnalytics.swift; sourceTree = "<group>"; };
+		7CE50D2AA8CB71A5A1C055B5 /* ReadingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingSession.swift; sourceTree = "<group>"; };
+		8192DDBE8C497ACADFC79856 /* StreamParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamParsingTests.swift; sourceTree = "<group>"; };
+		83ECAAEEFBB462057FDE4626 /* MP3StreamDecoderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MP3StreamDecoderTests.swift; sourceTree = "<group>"; };
+		9A3468E0FB826175A5CF842A /* ReaderTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderTextView.swift; sourceTree = "<group>"; };
+		A5B3A273B332F54AE222A7EE /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
+		AC74E909F756D1DFAB726238 /* PCM16Decoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PCM16Decoder.swift; sourceTree = "<group>"; };
+		B0638F709AC27C1875175028 /* ComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeView.swift; sourceTree = "<group>"; };
+		B5A18AB379EF288161280713 /* ReadAloudUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadAloudUITests.swift; sourceTree = "<group>"; };
+		B6846FC5740C75F571F2AE64 /* mp3_44100_64.ndjson */ = {isa = PBXFileReference; path = mp3_44100_64.ndjson; sourceTree = "<group>"; };
+		B8AE11111FF26DD8833E0787 /* VoicePreviewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoicePreviewer.swift; sourceTree = "<group>"; };
+		B8AE3E4ACB9DCAD372A2F36D /* StreamingPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingPlayer.swift; sourceTree = "<group>"; };
+		C891FAF9B91709C075B434CF /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		CB7A1F62C91B9484C5688029 /* ProductAnalyticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductAnalyticsTests.swift; sourceTree = "<group>"; };
+		CCB48E4E4A4A0F5CF065CA5C /* AccountSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSession.swift; sourceTree = "<group>"; };
+		D1FA816BB8EA7E4F3325B40C /* TimelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineTests.swift; sourceTree = "<group>"; };
+		DE3ABF8843FF1E1903EE399A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		DF0ED44F2E87ED8D1F5C4A58 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		E118582160B3BCB0845D8447 /* TextSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextSegmenter.swift; sourceTree = "<group>"; };
+		EC41C3B85681CEDB04DE6EE4 /* ServiceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceClient.swift; sourceTree = "<group>"; };
+		F2CC53549EB40995FDAA175C /* StreamingPlayerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingPlayerTests.swift; sourceTree = "<group>"; };
+		F3DCC05FF86F6BF93E037B59 /* analytics-project.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "analytics-project.json"; sourceTree = "<group>"; };
+		F64ACC3185C4280B9D1798EA /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
+		F85C96B567BFAE75DDF9AF1B /* TristrFlowTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TristrFlowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F9E1249876087F5A26981206 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		12BBE78E515D2007BDA28B0D /* TristrFlowUITests */ = {
+			isa = PBXGroup;
+			children = (
+				B5A18AB379EF288161280713 /* ReadAloudUITests.swift */,
+			);
+			path = TristrFlowUITests;
+			sourceTree = "<group>";
+		};
+		22FB21181A24DF1649A17357 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				42D57D3626BA3F94C10247D0 /* TristrFlowApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		3B6495857E1B7B8F138686F9 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B0638F709AC27C1875175028 /* ComposeView.swift */,
+				F9E1249876087F5A26981206 /* ContentView.swift */,
+				4C6241226BD41AA88EC818A1 /* ControlBar.swift */,
+				9A3468E0FB826175A5CF842A /* ReaderTextView.swift */,
+				62DE6961AABFA86ED54260DF /* SettingsView.swift */,
+				F64ACC3185C4280B9D1798EA /* SignInView.swift */,
+				706FB120FB63E341EB1A45AD /* Theme.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		56AD869A2B918313EA0713ED /* TristrFlow */ = {
+			isa = PBXGroup;
+			children = (
+				2BB6B1616FAA179DEFF846CC /* Assets.xcassets */,
+				614567D87946F4570D6B034D /* Info.plist */,
+				DE3ABF8843FF1E1903EE399A /* PrivacyInfo.xcprivacy */,
+				22FB21181A24DF1649A17357 /* App */,
+				F8C4ECE247FB3D464AF2F3A3 /* Audio */,
+				A8265110E0A9595BB3FA1DC0 /* Core */,
+				88946277F03A91D138CCDEC9 /* Session */,
+				3B6495857E1B7B8F138686F9 /* Views */,
+			);
+			path = TristrFlow;
+			sourceTree = "<group>";
+		};
+		6573B3881B39C33781E16C18 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				F3DCC05FF86F6BF93E037B59 /* analytics-project.json */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
+		848AF173F56E079D4CC2888D = {
+			isa = PBXGroup;
+			children = (
+				DFD1DD82F8B73DA45819DA03 /* ios-account-reader */,
+				56AD869A2B918313EA0713ED /* TristrFlow */,
+				BA37017C3E5B2EA3D57AFF89 /* TristrFlowTests */,
+				12BBE78E515D2007BDA28B0D /* TristrFlowUITests */,
+				B92564EAAA2B59229B09EF12 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		88946277F03A91D138CCDEC9 /* Session */ = {
+			isa = PBXGroup;
+			children = (
+				CCB48E4E4A4A0F5CF065CA5C /* AccountSession.swift */,
+				DF0ED44F2E87ED8D1F5C4A58 /* AppSettings.swift */,
+				A5B3A273B332F54AE222A7EE /* NowPlaying.swift */,
+				7CE50D2AA8CB71A5A1C055B5 /* ReadingSession.swift */,
+			);
+			path = Session;
+			sourceTree = "<group>";
+		};
+		A7AC81B9B92E16DE80D303B6 /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				1E7D1F0F24C5FBF9DB0B70C0 /* mp3_22050_32.ndjson */,
+				B6846FC5740C75F571F2AE64 /* mp3_44100_64.ndjson */,
+			);
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
+		A8265110E0A9595BB3FA1DC0 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				1627BF61D7E21445D820618B /* AnalyticsDelivery.swift */,
+				C891FAF9B91709C075B434CF /* KeychainStore.swift */,
+				42CA624297A75AB28818605E /* Log.swift */,
+				4B765C71ADCE0F2500842E86 /* MP3StreamDecoder.swift */,
+				523848BAC7824BF884C7F0EF /* NDJSONLineSplitter.swift */,
+				AC74E909F756D1DFAB726238 /* PCM16Decoder.swift */,
+				75A5250985FA4BAC0BB5C61D /* ProductAnalytics.swift */,
+				EC41C3B85681CEDB04DE6EE4 /* ServiceClient.swift */,
+				0E6BCF7ADF08305061D766D1 /* StreamFormat.swift */,
+				607A811EB3E7C164CA633F30 /* StreamModels.swift */,
+				E118582160B3BCB0845D8447 /* TextSegmenter.swift */,
+				02B6BFB6F4AA7326C431F14C /* Timeline.swift */,
+				6123AB90C9B84C8F65710236 /* Voice.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		B92564EAAA2B59229B09EF12 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				1F90BF037FDB8510804A4A07 /* TristrFlow.app */,
+				F85C96B567BFAE75DDF9AF1B /* TristrFlowTests.xctest */,
+				6FCB5835F164727432D68976 /* TristrFlowUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		BA37017C3E5B2EA3D57AFF89 /* TristrFlowTests */ = {
+			isa = PBXGroup;
+			children = (
+				63E19752DCBFD59EB1245C50 /* AccountSessionTests.swift */,
+				83ECAAEEFBB462057FDE4626 /* MP3StreamDecoderTests.swift */,
+				CB7A1F62C91B9484C5688029 /* ProductAnalyticsTests.swift */,
+				280576E033053BEF0E0C11AD /* ReadingSessionTests.swift */,
+				F2CC53549EB40995FDAA175C /* StreamingPlayerTests.swift */,
+				8192DDBE8C497ACADFC79856 /* StreamParsingTests.swift */,
+				D1FA816BB8EA7E4F3325B40C /* TimelineTests.swift */,
+				A7AC81B9B92E16DE80D303B6 /* Fixtures */,
+			);
+			path = TristrFlowTests;
+			sourceTree = "<group>";
+		};
+		DFD1DD82F8B73DA45819DA03 /* ios-account-reader */ = {
+			isa = PBXGroup;
+			children = (
+				6573B3881B39C33781E16C18 /* src */,
+			);
+			name = "ios-account-reader";
+			path = ..;
+			sourceTree = "<group>";
+		};
+		F8C4ECE247FB3D464AF2F3A3 /* Audio */ = {
+			isa = PBXGroup;
+			children = (
+				B8AE3E4ACB9DCAD372A2F36D /* StreamingPlayer.swift */,
+				B8AE11111FF26DD8833E0787 /* VoicePreviewer.swift */,
+			);
+			path = Audio;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C3159C56839C8B061875DC51 /* TristrFlowTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7F5973F714BA2BCE7C830271 /* Build configuration list for PBXNativeTarget "TristrFlowTests" */;
+			buildPhases = (
+				24E0D1518880B21AEC9CAE60 /* Sources */,
+				D446A71DC1023602DEC0D974 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C8681FFE6C3151AD1B25FF72 /* PBXTargetDependency */,
+			);
+			name = TristrFlowTests;
+			packageProductDependencies = (
+			);
+			productName = TristrFlowTests;
+			productReference = F85C96B567BFAE75DDF9AF1B /* TristrFlowTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		C7117D34EADBB55FD2F4AB15 /* TristrFlow */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 644B2F7601E367BF6649D545 /* Build configuration list for PBXNativeTarget "TristrFlow" */;
+			buildPhases = (
+				E6B62B1884A4B74A91B96320 /* Sources */,
+				4751534825CE977395D27436 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TristrFlow;
+			packageProductDependencies = (
+			);
+			productName = TristrFlow;
+			productReference = 1F90BF037FDB8510804A4A07 /* TristrFlow.app */;
+			productType = "com.apple.product-type.application";
+		};
+		DE498DEF356FE11113994BB6 /* TristrFlowUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 372CDFDE7A80187D12ED1463 /* Build configuration list for PBXNativeTarget "TristrFlowUITests" */;
+			buildPhases = (
+				E96115AB7A76EFF64646D6F0 /* Sources */,
+				1F36219F2DA9DF93D9E43A94 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3A46E9ECF093CDAFC7A68FF0 /* PBXTargetDependency */,
+			);
+			name = TristrFlowUITests;
+			packageProductDependencies = (
+			);
+			productName = TristrFlowUITests;
+			productReference = 6FCB5835F164727432D68976 /* TristrFlowUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		BE2CF19C249A2C0CFCC407CE /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					C7117D34EADBB55FD2F4AB15 = {
+						DevelopmentTeam = RM6AG38FWP;
+						ProvisioningStyle = Automatic;
+					};
+					DE498DEF356FE11113994BB6 = {
+						TestTargetID = C7117D34EADBB55FD2F4AB15;
+					};
+				};
+			};
+			buildConfigurationList = E38E9016048937445AAC3A9B /* Build configuration list for PBXProject "TristrFlow" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 848AF173F56E079D4CC2888D;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = B92564EAAA2B59229B09EF12 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C7117D34EADBB55FD2F4AB15 /* TristrFlow */,
+				C3159C56839C8B061875DC51 /* TristrFlowTests */,
+				DE498DEF356FE11113994BB6 /* TristrFlowUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1F36219F2DA9DF93D9E43A94 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C32DDA5D8360A95228761E13 /* mp3_44100_64.ndjson in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4751534825CE977395D27436 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				63BE44631FE6F98356B5EB47 /* Assets.xcassets in Resources */,
+				378BB0F32F3D5601EFBB673A /* PrivacyInfo.xcprivacy in Resources */,
+				4A8EE0660315B2E4D587EE9C /* analytics-project.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D446A71DC1023602DEC0D974 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				74E4F2680BEEEFE1E4AFF4B6 /* mp3_22050_32.ndjson in Resources */,
+				6F2AA1F57A1C3C21321777FB /* mp3_44100_64.ndjson in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		24E0D1518880B21AEC9CAE60 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9B18D5DBCBB554DCD4DF06B1 /* AccountSessionTests.swift in Sources */,
+				FF3E18BD5771533EAC83C197 /* MP3StreamDecoderTests.swift in Sources */,
+				7FB06B1BA2FF3AF911C61131 /* ProductAnalyticsTests.swift in Sources */,
+				253CDABFB622FE7E034A1641 /* ReadingSessionTests.swift in Sources */,
+				B527F96F1C3EB5935482B6CF /* StreamParsingTests.swift in Sources */,
+				51004D42BB13E17ED1507063 /* StreamingPlayerTests.swift in Sources */,
+				9C80ABB51BE409BBD5F1A87D /* TimelineTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E6B62B1884A4B74A91B96320 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				29A007C5DA5C961E71F2931F /* AccountSession.swift in Sources */,
+				D97739DB9B463551E55D867D /* AnalyticsDelivery.swift in Sources */,
+				B4B7948B2E692F1783222A4F /* AppSettings.swift in Sources */,
+				45CBE2F28675ACD3A47333DF /* ComposeView.swift in Sources */,
+				B964C0D8938494A1A8F112F4 /* ContentView.swift in Sources */,
+				AD695434FEC65077CAE42951 /* ControlBar.swift in Sources */,
+				088F2D7BB0106C1BAAF021EF /* KeychainStore.swift in Sources */,
+				8E15E979F0A2056016C64C39 /* Log.swift in Sources */,
+				FACB31E0FDE8B551B6FBFEEE /* MP3StreamDecoder.swift in Sources */,
+				961BEF213D395B610D8E0554 /* NDJSONLineSplitter.swift in Sources */,
+				49CEF129B30FE9ECFCAA2732 /* NowPlaying.swift in Sources */,
+				147A03EA1BC998F9E322E61F /* PCM16Decoder.swift in Sources */,
+				2875945D47CD779F0D92097C /* ProductAnalytics.swift in Sources */,
+				F3B98EAF2EA88DC426BCAA33 /* ReaderTextView.swift in Sources */,
+				DC763217327EB7AAC77B53DA /* ReadingSession.swift in Sources */,
+				AAB405D2FD584A244273C61A /* ServiceClient.swift in Sources */,
+				DEC5FF1B6D7D7A9DBC1AB3CC /* SettingsView.swift in Sources */,
+				0AC4B3FB0785F0C3258EFC56 /* SignInView.swift in Sources */,
+				486B378BF18CEACFF4F8500D /* StreamFormat.swift in Sources */,
+				29D64835D93328E41CD8FC0B /* StreamModels.swift in Sources */,
+				AAD320C08D421FDE0FB3465B /* StreamingPlayer.swift in Sources */,
+				3C30B99D6DF096415785D9D4 /* TextSegmenter.swift in Sources */,
+				361717556C307A8F80D1E78F /* Theme.swift in Sources */,
+				42D3F9C3FF1B167F6B6F1A59 /* Timeline.swift in Sources */,
+				B023F8291EBAA70C6C03D6E5 /* TristrFlowApp.swift in Sources */,
+				51A3FEFEBC914498AB2B15F0 /* Voice.swift in Sources */,
+				58E588CD13E7456F48074DCE /* VoicePreviewer.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E96115AB7A76EFF64646D6F0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AC781F064D7F7E60BE168F17 /* ReadAloudUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		3A46E9ECF093CDAFC7A68FF0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C7117D34EADBB55FD2F4AB15 /* TristrFlow */;
+			targetProxy = 548662BAB929625445BBE6DA /* PBXContainerItemProxy */;
+		};
+		C8681FFE6C3151AD1B25FF72 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C7117D34EADBB55FD2F4AB15 /* TristrFlow */;
+			targetProxy = 098761E14DC94BA1A579705C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1CA65B649E60D2E3D63A119F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = RM6AG38FWP;
+				INFOPLIST_FILE = TristrFlow/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ai.pazi.tristrflow.ios;
+				PRODUCT_NAME = TristrFlow;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		439813C58D045D412B225BDC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		85640C76302A250DED315351 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = RM6AG38FWP;
+				INFOPLIST_FILE = TristrFlow/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ai.pazi.tristrflow.ios;
+				PRODUCT_NAME = TristrFlow;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A20092EFFA7D6EC2A5FD16BD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ai.pazi.tristrflow.ios.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TristrFlow.app/TristrFlow";
+			};
+			name = Release;
+		};
+		A9CD9C4E342AC51AA61762EE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ai.pazi.tristrflow.ios.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = TristrFlow;
+			};
+			name = Release;
+		};
+		A9E22ED3D38CCE2DA9BBD2D1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ai.pazi.tristrflow.ios.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = TristrFlow;
+			};
+			name = Debug;
+		};
+		AB43AC8299B9314BE2C086A8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ai.pazi.tristrflow.ios.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TristrFlow.app/TristrFlow";
+			};
+			name = Debug;
+		};
+		ACA82A7832550046F854B58A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		372CDFDE7A80187D12ED1463 /* Build configuration list for PBXNativeTarget "TristrFlowUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A9E22ED3D38CCE2DA9BBD2D1 /* Debug */,
+				A9CD9C4E342AC51AA61762EE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		644B2F7601E367BF6649D545 /* Build configuration list for PBXNativeTarget "TristrFlow" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				85640C76302A250DED315351 /* Debug */,
+				1CA65B649E60D2E3D63A119F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7F5973F714BA2BCE7C830271 /* Build configuration list for PBXNativeTarget "TristrFlowTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AB43AC8299B9314BE2C086A8 /* Debug */,
+				A20092EFFA7D6EC2A5FD16BD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E38E9016048937445AAC3A9B /* Build configuration list for PBXProject "TristrFlow" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				ACA82A7832550046F854B58A /* Debug */,
+				439813C58D045D412B225BDC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = BE2CF19C249A2C0CFCC407CE /* Project object */;
+}

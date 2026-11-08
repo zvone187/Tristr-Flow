@@ -1,0 +1,8 @@
+# Xcode
+build/
+DerivedData/
+*.xcresult
+xcuserdata/
+*.xcuserstate
+.swiftpm/
+/implementation assets/

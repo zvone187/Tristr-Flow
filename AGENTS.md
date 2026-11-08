@@ -14,3 +14,6 @@
 - Keep electron-builder at the workflow's pinned signing version. To recover a failed release, dispatch the release workflow from `main` with the existing tag; it checks out that immutable tag and uses the fixed build tool without retagging.
 - Clipboard images must be rebuilt from validated HTTP(S) or embedded raster sources, omit referrers, and stay outside canonical speech text. Never copy image event handlers, srcset, styling, or local file URLs into the overlay.
 - Keep overlay images proportional with automatic width/height and containment. Browser QA must compare rendered image ratios to original source assets, not fixtures stretched during generation.
+
+- The iOS reader in `ios/` uses Tristr Flow accounts for all speech, including previews. Keep provider credentials off the device and store the service bearer only in the iOS Keychain. The desktop provider-key override does not apply to iOS.
+- Edit `ios/project.yml` and regenerate the checked-in project with `xcodegen generate --spec ios/project.yml` when adding files or changing signing. Keep the organization bundle ID stable across device and App Store builds. Never ship simulator fixture configuration in device builds.
