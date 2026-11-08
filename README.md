@@ -109,9 +109,11 @@ identically no matter which app the text came from.
 
 ## First run
 
-Sign in to a Tristr Flow account to use the hosted, credit-metered ElevenLabs
-and Fish Audio service. For development or bring-your-own-key use, provider keys
-can also be loaded from `.env` or saved in Preferences.
+1. Download the [signed Apple silicon installer](https://github.com/zvone187/Tristr-Flow/releases/latest), open the DMG, and move **Tristr Flow** to **Applications**. If replacing a copy, quit it first. Open the app from Applications.
+2. Allow **Tristr Flow** in **System Settings > Privacy & Security > Accessibility**. The welcome window updates when the permission takes effect. You can sign in while permission is pending.
+3. Choose **Sign in** for an existing account or **Create account** for a new one. Complete setup, select text in another app, and press **Control + Shift + Space**.
+
+If Accessibility is enabled but the app still cannot read a selection, open **Setup** from the menu bar. Expand **Already enabled in System Settings?**, select **Repair permission**, confirm, then enable the installed app again. This clears only Tristr Flow's Accessibility permission. It preserves account details, other permissions and settings. If macOS prevents the reset, remove the old entry in Accessibility settings and add the copy in Applications using **+**.
 
 ### Run from source
 
@@ -130,25 +132,13 @@ permission:
 - **System Settings → Privacy & Security → Accessibility** → enable the app
   (or "Terminal"/"Electron" when running from source).
 
-> **After each rebuild** the unsigned app gets a new identity, so macOS forgets
-> the grant — remove the old "Tristr Flow" entry and re-add the new one if
-> capture suddenly stops working.
+Development builds can have a different signing identity. Use a separate development install. Never replace the signed release with a local test build on a user's Mac.
 
-The menu-bar menu shows whether the permission and API key are detected, and has
-a **"Read clipboard text aloud"** item to test without granting Accessibility.
+**Read clipboard text aloud** in the menu bar is available even without Accessibility.
 
 ## Build an installable app
 
-```bash
-npm run dist
-```
-
-Produces a `.dmg` (and `.zip`) in `dist/`. Open the DMG and drag the app to
-Applications.
-
-> The build is **unsigned**, so the first launch needs right-click → **Open** to
-> get past Gatekeeper, and you must re-grant Accessibility after each rebuild
-> (an unsigned app gets a new identity each time).
+Use `npm run dist` for local packaging. Only distribute the Developer ID signed and notarized DMG produced by the release workflow. The version tag must match the version in package.json.
 
 ## Config
 

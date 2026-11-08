@@ -406,7 +406,7 @@ function acctMsg(text, isErr) {
 function renderAccount(a) {
   const signedIn = !!a.signedIn;
   const ownKey = !!a.hasOwnKey;
-  acctSignedOutEl.hidden = signedIn || ownKey;
+  acctSignedOutEl.hidden = signedIn;
   acctSignedInEl.hidden = !(signedIn || ownKey);
   if (signedIn) {
     const left = a.minutesLeft != null

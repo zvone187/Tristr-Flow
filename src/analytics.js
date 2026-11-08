@@ -152,6 +152,8 @@ const PROPERTY_RULES = {
   ),
   shortcut_slot: number(1, 2),
   source: oneOf(
+    'accessibility-granted',
+    'shortcut',
     'ax-menu',
     'cmd-c',
     'launch-nudge',

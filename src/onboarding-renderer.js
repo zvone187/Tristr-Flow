@@ -13,6 +13,8 @@ const ownKeyEl = $('ownKey');
 const btnSignup = $('btnSignup');
 const btnLogin = $('btnLogin');
 const btnOwnKey = $('btnOwnKey');
+const btnAuthSubmit = $('btnAuthSubmit');
+const btnContinueKey = $('btnContinueKey');
 
 const voiceEl = $('voice');
 const whoEl = $('who');
@@ -24,6 +26,7 @@ const btnDone = $('btnDone');
 const openAtLoginEl = $('openAtLogin');
 
 let recording = false;
+let useExistingLoginPreference = true;
 
 // ---- shortcut encoding (mirrors settings-renderer) ----------------------
 function accelToSymbols(accel) {
@@ -62,41 +65,64 @@ function acctMsg(text, isErr) {
   acctMsgEl.classList.toggle('err', !!isErr);
 }
 
-async function goStep2() {
-  const a = await window.onb.account().catch(() => ({}));
-  whoEl.textContent = a && a.email ? a.email.split('@')[0] : '';
-  await loadStep2Data();
+function goStep2(email = '') {
+  if (!step2.hidden) return;
+  openAtLoginEl.disabled = useExistingLoginPreference;
+  whoEl.textContent = email.split('@')[0];
   step1.hidden = true;
   step2.hidden = false;
   dots.forEach((d) => d.classList.toggle('active', d.dataset.step === '2'));
   window.onb.track('onboarding_step_viewed', { surface: 'onboarding', step: 2 });
+  loadStep2Data();
 }
 
-async function doAuth(fn, action) {
-  const email = (emailEl.value || '').trim();
-  const pass = passEl.value || '';
-  if (!email || !pass) {
-    window.onb.track('account_action_completed', {
-      surface: 'onboarding',
-      action,
-      outcome: 'rejected',
-      reason: 'invalid-request',
-    });
-    acctMsg('Enter your email and a password.', true);
-    return;
+let accountAction = 'login';
+
+function selectAccountAction(action) {
+  accountAction = action;
+  const login = action === 'login';
+  btnLogin.setAttribute('aria-pressed', String(login));
+  btnSignup.setAttribute('aria-pressed', String(!login));
+  passEl.autocomplete = login ? 'current-password' : 'new-password';
+  passEl.minLength = login ? 0 : 8;
+  passEl.placeholder = login ? 'Password' : 'Password (8 or more characters)';
+  btnAuthSubmit.textContent = login ? 'Sign in' : 'Create account';
+  acctMsg('');
+}
+
+function setAccountBusy(busy) {
+  for (const button of [btnAuthSubmit, btnSignup, btnLogin, btnOwnKey, btnContinueKey]) {
+    button.disabled = busy;
   }
-  acctMsg('Working…');
-  btnSignup.disabled = btnLogin.disabled = true;
-  const r = await fn(email, pass);
-  btnSignup.disabled = btnLogin.disabled = false;
-  if (r && r.ok) { acctMsg(''); await goStep2(); }
-  else { acctMsg((r && r.error) || 'Something went wrong.', true); }
 }
 
-btnSignup.addEventListener('click', () => doAuth(window.onb.signup, 'signup'));
-btnLogin.addEventListener('click', () => doAuth(window.onb.login, 'login'));
+btnLogin.addEventListener('click', () => selectAccountAction('login'));
+btnSignup.addEventListener('click', () => selectAccountAction('signup'));
+$('accountForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (btnAuthSubmit.disabled) return;
+  const email = emailEl.value.trim();
+  const password = passEl.value;
+  acctMsg(accountAction === 'login' ? 'Signing in…' : 'Creating your account…');
+  setAccountBusy(true);
+  try {
+    const result = await window.onb[accountAction](email, password);
+    if (result && result.ok) {
+      passEl.value = '';
+      goStep2(result.email || email);
+    } else {
+      acctMsg((result && result.error) || 'Could not reach your account. Try again.', true);
+    }
+  } catch {
+    acctMsg('Could not connect. Check your connection and try again.', true);
+  } finally {
+    setAccountBusy(false);
+  }
+});
+
+btnContinueKey.addEventListener('click', () => goStep2());
 btnOwnKey.addEventListener('click', async () => {
-  const key = (ownKeyEl.value || '').trim();
+  const key = ownKeyEl.value.trim();
   if (!key) {
     window.onb.track('account_action_completed', {
       surface: 'onboarding',
@@ -107,28 +133,49 @@ btnOwnKey.addEventListener('click', async () => {
     acctMsg('Paste your ElevenLabs key (starts with sk_).', true);
     return;
   }
-  const r = await window.onb.setOwnKey(key);
-  if (r && r.ok && r.hasOwnKey) { acctMsg(''); await goStep2(); }
-  else { acctMsg('That key didn’t take — check it and try again.', true); }
+  setAccountBusy(true);
+  try {
+    const result = await window.onb.setOwnKey(key);
+    if (result && result.ok && result.hasOwnKey) {
+      ownKeyEl.value = '';
+      goStep2();
+    } else {
+      acctMsg('Check your key and try again.', true);
+    }
+  } catch {
+    acctMsg('Could not save your key. Try again.', true);
+  } finally {
+    setAccountBusy(false);
+  }
 });
-passEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doAuth(window.onb.signup, 'signup'); } });
 
-// ---- step 2: voice + shortcut + finish -----------------------------------
+// Show the saved shortcut and voice immediately, even if the catalogue is slow.
 async function loadStep2Data() {
-  const [voices, cfg] = await Promise.all([
-    window.onb.curatedVoices().catch(() => []),
-    window.onb.get().catch(() => ({})),
-  ]);
-  voiceEl.innerHTML = '';
-  (voices || []).forEach((v) => {
-    const o = document.createElement('option');
-    o.value = v.voice_id;
-    o.textContent = v.name;
-    o.dataset.name = v.name;
-    if (v.voice_id === cfg.voiceId) o.selected = true;
-    voiceEl.appendChild(o);
-  });
+  const cfg = await window.onb.get().catch(() => ({}));
+  if (useExistingLoginPreference && typeof cfg.openAtLogin === 'boolean') {
+    openAtLoginEl.checked = cfg.openAtLogin;
+    openAtLoginEl.disabled = false;
+  }
   if (cfg.hotkey) comboEl.textContent = accelToSymbols(cfg.hotkey);
+  const addVoice = (id, name) => {
+    const option = document.createElement('option');
+    option.value = id;
+    option.textContent = option.dataset.name = name;
+    option.selected = id === cfg.voiceId;
+    voiceEl.appendChild(option);
+  };
+  if (cfg.voiceId) {
+    voiceEl.innerHTML = '';
+    addVoice(cfg.voiceId, cfg.voiceName || cfg.voiceId);
+  }
+  const voices = await window.onb.curatedVoices().catch(() => []);
+  if (!voices.length) return;
+  voiceEl.innerHTML = '';
+  if (cfg.voiceId && !voices.some(v => v.voice_id === cfg.voiceId)) {
+    addVoice(cfg.voiceId, cfg.voiceName || cfg.voiceId);
+  }
+  for (const voice of voices) addVoice(voice.voice_id, voice.name);
+  voiceEl.disabled = false;
 }
 
 voiceEl.addEventListener('change', () => {
@@ -175,9 +222,18 @@ if (openAtLoginEl) {
 }
 
 btnDone.addEventListener('click', async () => {
-  if (openAtLoginEl) await window.onb.setOpenAtLogin(openAtLoginEl.checked); // apply the (default-on) choice
+  // Returning users already have an OS preference. Only a checkbox change
+  // should modify it when they revisit setup to repair a permission.
+  if (!useExistingLoginPreference) await window.onb.setOpenAtLogin(openAtLoginEl.checked);
   window.onb.finish();
 });
 
-window.onb.track('onboarding_step_viewed', { surface: 'onboarding', step: 1 });
-loadStep2Data();
+window.onb.account().catch(() => ({})).then((account) => {
+  useExistingLoginPreference = !!(account.onboarded || account.email || account.mode === 'service' || account.hasDirectKey);
+  if (account.email || account.mode === 'service') {
+    goStep2(account.email);
+  } else {
+    btnContinueKey.hidden = !account.hasDirectKey;
+    window.onb.track('onboarding_step_viewed', { surface: 'onboarding', step: 1 });
+  }
+});

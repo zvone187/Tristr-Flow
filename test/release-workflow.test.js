@@ -8,10 +8,12 @@ const { spawnSync } = require('node:child_process');
 
 const root = path.join(__dirname, '..');
 
-test('release metadata is bumped consistently to 0.1.4', () => {
+test('release metadata is consistent for the current version', () => {
   const pkg = require('../package.json');
   const lock = require('../package-lock.json');
-  assert.equal(pkg.version, '0.1.4');
+  assert.match(pkg.version, /^\d+\.\d+\.\d+$/);
+  assert.deepEqual(lock.packages[''].dependencies, pkg.dependencies);
+  assert.deepEqual(lock.packages[''].devDependencies, pkg.devDependencies);
   assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[''].version, pkg.version);
   assert.equal(pkg.build.artifactName, 'Tristr-Flow-${version}-${arch}.${ext}');

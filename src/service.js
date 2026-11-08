@@ -12,16 +12,10 @@ function pickLib(u) {
   return u.protocol === 'http:' ? http : https;
 }
 
-function readBody(res) {
-  return new Promise((resolve) => {
-    let data = '';
-    res.setEncoding('utf8');
-    res.on('data', (d) => (data += d));
-    res.on('end', () => resolve(data));
-  });
-}
+// The hosted account service can take about a minute to wake from idle.
+const AUTH_TIMEOUT_MS = 90000;
 
-function jsonRequest({ baseUrl, path, method = 'POST', token, body }) {
+function jsonRequest({ baseUrl, path, method = 'POST', token, body, timeoutMs = 30000 }) {
   return new Promise((resolve, reject) => {
     let u;
     try { u = new URL(path, baseUrl); } catch (e) { return reject(e); }
@@ -39,16 +33,23 @@ function jsonRequest({ baseUrl, path, method = 'POST', token, body }) {
         port: u.port || (u.protocol === 'http:' ? 80 : 443),
         path: u.pathname + u.search,
         headers,
+        signal: AbortSignal.timeout(timeoutMs),
       },
-      async (res) => {
-        const text = await readBody(res);
-        let json = null;
-        try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
-        resolve({ status: res.statusCode, json });
+      (res) => {
+        let text = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => { text += chunk; });
+        res.on('error', reject);
+        res.on('end', () => {
+          let json;
+          try { json = JSON.parse(text) || {}; } catch { json = {}; }
+          resolve({ status: res.statusCode, json });
+        });
       }
     );
-    req.on('error', reject);
-    req.setTimeout(30000, () => req.destroy(new Error('Service request timed out.')));
+    req.on('error', error => reject(error.code === 'ABORT_ERR'
+      ? new Error('The service took too long to respond. Try again.')
+      : error));
     if (payload) req.write(payload);
     req.end();
   });
@@ -57,7 +58,7 @@ function jsonRequest({ baseUrl, path, method = 'POST', token, body }) {
 // POST /api/auth/login  -> { ok, email, apiToken, creditsMicros }
 async function login({ baseUrl, email, password }) {
   const { status, json } = await jsonRequest({
-    baseUrl, path: '/api/auth/login', body: { email, password },
+    baseUrl, path: '/api/auth/login', body: { email, password }, timeoutMs: AUTH_TIMEOUT_MS,
   });
   if (status >= 200 && status < 300 && json.apiToken) return json;
   throw new Error(json.error || `Login failed (${status}).`);
@@ -66,7 +67,7 @@ async function login({ baseUrl, email, password }) {
 // POST /api/auth/signup -> { ok, email, apiToken, creditsMicros }
 async function signup({ baseUrl, email, password }) {
   const { status, json } = await jsonRequest({
-    baseUrl, path: '/api/auth/signup', body: { email, password },
+    baseUrl, path: '/api/auth/signup', body: { email, password }, timeoutMs: AUTH_TIMEOUT_MS,
   });
   if (status >= 200 && status < 300 && json.apiToken) return json;
   throw new Error(json.error || `Sign up failed (${status}).`);

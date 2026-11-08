@@ -16,33 +16,44 @@
         <span class="dot" data-step="2"></span>
       </div>
 
+      <section id="accessCard" class="card" data-status="unknown" aria-labelledby="accessTitle">
+        <h2 id="accessTitle">Read selected text</h2>
+        <p id="accessStatus" role="status">Checking Accessibility permission…</p>
+        <button type="button" id="btnAccessSettings" class="ghost" hidden>Open Accessibility Settings</button>
+        <button type="button" id="btnRetryAccess" class="ghost" hidden>Check again</button>
+        <details id="accessRecovery" hidden>
+          <summary>Already enabled in System Settings?</summary>
+          <p>Repair clears the saved Accessibility permission for Tristr Flow. Then you can allow the installed app again.</p>
+          <button type="button" id="btnRepairAccess" class="ghost">Repair permission…</button>
+        </details>
+        <p id="accessMessage" role="status"></p>
+      </section>
+
       <!-- STEP 1 — account -->
       <section class="step" id="step1">
         <h1>Welcome to Tristr&nbsp;Flow</h1>
         <p class="lede">
-          Select text in any app, press your shortcut, and hear it read aloud —
-          with each word highlighted as it’s spoken.
+          Select text in any app and press your shortcut to hear it read aloud.
         </p>
 
         <div class="card">
-          <h2>Start free</h2>
-          <p class="muted">
-            Create an account and get <strong>$2 of reading</strong> on us — no
-            API key required.
-          </p>
-          <div class="fields">
-            <input id="email" type="email" placeholder="you@email.com" autocomplete="username" />
-            <input id="pass" type="password" placeholder="Password (8+ characters)" autocomplete="new-password" />
+          <div class="account-modes" role="group" aria-label="Account options">
+            <button id="btnLogin" type="button" aria-pressed="true">Sign in</button>
+            <button id="btnSignup" type="button" aria-pressed="false">Create account</button>
           </div>
-          <div class="row">
-            <button id="btnSignup" class="primary">Create account</button>
-            <button id="btnLogin" class="ghost">I already have one</button>
-          </div>
-          <p id="acctMsg" class="msg"></p>
+          <form id="accountForm">
+            <div class="fields">
+              <input id="email" type="email" aria-label="Email" placeholder="Email address" autocomplete="username" required />
+              <input id="pass" type="password" aria-label="Password" placeholder="Password" autocomplete="current-password" required />
+            </div>
+            <button id="btnAuthSubmit" type="submit" class="primary wide">Sign in</button>
+          </form>
+          <p id="acctMsg" class="msg" role="status" aria-live="polite"></p>
+          <button id="btnContinueKey" class="ghost" hidden>Continue with my saved key</button>
         </div>
 
         <details id="ownKeyWrap" class="card subtle">
-          <summary>Advanced — use my own ElevenLabs key</summary>
+          <summary>Use my own ElevenLabs key</summary>
           <p class="muted">Runs entirely on your own ElevenLabs account. No login, no credits.</p>
           <div class="fields">
             <input id="ownKey" type="password" placeholder="sk_…" autocomplete="off" />
@@ -58,7 +69,7 @@
 
         <div class="card">
           <h2>Voice</h2>
-          <select id="voice" aria-label="Voice"></select>
+          <select id="voice" aria-label="Voice" disabled><option>Loading voices…</option></select>
         </div>
 
         <div class="card">
@@ -86,5 +97,6 @@
       </section>
     </div>
     <script src="onboarding-renderer.js"></script>
+    <script src="onboarding-accessibility.js"></script>
   </body>
 </html>

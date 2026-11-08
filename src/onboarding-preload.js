@@ -3,7 +3,15 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('onb', {
-  account: () => ipcRenderer.invoke('account:get'),
+  account: () => ipcRenderer.invoke('onboarding:account'),
+  accessibility: () => ipcRenderer.invoke('accessibility:status'),
+  openAccessibility: () => ipcRenderer.invoke('accessibility:open'),
+  repairAccessibility: () => ipcRenderer.invoke('accessibility:repair'),
+  onAccessibilityChanged: (callback) => {
+    const handler = (_event, status) => callback(status);
+    ipcRenderer.on('accessibility:changed', handler);
+    return () => ipcRenderer.removeListener('accessibility:changed', handler);
+  },
   login: (email, password) => ipcRenderer.invoke('account:login', { email, password, source: 'onboarding' }),
   signup: (email, password) => ipcRenderer.invoke('account:signup', { email, password, source: 'onboarding' }),
   setOwnKey: (key) => ipcRenderer.invoke('account:setOwnKey', { key, source: 'onboarding' }),

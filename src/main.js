@@ -19,9 +19,13 @@ const {
 } = require('electron');
 const { randomUUID } = require('crypto');
 const path = require('path');
+const execFileAsync = require('node:util').promisify(require('node:child_process').execFile);
+const { createAccessibilityController } = require('./accessibility');
+const { repairAccessibility } = require('./accessibility-repair');
+const { needsInstallation, offerInstallation } = require('./install-location');
 
 const { loadConfig } = require('./config');
-const { getSelectedText, getFrontmostApplicationPid } = require('./selection');
+const { getSelectedText, getFrontmostApplicationPid, probeSelectionAccessibility } = require('./selection');
 const { readClipboardContent } = require('./clipboard-content');
 const { synthesize, synthesizeStream, clampSpeed, clampStability } = require('./elevenlabs');
 const { isFishVoice, synthesizeFish, synthesizeFishStream } = require('./fishaudio');
@@ -37,8 +41,10 @@ const { createShortcutManager, selectedTextMenuPresentation } = require('./short
 
 // A second background instance can silently lose both global accelerators to
 // the first one while still showing a working tray menu. Keep one owner.
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
-if (!hasSingleInstanceLock) app.quit();
+const needsInstall = needsInstallation(app);
+const hasSingleInstanceLock = !needsInstall && app.requestSingleInstanceLock();
+if (needsInstall) app.whenReady().then(() => offerInstallation(app, dialog));
+else if (!hasSingleInstanceLock) app.quit();
 
 let tray = null;
 let overlayWin = null;
@@ -62,6 +68,8 @@ let analyticsShutdownComplete = false;
 let lastExternalAppPid = 0;
 let currentReading = null;
 let appQuitCaptured = false;
+let accessibility = null;
+let repairInProgress = null;
 
 function maybePauseMusic() {
   if (state.pauseMusic && !musicPausePromise) musicPausePromise = mediaCtl.pauseMusic();
@@ -188,8 +196,7 @@ function notify(title, body) {
 }
 
 function hasAccessibility() {
-  if (process.platform !== 'darwin') return true;
-  return systemPreferences.isTrustedAccessibilityClient(false);
+  return accessibility?.status() === 'granted';
 }
 
 function persist() {
@@ -212,6 +219,7 @@ function persist() {
     ownKey: state.ownKey || '',
     fishKey: state.fishKey || '',
     onboarded: state.onboarded || false,
+    accessibilityPrompted: !!state.accessibilityPrompted,
     launchCount: state.launchCount || 0,
     // Random per-install analytics identifier. It is not tied to an email or
     // account and PostHog person-profile processing is disabled for all events.
@@ -849,24 +857,10 @@ async function onHotkey(trigger = 'shortcut', { targetPid = 0 } = {}) {
   }
   busy = true;
   try {
-    if (!hasAccessibility()) {
-      console.warn('[shortcut] selection capture blocked: Accessibility permission is unavailable');
-      captureAnalytics('selection_capture_finished', {
-        trigger,
-        outcome: 'failed',
-        reason: 'not-trusted',
-      });
-      systemPreferences.isTrustedAccessibilityClient(true);
-      notify(
-        'Accessibility permission needed',
-        'Enable Tristr Flow under System Settings → Privacy & Security → Accessibility, then try again.'
-      );
-      if (trigger === 'selected_text_menu') {
-        shell.openExternal(
-          'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'
-        );
-      }
-      updateTrayMenu();
+    // Check again on use so revocation or a grant after the watcher expired
+    // takes effect on the first shortcut. No automatic prompt on this path.
+    if (!hasAccessibility() && await accessibility.check() !== 'granted') {
+      openOnboarding('shortcut');
       return;
     }
     const { text, html, reason, source } = await getSelectedText({ targetPid });
@@ -878,11 +872,8 @@ async function onHotkey(trigger = 'shortcut', { targetPid = 0 } = {}) {
         source: source || 'none',
       });
       if (reason === 'not-trusted') {
-        systemPreferences.isTrustedAccessibilityClient(true);
-        notify(
-          'Accessibility permission needed',
-          'Enable Tristr Flow under System Settings → Privacy & Security → Accessibility, then try again.'
-        );
+        await accessibility.check();
+        openOnboarding('shortcut');
       } else if (reason === 'secure-input') {
         notify(
           "Can't read selection",
@@ -1120,10 +1111,7 @@ function updateTrayMenu() {
       click: () => {
         if (!ok) {
           captureAnalytics('accessibility_prompt_opened', { surface: 'tray' });
-          systemPreferences.isTrustedAccessibilityClient(true);
-          shell.openExternal(
-            'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'
-          );
+          openOnboarding('tray');
         }
       },
     },
@@ -1148,8 +1136,9 @@ function rememberSelectionOwner() {
   if (pid && pid !== process.pid) lastExternalAppPid = pid;
 }
 
-function showTrayMenu() {
+async function showTrayMenu() {
   rememberSelectionOwner();
+  await accessibility.check();
   // Opening the fallback menu is an explicit signal that shortcuts may be
   // unhealthy, so force a native re-registration even if Electron's cached
   // isRegistered() result still says they are present.
@@ -1251,6 +1240,44 @@ function accountMode() {
   return 'unconfigured';                                       // needs onboarding
 }
 
+ipcMain.handle('onboarding:account', () => ({
+  onboarded: !!state.onboarded,
+  mode: accountMode(),
+  email: state.serviceToken ? state.serviceEmail || '' : '',
+  hasDirectKey: !!(effectiveKey() || effectiveFishKey()),
+}));
+
+// Only the setup window can invoke system settings and consent to a repair.
+function isSetupSender(event) {
+  return onboardingWin && !onboardingWin.isDestroyed() &&
+    event.sender === onboardingWin.webContents && event.senderFrame === event.sender.mainFrame;
+}
+ipcMain.handle('accessibility:status', (event) => isSetupSender(event) ? accessibility.check() : 'unavailable');
+ipcMain.handle('accessibility:open', (event) => isSetupSender(event)
+  ? accessibility.request({ userInitiated: true }) : 'unavailable');
+ipcMain.handle('accessibility:repair', (event) => {
+  if (!isSetupSender(event)) return { ok: false };
+  if (!repairInProgress) {
+    repairInProgress = repairAccessibility({
+      installed: process.platform === 'darwin' && app.isPackaged && !needsInstall,
+      check: accessibility.check,
+      confirm: async () => (await dialog.showMessageBox(onboardingWin, {
+        type: 'question', buttons: ['Cancel', 'Reset Tristr Flow permission'],
+        defaultId: 0, cancelId: 0,
+        message: 'Reset Accessibility for Tristr Flow?',
+        detail: 'Use this if Tristr Flow is enabled in System Settings but still cannot read selections. You will need to allow it again. Your account and other permissions stay as they are.',
+      })).response === 1,
+      reset: (file, args) => execFileAsync(file, args, { timeout: 10000 }),
+      requestAgain: () => {
+        state.accessibilityPrompted = false;
+        persist();
+        return accessibility.request({ userInitiated: true });
+      },
+    }).finally(() => { repairInProgress = null; });
+  }
+  return repairInProgress;
+});
+
 ipcMain.handle('account:get', async () => {
   const out = {
     mode: accountMode(),
@@ -1291,7 +1318,7 @@ ipcMain.handle('account:login', async (_e, { email, password, source = 'preferen
     const r = await svc.login({ baseUrl: config.serviceBaseUrl, email, password });
     state.serviceToken = r.apiToken;
     state.serviceEmail = r.email;
-    state.onboarded = true;
+    if (source !== 'onboarding') state.onboarded = true;
     persist();
     updateTrayMenu();
     captureAnalytics('account_action_completed', {
@@ -1317,7 +1344,7 @@ ipcMain.handle('account:signup', async (_e, { email, password, source = 'prefere
     const r = await svc.signup({ baseUrl: config.serviceBaseUrl, email, password });
     state.serviceToken = r.apiToken;
     state.serviceEmail = r.email;
-    state.onboarded = true;
+    if (source !== 'onboarding') state.onboarded = true;
     persist();
     updateTrayMenu();
     captureAnalytics('account_action_completed', {
@@ -1395,7 +1422,7 @@ ipcMain.handle('account:setFishKey', (_e, { key, source = 'preferences' }) => {
 
 ipcMain.handle('account:setOwnKey', (_e, { key, source = 'preferences' }) => {
   state.ownKey = (key || '').trim();
-  state.onboarded = true;
+  if (source !== 'onboarding' && state.ownKey) state.onboarded = true;
   persist();
   updateTrayMenu();
   captureAnalytics('account_action_completed', {
@@ -1661,14 +1688,20 @@ ipcMain.on('overlay:openSettings', () => openSettings('overlay'));
 // ---- lifecycle -----------------------------------------------------------
 
 if (hasSingleInstanceLock) {
+  const reopen = () => {
+    if (!tray) return;
+    if (!hasAccessibility() || !state.onboarded || !canSpeak() || onboardingWin) openOnboarding('system');
+    else openSettings('system');
+  };
   app.on('second-instance', () => {
     refreshHotkeys('second-instance');
-    notify('Tristr Flow is already running', 'The existing menu-bar app kept ownership of your shortcuts.');
+    reopen();
   });
+  app.on('activate', reopen);
 }
 
-if (hasSingleInstanceLock) app.whenReady().then(() => {
-  config = loadConfig();
+if (hasSingleInstanceLock) app.whenReady().then(async () => {
+  config = loadConfig({ packaged: app.isPackaged });
   const saved = settingsStore.load();
   state = {
     voiceId: saved.voiceId || config.voiceId,
@@ -1689,10 +1722,9 @@ if (hasSingleInstanceLock) app.whenReady().then(() => {
     serviceEmail: saved.serviceEmail || '',
     ownKey: saved.ownKey || '',
     fishKey: saved.fishKey || '',
-    // Existing users who already have a key/login are implicitly onboarded.
-    onboarded:
-      saved.onboarded ||
-      !!(config.apiKey || saved.serviceToken || saved.ownKey),
+    // An explicit false means the user signed in but hasn't finished setup.
+    onboarded: saved.onboarded ?? !!(saved.serviceToken || saved.ownKey || saved.fishKey || config.apiKey || config.fishApiKey),
+    accessibilityPrompted: !!saved.accessibilityPrompted,
     launchCount: saved.launchCount || 0,
     analyticsId: saved.analyticsId || randomUUID(),
   };
@@ -1714,6 +1746,21 @@ if (hasSingleInstanceLock) app.whenReady().then(() => {
       settingsWin.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#211d1a' : '#faf9f6');
     }
   });
+
+  accessibility = createAccessibilityController({
+    isTrusted: () => process.platform !== 'darwin' || systemPreferences.isTrustedAccessibilityClient(false),
+    probeCapture: () => process.platform !== 'darwin' || probeSelectionAccessibility(),
+    hasPrompted: () => state.accessibilityPrompted,
+    markPrompted: () => { state.accessibilityPrompted = true; persist(); },
+    prompt: () => systemPreferences.isTrustedAccessibilityClient(true),
+    openSettings: () => shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'),
+    onChange: (status, previous) => {
+      if (onboardingWin && !onboardingWin.isDestroyed()) onboardingWin.webContents.send('accessibility:changed', status);
+      if (status === 'granted' && previous !== 'unknown') refreshHotkeys('accessibility-granted');
+      else updateTrayMenu();
+    },
+  });
+  await accessibility.check();
 
   if (app.dock) app.dock.hide();
 
@@ -1760,23 +1807,13 @@ if (hasSingleInstanceLock) app.whenReady().then(() => {
   powerMonitor.on('resume', () => repairAfterSystemTransition('resume'));
   powerMonitor.on('unlock-screen', () => repairAfterSystemTransition('unlock-screen'));
 
-  // First run: welcome + setup. Existing users (env key / saved login / own key)
-  // are already marked onboarded above and skip straight in.
-  if (!state.onboarded) {
+  if (!state.onboarded || !canSpeak() || !hasAccessibility()) {
     openOnboarding('system');
-  } else if (!canSpeak()) {
-    notify(
-      'Tristr Flow needs setup',
-      'Open the menu-bar icon ▸ Setup to sign in or add your ElevenLabs key.'
-    );
+    // Account controls remain available after dismissing the native prompt.
+    await accessibility.request();
+  } else {
+    setTimeout(() => maybePromptOpenAtLogin(), 1500);
   }
-  if (!hasAccessibility()) {
-    systemPreferences.isTrustedAccessibilityClient(true);
-  }
-
-  // Nudge to open-at-login on launches 1/3/8 (onboarding already asks new users,
-  // so only nudge those who finished it). Short delay so the app settles first.
-  if (state.onboarded) setTimeout(() => maybePromptOpenAtLogin(), 1500);
 
   // Check for a newer release shortly after launch, then periodically.
   setTimeout(() => checkUpdates(), 8000);
@@ -1784,6 +1821,7 @@ if (hasSingleInstanceLock) app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
+  accessibility?.stopWatching();
   if (shortcutHealthTimer) clearInterval(shortcutHealthTimer);
   if (shortcutManager) shortcutManager.dispose();
   else globalShortcut.unregisterAll();

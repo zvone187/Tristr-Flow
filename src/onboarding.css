@@ -85,7 +85,20 @@ select#voice {
 .fields input:focus, select#voice:focus { outline: none; border-color: var(--accent); }
 select#voice { appearance: none; cursor: pointer; }
 
-.row { display: flex; gap: 8px; }
+.account-modes {
+  display: flex;
+  margin-bottom: 12px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--bg);
+}
+.account-modes button { flex: 1; background: transparent; color: var(--text); }
+.account-modes button[aria-pressed="true"] {
+  background: var(--panel);
+  font-weight: 600;
+  border-color: var(--border);
+}
+
 button {
   font-family: inherit;
   border-radius: 9px;
@@ -144,3 +157,15 @@ kbd#combo.recording { border-color: var(--accent); color: var(--accent); animati
   margin: 2px 0 6px;
 }
 #loginrow input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; flex: none; }
+
+#accessStatus, #accessRecovery, #accessMessage {
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+}
+#accessCard button { margin-top: 9px; }
+#accessCard button:disabled { opacity: .65; cursor: default; }
+#accessRecovery { margin-top: 10px; }
+#accessRecovery summary { cursor: pointer; }
+#accessRecovery p, #accessMessage:not(:empty) { margin: 8px 0 0; }
+#accessCard[data-status="granted"] { background: var(--panel-hi); }

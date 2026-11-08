@@ -28,9 +28,19 @@
 //       (concurrent clipboard-manager guard).
 
 const { execFile, execFileSync } = require('child_process');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+
+function probeSelectionAccessibility() {
+  if (process.platform !== 'darwin') return Promise.resolve(true);
+  const probe = "ObjC.import('ApplicationServices'); $.AXIsProcessTrusted() ? 'granted' : 'denied';";
+  return new Promise((resolve, reject) => {
+    execFile('/usr/bin/osascript', ['-l', 'JavaScript', '-e', probe], { timeout: 3000 }, (error, out) => {
+      if (error) return reject(error);
+      const result = String(out).trim();
+      if (result === 'granted' || result === 'denied') return resolve(result === 'granted');
+      reject(new Error('Could not check Accessibility for selection capture.'));
+    });
+  });
+}
 
 function normalizeTargetPid(value) {
   const pid = Number(value);
@@ -251,21 +261,6 @@ function run() {
 }
 `;
 
-// Materialize the JXA script to a stable temp path (rewrite if missing).
-const SCRIPT_DIR = path.join(os.tmpdir(), 'tristr-flow-jxa');
-const SCRIPT_PATH = path.join(SCRIPT_DIR, 'capture.js');
-function ensureScript() {
-  try {
-    fs.mkdirSync(SCRIPT_DIR, { recursive: true });
-    fs.writeFileSync(SCRIPT_PATH, CAPTURE_JXA, 'utf8');
-    return true;
-  } catch (e) {
-    console.error('[selection] failed to write JXA script:', e);
-    return false;
-  }
-}
-ensureScript();
-
 let inFlight = false;
 
 // Returns { text: string, reason: string }. text === '' means nothing captured;
@@ -281,14 +276,10 @@ function getSelectedText({ targetPid = 0 } = {}) {
       resolve({ text: '', html: '', reason: 'busy', source: 'none' });
       return;
     }
-    if (!fs.existsSync(SCRIPT_PATH) && !ensureScript()) {
-      resolve({ text: '', html: '', reason: 'capture-failed', source: 'none' });
-      return;
-    }
     inFlight = true;
     execFile(
       '/usr/bin/osascript',
-      ['-l', 'JavaScript', SCRIPT_PATH],
+      ['-l', 'JavaScript', '-e', CAPTURE_JXA],
       {
         timeout: 3000,
         maxBuffer: 64 * 1024 * 1024,
@@ -320,4 +311,4 @@ function getSelectedText({ targetPid = 0 } = {}) {
   });
 }
 
-module.exports = { getSelectedText, getFrontmostApplicationPid, normalizeTargetPid };
+module.exports = { getSelectedText, getFrontmostApplicationPid, normalizeTargetPid, probeSelectionAccessibility };

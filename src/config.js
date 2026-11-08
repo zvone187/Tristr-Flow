@@ -52,18 +52,20 @@ function readKeyFile(p) {
   }
 }
 
-function loadConfig() {
+function loadConfig({ packaged = false } = {}) {
   const home = os.homedir();
-  const paziEnv = readEnvFile(path.join(home, 'Development', 'pazi', 'api', '.env'));
-  const appEnv = readEnvFile(path.join(__dirname, '..', '.env'));
+  const paziEnv = packaged ? {} : readEnvFile(path.join(home, 'Development', 'pazi', 'api', '.env'));
+  const appEnv = packaged ? {} : readEnvFile(path.join(__dirname, '..', '.env'));
   const merged = { ...paziEnv, ...appEnv, ...process.env };
 
   const fishKey =
     merged.FISH_API_KEY ||
     merged.FISH_AUDIO_API_KEY ||
-    readKeyFile(path.join(__dirname, '..', 'fish.audio.key')) ||
-    readKeyFile(path.join(home, 'Development', 'Tristr Flow', 'fish.audio.key')) ||
-    readKeyFile(path.join(home, 'Development', 'Trister Flow', 'fish.audio.key')) ||
+    (!packaged && (
+      readKeyFile(path.join(__dirname, '..', 'fish.audio.key')) ||
+      readKeyFile(path.join(home, 'Development', 'Tristr Flow', 'fish.audio.key')) ||
+      readKeyFile(path.join(home, 'Development', 'Trister Flow', 'fish.audio.key'))
+    )) ||
     '';
 
   return {

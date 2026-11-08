@@ -20,7 +20,9 @@ function load() {
 
 function save(obj) {
   try {
-    fs.writeFileSync(settingsPath(), JSON.stringify(obj, null, 2), 'utf8');
+    const file = settingsPath();
+    fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(file, JSON.stringify(obj, null, 2), { encoding: 'utf8', mode: 0o600 });
     return true;
   } catch (e) {
     console.error('[settings] save failed:', e);
