@@ -21,16 +21,21 @@ chrome.action.onClicked.addListener((tab) => {
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'speak-tts') return;
+  let stream;
+  port.onDisconnect.addListener(() => stream?.abort());
   port.onMessage.addListener(async (msg) => {
-    if (!msg || msg.type !== 'tts') return;
+    if (stream || !msg || msg.type !== 'tts') return;
+    stream = new AbortController();
     try {
       const res = await fetch(BRIDGE, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-speak-token': TOKEN },
         body: JSON.stringify({ text: msg.text }),
+        signal: stream.signal,
       });
       if (!res.ok || !res.body) {
-        port.postMessage({ type: 'error', message: `Bridge error ${res.status}. Is the Tristr Flow app running?` });
+        const detail = await res.json().catch(() => ({}));
+        port.postMessage({ type: 'error', message: detail.error || 'Could not read with Tristr Flow. Open the desktop app and try again.' });
         return;
       }
       const reader = res.body.getReader();
@@ -51,10 +56,13 @@ chrome.runtime.onConnect.addListener((port) => {
       }
       port.postMessage({ type: 'end' });
     } catch (e) {
+      if (stream.signal.aborted) return;
       port.postMessage({
         type: 'error',
         message: `Can't reach the Tristr Flow app (${e.message}). Make sure it's running.`,
       });
+    } finally {
+      stream = null;
     }
   });
 });

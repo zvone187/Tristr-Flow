@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { randomUUID } = require('node:crypto');
 const { app } = require('electron');
 
 // User-chosen settings (voice, speed) persisted across restarts in the app's
@@ -19,12 +20,26 @@ function load() {
 }
 
 function save(obj) {
+  let pendingFile;
   try {
     const file = settingsPath();
     fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-    fs.writeFileSync(file, JSON.stringify(obj, null, 2), { encoding: 'utf8', mode: 0o600 });
+    const temporaryPath = `${file}.${randomUUID()}.tmp`;
+    const descriptor = fs.openSync(temporaryPath, 'wx', 0o600);
+    pendingFile = temporaryPath;
+    try {
+      fs.writeFileSync(descriptor, JSON.stringify(obj, null, 2), 'utf8');
+      fs.fsyncSync(descriptor);
+    } finally {
+      fs.closeSync(descriptor);
+    }
+    fs.renameSync(pendingFile, file);
     return true;
   } catch (e) {
+    if (pendingFile) {
+      try { fs.unlinkSync(pendingFile); }
+      catch (cleanupError) { console.error('[settings] temporary file cleanup failed:', cleanupError); }
+    }
     console.error('[settings] save failed:', e);
     return false;
   }

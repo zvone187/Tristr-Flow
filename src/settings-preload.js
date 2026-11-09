@@ -17,13 +17,13 @@ contextBridge.exposeInMainWorld('prefs', {
   setFontSize: (fontSize) => ipcRenderer.send('settings:setFontSize', { fontSize, source: 'preferences' }),
   setTheme: (theme) => ipcRenderer.send('settings:setTheme', { theme, source: 'preferences' }),
   close: () => ipcRenderer.send('settings:close'),
-  // Account / service mode
   account: () => ipcRenderer.invoke('account:get'),
-  login: (email, password) => ipcRenderer.invoke('account:login', { email, password, source: 'preferences' }),
-  signup: (email, password) => ipcRenderer.invoke('account:signup', { email, password, source: 'preferences' }),
-  logout: () => ipcRenderer.invoke('account:logout'),
-  setOwnKey: (key) => ipcRenderer.invoke('account:setOwnKey', { key, source: 'preferences' }),
-  setFishKey: (key) => ipcRenderer.invoke('account:setFishKey', { key, source: 'preferences' }),
+  onAccountChanged: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('account:changed', handler);
+    return () => ipcRenderer.removeListener('account:changed', handler);
+  },
+  logout: () => ipcRenderer.invoke('account:logout', { source: 'preferences' }),
   openBilling: () => ipcRenderer.invoke('account:openBilling'),
   track: (event, properties) => ipcRenderer.send('analytics:track', { event, properties }),
 });

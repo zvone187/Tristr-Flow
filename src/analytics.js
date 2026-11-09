@@ -1,5 +1,7 @@
 'use strict';
 
+const { randomUUID } = require('node:crypto');
+
 // Analytics is allowlisted, not merely redacted. A renderer or future call site
 // cannot invent an event or smuggle user content through a novel property/value.
 const ALLOWED_EVENTS = new Set([
@@ -56,8 +58,8 @@ const matches = (pattern, maxLength) => (value) =>
 
 const PROPERTY_RULES = {
   accessibility_granted: boolean,
-  account_mode: oneOf('direct', 'service', 'unconfigured'),
-  action: oneOf('login', 'signup', 'logout', 'set_elevenlabs_key', 'set_fish_key'),
+  account_mode: oneOf('service', 'unconfigured'),
+  action: oneOf('login', 'signup', 'logout'),
   all_registered: boolean,
   app_version: matches(/^[0-9A-Za-z.+-]+$/, 32),
   arch: oneOf('arm64', 'x64', 'ia32', 'universal'),
@@ -109,7 +111,10 @@ const PROPERTY_RULES = {
     'empty-clipboard',
     'empty-or-nocopy',
     'invalid-request',
-    'missing-provider',
+    'signed-out',
+    'unauthorized',
+    'insufficient-credits',
+    'cancelled',
     'network-error',
     'no-selection',
     'not-trusted',
@@ -123,8 +128,6 @@ const PROPERTY_RULES = {
   secondary_registered: boolean,
   segment_count: number(0, 10_000),
   setting_name: oneOf(
-    'elevenlabs_key',
-    'fish_key',
     'font_size',
     'hotkey_primary',
     'hotkey_secondary',
@@ -181,89 +184,132 @@ const PROPERTY_RULES = {
 function safeProperties(properties) {
   const safe = {};
   for (const [key, value] of Object.entries(properties || {})) {
+    if (!Object.hasOwn(PROPERTY_RULES, key)) continue;
     const normalize = PROPERTY_RULES[key];
-    if (!normalize) continue;
     const normalized = normalize(value);
     if (normalized !== undefined) safe[key] = normalized;
   }
   return safe;
 }
 
-function defaultClientFactory(token, options) {
-  const { PostHog } = require('posthog-node');
-  return new PostHog(token, {
-    ...options,
-    flushAt: 10,
-    flushInterval: 10000,
-    enableExceptionAutocapture: false,
-  });
-}
+const BEFORE_LOGIN = new Set([
+  'accessibility_prompt_opened', 'account_action_completed', 'app_launched', 'app_quit',
+  'extension_read_failed', 'onboarding_step_viewed', 'read_rejected', 'read_requested',
+  'reading_rejected', 'shortcut_registration_changed', 'shortcut_registration_checked',
+  'shortcut_registration_recovered', 'shortcut_registration_refreshed', 'tray_menu_opened',
+  'update_check_completed', 'update_download_opened', 'window_closed', 'window_opened',
+]);
 
 function createAnalytics({
-  token,
-  host = 'https://us.i.posthog.com',
-  distinctId = '',
-  appVersion,
-  platform,
-  arch,
-  clientFactory = defaultClientFactory,
+  enabled = true, installationId, getSession, appVersion, platform, arch, fetchImpl = fetch,
+  batchDelayMs = 750, retryDelaysMs = [1000, 3000, 8000, 15000, 30000, 60000, 60000],
 } = {}) {
-  const enabled = !!(token && distinctId);
-  if (!enabled) {
-    return {
-      enabled: false,
-      capture() { return false; },
-      async shutdown() {},
-    };
-  }
+  const queues = new Map();
+  const defaults = safeProperties({ app_version: appVersion, platform, arch });
+  let closed = false;
 
-  let client;
-  try {
-    client = clientFactory(token, { host });
-  } catch (error) {
-    console.error('[analytics] initialization failed:', error && error.message ? error.message : error);
-    return {
-      enabled: false,
-      capture() { return false; },
-      async shutdown() {},
-    };
-  }
-
-  const defaults = safeProperties({
-    app_version: appVersion,
-    platform,
-    arch,
-  });
-
-  function capture(event, properties) {
-    if (!ALLOWED_EVENTS.has(event)) return false;
+  async function deliver(queue, events) {
+    const headers = { 'Content-Type': 'application/json' };
+    const body = { events };
+    if (queue.token) headers.Authorization = 'Bearer ' + queue.token;
+    else body.installationId = installationId;
     try {
-      client.capture({
-        distinctId,
-        event,
-        properties: {
-          ...defaults,
-          $process_person_profile: false,
-          $geoip_disable: true,
-          ...safeProperties(properties),
-        },
+      const response = await fetchImpl(new URL('/api/desktop/events', queue.baseUrl), {
+        method: 'POST', headers, body: JSON.stringify(body),
+        signal: AbortSignal.any([queue.lifetime.signal, AbortSignal.timeout(20000)]),
+        redirect: 'error', credentials: 'omit',
       });
-      return true;
-    } catch (error) {
-      console.error('[analytics] capture failed:', error && error.message ? error.message : error);
+      // A bad payload or revoked session cannot succeed on retry.
+      return response.ok || (response.status < 500 && ![408, 429].includes(response.status));
+    } catch {
       return false;
     }
   }
 
-  async function shutdown() {
+  function retire(queue) {
+    clearTimeout(queue.timer);
+    queue.lifetime.abort();
+    queue.events.length = 0;
+    queues.delete(queue.token);
+    queue.resolve();
+  }
+
+  function schedule(queue, delayMs) {
+    queue.timer = setTimeout(() => drain(queue), delayMs);
+    queue.timer.unref();
+  }
+
+  async function drain(queue) {
+    clearTimeout(queue.timer);
+    queue.timer = null;
+    if (queue.sending || queue.lifetime.signal.aborted) return;
+    queue.sending = true;
     try {
-      await client.shutdown();
-    } catch (error) {
-      console.error('[analytics] shutdown failed:', error && error.message ? error.message : error);
+      while (queue.events.length) {
+        const batch = queue.events.slice(0, 32);
+        const delivered = await deliver(queue, batch);
+        if (queue.lifetime.signal.aborted) return;
+        if (delivered) {
+          queue.events.splice(0, batch.length);
+          queue.attempt = 0;
+          continue;
+        }
+        if (queue.attempt >= retryDelaysMs.length) break;
+        if (queue.token && !queue.closing && getSession().token !== queue.token) break;
+        const delay = retryDelaysMs[queue.attempt++];
+        schedule(queue, queue.closing ? Math.min(delay, 100) : delay);
+        return;
+      }
+      retire(queue);
+    } finally {
+      queue.sending = false;
     }
   }
 
-  return { enabled: true, capture, shutdown };
+  async function flushSession(token) {
+    const queue = queues.get(token);
+    if (!queue) return;
+    queue.closing = true;
+    // Logout can revoke immediately after this returns. Never keep retrying an
+    // expired session or make logout and quit wait through a service cold start.
+    const deadline = setTimeout(() => retire(queue), 1500);
+    drain(queue);
+    try { await queue.finished; } finally { clearTimeout(deadline); }
+  }
+
+  function capture(event, properties) {
+    if (!enabled || closed || !ALLOWED_EVENTS.has(event)) return false;
+    const { baseUrl, token = '' } = getSession();
+    const safe = safeProperties(properties);
+    if (!token) {
+      if (!installationId || !BEFORE_LOGIN.has(event)) return false;
+      if (event === 'account_action_completed' &&
+          !(['login', 'signup'].includes(safe.action) && ['failed', 'rejected'].includes(safe.outcome))) {
+        return false;
+      }
+    }
+    let queue = queues.get(token);
+    if (!queue) {
+      queue = { baseUrl, token, events: [], timer: null, sending: false, closing: false,
+        lifetime: new AbortController(), attempt: 0 };
+      queue.finished = new Promise(resolve => { queue.resolve = resolve; });
+      queues.set(token, queue);
+    }
+    if (queue.events.length >= 256) return false;
+    queue.events.push({ event, properties: { ...defaults, ...safe }, uuid: randomUUID(), timestamp: new Date().toISOString() });
+    if (!queue.sending && !queue.attempt && queue.events.length >= 32) drain(queue);
+    else if (!queue.sending && !queue.timer) schedule(queue, batchDelayMs);
+    return true;
+  }
+
+  return {
+    enabled, capture,
+    flushSession,
+    async shutdown() {
+      closed = true;
+      await Promise.all(Array.from(queues.keys(), flushSession));
+    },
+  };
 }
 
 module.exports = { ALLOWED_EVENTS, PROPERTY_RULES, createAnalytics, safeProperties };

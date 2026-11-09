@@ -67,3 +67,16 @@ test('a failed permission check offers retry and only a confirmed denial offers 
   assert.match(get('accessMessage').textContent, /repair failed/i);
   assert.equal(get('btnRepairAccess').disabled, false);
 });
+
+test('sign-in rechecks an existing OS grant without a window focus or grant change', async () => {
+  let signedIn = false;
+  const { get, window } = openPanel({
+    accessibility: async () => signedIn ? 'granted' : 'unavailable',
+  });
+  await settle();
+  signedIn = true;
+  window.dispatchEvent(new Event('onboarding-setup-opened'));
+  await settle();
+  assert.equal(get('accessCard').dataset.status, 'granted');
+  assert.equal(get('btnRetryAccess').hidden, true);
+});

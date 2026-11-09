@@ -107,3 +107,82 @@ test('merges service voices without duplicating local or curated voices', () => 
   );
   assert.deepEqual(merged.map((voice) => voice.voice_id), ['eleven-1', 'fish:v1']);
 });
+
+test('forwards segments and terminates once when the account balance runs out midstream', async () => {
+  const calls = [];
+  let header;
+  await withServer((req, res) => {
+    header = req.headers['x-tristr-client'];
+    res.end([
+      { type: 'segment', index: 0 },
+      { audio: 'YQ==' },
+      { type: 'error', message: 'insufficient_credits' },
+      { audio: 'Yg==' },
+      { type: 'done' },
+    ].map(record => JSON.stringify(record)).join('\n'));
+  }, async baseUrl => {
+    await new Promise(resolve => {
+      serviceStream({
+        baseUrl, token: 'tfdesk_test', voiceId: 'fish:v1', text: 'Speech',
+        onSegment: index => calls.push(['segment', index]),
+        onLine: line => calls.push(['audio', line.audio_base64]),
+        onError: error => { calls.push(['error', error.status]); setImmediate(resolve); },
+        onEnd: () => { calls.push(['end']); setImmediate(resolve); },
+      });
+    });
+    assert.deepEqual(calls, [['segment', 0], ['audio', 'YQ=='], ['error', 402]]);
+    assert.equal(header, 'desktop');
+  });
+});
+
+test('an already cancelled voice preview cannot make a billable speech request', async () => {
+  let requests = 0;
+  await withServer((_req, res) => {
+    requests++;
+    res.end('{"audio":"YQ=="}\n{"type":"done"}\n');
+  }, async baseUrl => {
+    await assert.rejects(serviceSynthesize({
+      baseUrl, token: 'tfdesk_test', voiceId: 'fish:v1', text: 'Preview', signal: AbortSignal.abort(),
+    }), { name: 'AbortError' });
+    assert.equal(requests, 0);
+  });
+});
+
+test('signing out closes an active speech request and delivers just one failure', { timeout: 2500 }, async () => {
+  const active = Promise.withResolvers();
+  const closed = Promise.withResolvers();
+  await withServer((_req, res) => {
+    res.on('close', closed.resolve);
+    res.write('{"type":"segment","index":0}\n');
+    active.resolve();
+  }, async baseUrl => {
+    const controller = new AbortController();
+    const calls = [];
+    const finished = Promise.withResolvers();
+    const stream = serviceStream({
+      baseUrl, token: 'tfdesk_test', text: 'read', signal: controller.signal,
+      onLine: () => calls.push('audio'),
+      onEnd: () => { calls.push('done'); finished.resolve(); },
+      onError: error => { calls.push(error.name); finished.resolve(); },
+    });
+    await active.promise;
+    controller.abort();
+    await Promise.all([finished.promise, closed.promise]);
+    stream.abort();
+    assert.deepEqual(calls, ['AbortError']);
+  });
+});
+
+
+test('account-only upgrade replaces private key voices and preserves known or account-backed selections', () => {
+  const { restoreVoice, CURATED } = require('../src/voices');
+  const fallback = { voiceId: CURATED[0].voice_id, voiceName: CURATED[0].name };
+  const oldFish = { voiceId: 'fish:private', voiceName: 'Personal recording' };
+  assert.deepEqual(restoreVoice({ ...oldFish, fishKey: 'old-key' }, fallback), fallback);
+  const oldEleven = { voiceId: 'private-voice', voiceName: 'Personal library' };
+  assert.deepEqual(restoreVoice({ ...oldEleven, ownKey: 'old-key' }, fallback), fallback);
+  const known = { voiceId: CURATED[1].voice_id, voiceName: CURATED[1].name };
+  assert.deepEqual(restoreVoice({ ...known, ownKey: 'old-key' }, fallback), known);
+  assert.deepEqual(restoreVoice({ ...oldFish, serviceToken: 'live-account' }, fallback), oldFish);
+  assert.deepEqual(restoreVoice({ ...oldEleven, fishKey: 'unrelated' }, fallback), oldEleven);
+});

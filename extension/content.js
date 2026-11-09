@@ -159,7 +159,15 @@
       if (line.index > 0) timeOffset = charEnd.length ? charEnd[charEnd.length - 1] : timeOffset;
       return;
     }
-    if (line.type === 'error') { setStatus('⚠ ' + line.message); return; }
+    if (line.type === 'error') {
+      if (line.reason === 'cancelled' || line.reason === 'unauthorized') {
+        stop();
+        flash(line.message);
+      } else {
+        setStatus('⚠ ' + line.message);
+      }
+      return;
+    }
     if (line.type === 'done') { allReceived = true; pump(); return; }
     if (line.audio) { appendQueue.push(b64ToBytes(line.audio)); pump(); }
     if (line.alignment) appendTimings(line.alignment);

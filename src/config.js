@@ -1,13 +1,8 @@
 'use strict';
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 
-// PostHog project tokens are intentionally public ingestion identifiers (the
-// same kind embedded in websites and desktop clients), not private API keys.
-// Keep the host overrideable so an EU project can use eu.i.posthog.com.
-const { projectToken: DEFAULT_POSTHOG_PROJECT_TOKEN } = require('./analytics-project.json');
 const DEFAULT_SERVICE_BASE_URL = 'https://tristr-flow-5iy7.onrender.com';
 
 // Minimal .env parser (handles quotes; ignores comments / blank lines).
@@ -37,61 +32,30 @@ function readEnvFile(p) {
   }
 }
 
-// Resolves config from (lowest -> highest priority):
-//   1. ~/Development/pazi/api/.env   (where the key already lives)
-//   2. <app>/.env                    (local override you can drop next to the app)
-//   3. real environment variables
-// The Fish Audio key ships as a bare-token file rather than a .env entry, so
-// look for it next to the app and in the project checkout (dev machines).
-function readKeyFile(p) {
-  try {
-    const v = fs.readFileSync(p, 'utf8').trim();
-    return /^[\w.-]{16,}$/.test(v) ? v : '';
-  } catch {
-    return '';
-  }
+function clampSpeed(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 1;
+  return Math.min(3, Math.max(0.5, number));
+}
+
+function clampStability(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0.5;
+  return Math.min(1, Math.max(0, number));
 }
 
 function loadConfig({ packaged = false } = {}) {
-  const home = os.homedir();
-  const paziEnv = packaged ? {} : readEnvFile(path.join(home, 'Development', 'pazi', 'api', '.env'));
   const appEnv = packaged ? {} : readEnvFile(path.join(__dirname, '..', '.env'));
-  const merged = { ...paziEnv, ...appEnv, ...process.env };
-
-  const fishKey =
-    merged.FISH_API_KEY ||
-    merged.FISH_AUDIO_API_KEY ||
-    (!packaged && (
-      readKeyFile(path.join(__dirname, '..', 'fish.audio.key')) ||
-      readKeyFile(path.join(home, 'Development', 'Tristr Flow', 'fish.audio.key')) ||
-      readKeyFile(path.join(home, 'Development', 'Trister Flow', 'fish.audio.key'))
-    )) ||
-    '';
+  const merged = { ...appEnv, ...process.env };
 
   return {
-    apiKey: merged.ELEVENLABS_API_KEY || merged.ELEVEN_API_KEY || '',
-    // Fish Audio: a second TTS provider. Voices from it are namespaced
-    // "fish:<id>" so a saved voice always says which provider owns it.
-    fishApiKey: fishKey,
-    // Fish backbone model: 's1', 's2-pro' or 's2.1-pro'.
-    fishModelId: merged.FISH_MODEL_ID || 's1',
-    // Hosted Tristr Flow service. Used in "service mode" (no own ElevenLabs key):
-    // the app logs in and routes TTS through the credit-metered proxy.
     serviceBaseUrl: merged.SPEAK_SERVICE_URL || DEFAULT_SERVICE_BASE_URL,
-    // Force routing through the hosted service even when a local key exists
-    // (for testing the service path on a dev machine that has its own key).
-    forceService: (merged.SPEAK_FORCE_SERVICE || 'false') === 'true',
-    // Default: ElevenLabs "Hope — Clear, Relatable & Charismatic".
     voiceId: merged.SPEAK_VOICE_ID || 'zGjIP4SZlMnY9m93k97r',
     voiceName: merged.SPEAK_VOICE_NAME || 'Hope — Clear, Relatable & Charismatic',
-    // Newest / highest-quality model. Verified to support the with-timestamps
-    // endpoint (required for karaoke highlighting).
-    modelId: merged.SPEAK_MODEL_ID || 'eleven_v3',
     speed: parseFloat(merged.SPEAK_SPEED || '1.0'),
     // v3's only effective knob: 0.0 Creative / 0.5 Natural / 1.0 Robust.
     // Higher = steadier (fixes "sounds weird"); lower = more expressive.
     stability: parseFloat(merged.SPEAK_STABILITY || '0.5'),
-    maxChars: parseInt(merged.SPEAK_MAX_CHARS || '5000', 10),
     fontSize: parseInt(merged.SPEAK_FONT_SIZE || '20', 10),
     theme: merged.SPEAK_THEME || 'system', // system | light | dark
     // 'floating' = a free pop-up window; 'menubar' = a dropdown anchored under
@@ -102,12 +66,8 @@ function loadConfig({ packaged = false } = {}) {
     // Second trigger. Bare "W+D" is intentionally NOT used (it would misfire
     // constantly while typing/gaming); a modifier-anchored "D" combo is safe.
     hotkey2: merged.SPEAK_HOTKEY2 || 'Control+Alt+D',
-    posthogToken:
-      merged.POSTHOG_DISABLED === 'true'
-        ? ''
-        : (merged.POSTHOG_PROJECT_TOKEN || DEFAULT_POSTHOG_PROJECT_TOKEN),
-    posthogHost: merged.POSTHOG_HOST || 'https://us.i.posthog.com',
+    analyticsDisabled: merged.POSTHOG_DISABLED === 'true',
   };
 }
 
-module.exports = { DEFAULT_SERVICE_BASE_URL, loadConfig };
+module.exports = { DEFAULT_SERVICE_BASE_URL, loadConfig, clampSpeed, clampStability };

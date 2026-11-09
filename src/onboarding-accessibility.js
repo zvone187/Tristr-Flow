@@ -11,7 +11,7 @@
   const repair = document.getElementById('btnRepairAccess');
   const descriptions = {
     unknown: 'Checking Accessibility permission…',
-    denied: 'Turn on Tristr Flow in Accessibility Settings to read text selected in other apps. You can sign in while you set this up.',
+    denied: 'Turn on Tristr Flow in Accessibility Settings to read text selected in other apps.',
     'capture-denied': 'macOS still blocks reading selected text. Check that the installed copy of Tristr Flow is enabled in Accessibility Settings.',
     unavailable: 'Couldn’t check access to selected text. You can keep using setup and check again.',
     granted: 'Accessibility granted. Your shortcut can now read selected text.',
@@ -75,6 +75,7 @@
   settings.addEventListener('click', () => changeAccess(false));
   repair.addEventListener('click', () => changeAccess(true));
   retry.addEventListener('click', check);
+  window.addEventListener('onboarding-setup-opened', check);
   window.addEventListener('focus', check);
   window.addEventListener('pagehide', unsubscribe, { once: true });
   check();

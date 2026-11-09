@@ -1,155 +1,153 @@
 'use strict';
 
-// Tiny localhost bridge so the Chrome extension can get streaming TTS without
-// ever seeing the ElevenLabs API key (the key stays in this process). Bound to
-// 127.0.0.1 and gated by a shared token that only our extension's (isolated-
-// world) content script knows — so random web pages can't reach it.
-
 const http = require('http');
-const { synthesizeStream } = require('./elevenlabs');
+const { serviceStream } = require('./service');
+const { segmentsForVoice } = require('./speech-segments');
 
 const PORT = 8757;
-const TOKEN = 'tristr-flow-local-7c4e9a1b2f8d'; // shared with the extension
-
-const SEGMENT_CHARS = 4500; // keep each request under v3's 5000-char limit
-function segmentText(text) {
-  if (text.length <= SEGMENT_CHARS) return [text];
-  const segs = [];
-  let i = 0;
-  while (i < text.length) {
-    let end = Math.min(i + SEGMENT_CHARS, text.length);
-    if (end < text.length) {
-      const slice = text.slice(i, end);
-      let cut = Math.max(
-        slice.lastIndexOf('. '), slice.lastIndexOf('! '),
-        slice.lastIndexOf('? '), slice.lastIndexOf('\n')
-      );
-      if (cut < SEGMENT_CHARS * 0.5) cut = slice.lastIndexOf(' ');
-      if (cut > 0) end = i + cut + 1;
-    }
-    segs.push(text.slice(i, end));
-    i = end;
-  }
-  return segs;
-}
+const TOKEN = 'tristr-flow-local-7c4e9a1b2f8d';
+const EXTENSION_ORIGIN = 'chrome-extension://jllpigimfnadoijjooemcapddkfpafjd';
+const MAX_BODY_BYTES = 5_000_000;
 
 function start({
-  getConfig,
-  getState,
-  captureAnalytics = () => {},
-  synthesize = synthesizeStream,
-  port = PORT,
+  getConfig, getState, getToken, captureAnalytics = () => {}, onUsage = () => {},
+  onUnauthorized = () => {}, port = PORT,
 }) {
-  const server = http.createServer((req, res) => {
-    const origin = req.headers.origin || '';
-    res.setHeader('Access-Control-Allow-Origin', origin || '*');
-    res.setHeader('Access-Control-Allow-Headers', 'content-type, x-speak-token');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Private-Network', 'true'); // Private Network Access preflight
+  const reads = new Set();
+  let generation = 0;
+  const server = http.createServer(async (req, res) => {
+    function reject(status, error) {
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error }));
+    }
 
-    if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
     if (req.method === 'GET' && req.url === '/ping') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, app: 'tristr-flow' }));
       return;
     }
-    if (req.method !== 'POST' || req.url !== '/tts') { res.writeHead(404); res.end(); return; }
-    if (req.headers['x-speak-token'] !== TOKEN) { res.writeHead(403); res.end('forbidden'); return; }
-
-    let body = '';
-    req.on('data', (d) => { body += d; if (body.length > 5_000_000) req.destroy(); });
-    req.on('end', async () => {
-      let parsed;
-      try { parsed = JSON.parse(body); } catch {
-        captureAnalytics('extension_read_failed', {
-          surface: 'extension',
-          reason: 'invalid-request',
-        });
-        res.writeHead(400);
-        res.end();
-        return;
-      }
-      const text = (parsed.text || '').trim();
-      if (!text) {
-        captureAnalytics('extension_read_failed', {
-          surface: 'extension',
-          reason: 'invalid-request',
-        });
-        res.writeHead(400);
-        res.end();
-        return;
-      }
-
-      const config = getConfig();
-      const state = getState();
-      const segments = segmentText(text);
-      const startedAt = Date.now();
-      captureAnalytics('extension_read_requested', {
-        surface: 'extension',
-        provider: config.apiKey ? 'elevenlabs' : 'none',
-        character_count: text.length,
-        segment_count: segments.length,
-      });
-      if (!config.apiKey) {
-        captureAnalytics('extension_read_failed', {
-          surface: 'extension',
-          provider: 'none',
-          reason: 'missing-provider',
-          duration_ms: Date.now() - startedAt,
-        });
-        res.writeHead(200, { 'Content-Type': 'application/x-ndjson' });
-        res.write(JSON.stringify({ type: 'error', message: 'No ElevenLabs API key in the app.' }) + '\n');
-        res.end();
-        return;
-      }
-
-      res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache' });
-      try {
-        for (let i = 0; i < segments.length; i++) {
-          res.write(JSON.stringify({ type: 'segment', index: i }) + '\n');
-          await new Promise((resolve, reject) => {
-            synthesize({
-              apiKey: config.apiKey,
-              voiceId: state.voiceId,
-              modelId: config.modelId,
-              stability: state.stability,
-              text: segments[i],
-              onLine: (line) => {
-                res.write(JSON.stringify({ audio: line.audio_base64 || null, alignment: line.alignment || null }) + '\n');
-              },
-              onEnd: resolve,
-              onError: reject,
-            });
-          });
-        }
-        res.write(JSON.stringify({ type: 'done' }) + '\n');
-        captureAnalytics('extension_read_completed', {
-          surface: 'extension',
-          provider: 'elevenlabs',
-          character_count: text.length,
-          segment_count: segments.length,
-          duration_ms: Date.now() - startedAt,
-        });
-      } catch (e) {
-        captureAnalytics('extension_read_failed', {
-          surface: 'extension',
-          provider: 'elevenlabs',
-          reason: 'network-error',
-          duration_ms: Date.now() - startedAt,
-          error_name: e && e.name ? e.name : 'Error',
-        });
-        res.write(JSON.stringify({ type: 'error', message: String(e.message || e) }) + '\n');
-      }
+    if (req.url !== '/tts' || !['POST', 'OPTIONS'].includes(req.method)) {
+      return reject(404, 'Unknown route.');
+    }
+    // The service worker uses its pinned extension origin. A web page cannot
+    // spend the account's credits by copying the public bridge token.
+    if (req.headers.origin !== EXTENSION_ORIGIN) return reject(403, 'Forbidden.');
+    res.setHeader('Access-Control-Allow-Origin', EXTENSION_ORIGIN);
+    res.setHeader('Vary', 'Origin');
+    if (req.method === 'OPTIONS') {
+      res.setHeader('Access-Control-Allow-Headers', 'content-type, x-speak-token');
+      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Private-Network', 'true');
+      res.writeHead(204);
       res.end();
-    });
-  });
+      return;
+    }
+    if (req.headers['x-speak-token'] !== TOKEN) return reject(403, 'Forbidden.');
+    if (req.headers['content-type']?.split(';')[0].trim().toLowerCase() !== 'application/json') {
+      return reject(415, 'Expected JSON.');
+    }
 
-  server.on('error', (e) => console.error('[localserver]', e.message));
-  server.listen(port, '127.0.0.1', () => {
-    const address = server.address();
-    console.log('[localserver] listening on 127.0.0.1:' + (address && address.port));
+    if (!getState().serviceToken) {
+      captureAnalytics('extension_read_failed', { surface: 'extension', reason: 'signed-out' });
+      return reject(401, 'Please sign in to the Tristr Flow desktop app.');
+    }
+    const requestGeneration = generation;
+    let text;
+    try {
+      const chunks = [];
+      let length = 0;
+      for await (const chunk of req) {
+        length += chunk.length;
+        if (length > MAX_BODY_BYTES) return reject(413, 'Selection is too long.');
+        chunks.push(chunk);
+      }
+      const data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      text = typeof data?.text === 'string' ? data.text.trim() : '';
+    } catch { /* report malformed selections below */ }
+    if (generation !== requestGeneration) return reject(401, 'Account changed. Start reading again.');
+    if (!text) {
+      captureAnalytics('extension_read_failed', { surface: 'extension', reason: 'invalid-request' });
+      return reject(400, 'Select text to read.');
+    }
+
+    let token;
+    try {
+      token = getToken ? await getToken() : getState().serviceToken;
+    } catch {
+      return reject(503, 'Could not connect to your Tristr Flow account. Try again.');
+    }
+    if (res.destroyed) return;
+    if (generation !== requestGeneration) return reject(401, 'Account changed. Start reading again.');
+    if (!token || getState().serviceToken !== token) {
+      captureAnalytics('extension_read_failed', { surface: 'extension', reason: 'signed-out' });
+      return reject(401, 'Please sign in to the Tristr Flow desktop app.');
+    }
+
+    const { voiceId, stability } = getState();
+    const { serviceBaseUrl: baseUrl } = getConfig();
+    const segments = segmentsForVoice(text, voiceId);
+    const properties = {
+      surface: 'extension', provider: 'service',
+      character_count: text.length, segment_count: segments.length,
+    };
+    const startedAt = Date.now();
+    captureAnalytics('extension_read_requested', properties);
+    res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-store' });
+    res.flushHeaders();
+
+    const controller = new AbortController();
+    const cancel = () => controller.abort();
+    reads.add(cancel);
+    res.once('close', cancel);
+    const send = line => {
+      if (!res.destroyed && !res.writableEnded) res.write(JSON.stringify(line) + '\n');
+    };
+
+    try {
+      let index = 0;
+      for (const segment of segments) {
+        controller.signal.throwIfAborted();
+        await new Promise((resolve, rejectStream) => {
+          serviceStream({
+            baseUrl, token, text: segment, voiceId, stability, signal: controller.signal,
+            onSegment: () => send({ type: 'segment', index: index++ }),
+            onLine: line => send({ audio: line.audio_base64 || null, alignment: line.alignment || null }),
+            onEnd: resolve, onError: rejectStream,
+          });
+        });
+      }
+      controller.signal.throwIfAborted();
+      send({ type: 'done' });
+      captureAnalytics('extension_read_completed', { ...properties, duration_ms: Date.now() - startedAt });
+    } catch (error) {
+      const reason = controller.signal.aborted ? 'cancelled'
+        : error.status === 401 ? 'unauthorized'
+        : error.status === 402 ? 'insufficient-credits' : 'network-error';
+      const message = {
+        cancelled: 'Reading stopped.',
+        unauthorized: 'Please sign in to the Tristr Flow desktop app again.',
+        'insufficient-credits': 'Add credits to your Tristr Flow account to continue reading.',
+        'network-error': 'Could not finish reading. Please try again.',
+      }[reason];
+      send({ type: 'error', reason, message });
+      if (getState().serviceToken === token) {
+        captureAnalytics('extension_read_failed', { ...properties, reason, duration_ms: Date.now() - startedAt });
+      }
+      if (reason === 'unauthorized') onUnauthorized(token);
+    } finally {
+      reads.delete(cancel);
+      res.off('close', cancel);
+      if (!res.destroyed) res.end();
+      if (getState().serviceToken === token) onUsage(token);
+    }
   });
+  server.cancelReads = () => {
+    generation++;
+    for (const cancel of reads) cancel();
+  };
+  server.on('error', e => console.error('[localserver]', e.message));
+  server.listen(port, '127.0.0.1');
   return server;
 }
 
-module.exports = { start, PORT, TOKEN };
+module.exports = { start, PORT, TOKEN, EXTENSION_ORIGIN };

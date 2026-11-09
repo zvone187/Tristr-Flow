@@ -1,12 +1,6 @@
 'use strict';
 
-const https = require('https');
-const { listFishVoices } = require('./fishaudio');
-
-// Curated picks shown at the top of the picker. Includes the two "Hope" voices
-// (the Clear/Relatable/Charismatic one is the default; it's a library voice that
-// does NOT appear in /v1/voices but is usable directly by id), plus a few
-// great-sounding premades. The rest of the user's library is appended live.
+// Curated ElevenLabs voices also appear when the service catalogue is unavailable.
 const CURATED = [
   {
     voice_id: 'zGjIP4SZlMnY9m93k97r',
@@ -45,83 +39,10 @@ const CURATED = [
     name: 'Lily — Velvety',
     description: 'Smooth, expressive.',
   },
-];
+].map(voice => ({ ...voice, provider: 'elevenlabs' }));
 
-function fetchUserVoices(apiKey) {
-  return new Promise((resolve) => {
-    if (!apiKey) return resolve([]);
-    const req = https.request(
-      {
-        method: 'GET',
-        hostname: 'api.elevenlabs.io',
-        path: '/v1/voices',
-        headers: { 'xi-api-key': apiKey, Accept: 'application/json' },
-      },
-      (res) => {
-        let d = '';
-        res.setEncoding('utf8');
-        res.on('data', (c) => (d += c));
-        res.on('end', () => {
-          try {
-            const j = JSON.parse(d);
-            resolve(
-              (j.voices || []).map((v) => ({
-                voice_id: v.voice_id,
-                name: v.name,
-                description:
-                  (v.labels && Object.values(v.labels).filter(Boolean).join(', ')) ||
-                  v.category ||
-                  '',
-              }))
-            );
-          } catch {
-            resolve([]);
-          }
-        });
-      }
-    );
-    req.on('error', () => resolve([]));
-    req.setTimeout(15000, () => req.destroy());
-    req.end();
-  });
-}
-
-// The Fish library is ~1000 entries and does not change during a session, so
-// fetch it once; opening Preferences should not cost two round trips each time.
-let fishCache = null;
-let fishCacheKey = '';
-async function cachedFishVoices(fishKey) {
-  if (!fishKey) return [];
-  if (fishCache && fishCacheKey === fishKey) return fishCache;
-  const list = await listFishVoices(fishKey);
-  if (list.length) { fishCache = list; fishCacheKey = fishKey; }
-  return list;
-}
-
-// Curated ElevenLabs picks first, then the user's own ElevenLabs voices, then
-// the Fish Audio library. Every entry carries `provider` so the pickers can
-// badge them and so synthesis knows where to route.
-async function listVoices(apiKey, fishKey) {
-  const [user, fish] = await Promise.all([
-    fetchUserVoices(apiKey),
-    cachedFishVoices(fishKey).catch(() => []),
-  ]);
-
-  const seen = new Set(CURATED.map((v) => v.voice_id));
-  const merged = CURATED.map((v) => ({ ...v, provider: 'elevenlabs' }));
-  for (const v of user) {
-    if (!seen.has(v.voice_id)) {
-      merged.push({ ...v, provider: 'elevenlabs' });
-      seen.add(v.voice_id);
-    }
-  }
-  for (const v of fish) {
-    if (!seen.has(v.voice_id)) {
-      merged.push(v); // already tagged provider:'fish'
-      seen.add(v.voice_id);
-    }
-  }
-  return merged;
+function isFishVoice(voiceId) {
+  return typeof voiceId === 'string' && voiceId.startsWith('fish:');
 }
 
 function mergeVoices(localVoices, serviceVoices) {
@@ -135,4 +56,15 @@ function mergeVoices(localVoices, serviceVoices) {
   return merged;
 }
 
-module.exports = { listVoices, mergeVoices, CURATED };
+function restoreVoice(saved, config) {
+  const id = saved.voiceId || config.voiceId;
+  // A provider's private voices belonged to the old personal key. Its public
+  // catalogue is available again in the picker after account sign-in.
+  const hadPersonalProvider = isFishVoice(id) ? saved.fishKey : saved.ownKey;
+  if (hadPersonalProvider && !CURATED.some(voice => voice.voice_id === id)) {
+    return { voiceId: CURATED[0].voice_id, voiceName: CURATED[0].name };
+  }
+  return { voiceId: id, voiceName: saved.voiceName || config.voiceName };
+}
+
+module.exports = { restoreVoice, CURATED, mergeVoices, isFishVoice };

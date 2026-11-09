@@ -13,10 +13,9 @@ being spoken**.
    **Edit → Copy** menu item via Accessibility (works in Chrome, Safari, native
    apps and is immune to held modifier keys), and falls back to a clean
    synthetic ⌘C for apps with non-standard menus. (See *Chrome note* below.)
-3. **Speak (streaming)** — signed-in users send the text through the Tristr Flow
-   service to the selected provider (ElevenLabs or Fish Audio). Users who add
-   their own provider key call that provider directly. Audio **starts playing
-   before the whole thing is generated**, with timing data arriving alongside.
+3. **Stream speech.** Tristr Flow sends the selection to its backend with your
+   desktop session. The backend calls ElevenLabs or Fish Audio, meters the
+   request against your account credits and streams audio and timing data.
 4. **Highlight** — a frameless always-on-top overlay plays the audio and lights
    up each word in sync, auto-scrolling as it reads.
 
@@ -110,8 +109,10 @@ identically no matter which app the text came from.
 ## First run
 
 1. Download the [signed Apple silicon installer](https://github.com/zvone187/Tristr-Flow/releases/latest), open the DMG, and move **Tristr Flow** to **Applications**. If replacing a copy, quit it first. Open the app from Applications.
-2. Allow **Tristr Flow** in **System Settings > Privacy & Security > Accessibility**. The welcome window updates when the permission takes effect. You can sign in while permission is pending.
-3. Choose **Sign in** for an existing account or **Create account** for a new one. Complete setup, select text in another app, and press **Control + Shift + Space**.
+2. Choose **Sign in** or **Create account**. Tristr Flow remembers the signed-in account when you quit and reopen it. Users upgrading from a personal provider key sign in here too.
+3. Enable **Tristr Flow** in **System Settings > Privacy & Security > Accessibility** when prompted. Complete setup, select text in another app, and press **Control + Shift + Space**.
+
+Open **Preferences** to view the balance shared with your Tristr Flow account. Reads and voice previews use that balance. **Sign out** returns this Mac to the login screen. Your credits remain on your account.
 
 If Accessibility is enabled but the app still cannot read a selection, open **Setup** from the menu bar. Expand **Already enabled in System Settings?**, select **Repair permission**, confirm, then enable the installed app again. This clears only Tristr Flow's Accessibility permission. It preserves account details, other permissions and settings. If macOS prevents the reset, remove the old entry in Accessibility settings and add the copy in Applications using **+**.
 
@@ -142,8 +143,8 @@ Use `npm run dist` for local packaging. Only distribute the Developer ID signed 
 
 ## Config
 
-All optional — see [.env.example](.env.example). You can change the voice,
-model, hotkey, and max length via a `.env` next to the app or real env vars.
+Configure development defaults for the service address, voice and shortcuts in
+[.env.example](.env.example). Provider credentials belong on the backend.
 
 ### Product analytics
 
@@ -154,11 +155,9 @@ and browser-extension reads. The full taxonomy and suggested funnels are in
 [`docs/analytics.md`](docs/analytics.md).
 It does **not** send selected text, clipboard contents, HTML, email addresses, or
 API/service tokens, voice identifiers, URLs, or arbitrary renderer values.
-Unknown events and invalid property values are rejected before capture. Events
-use a random installation ID, disable PostHog person profiles and IP geolocation,
-and can be disabled with
-`POSTHOG_DISABLED=true`. Use `POSTHOG_HOST=https://eu.i.posthog.com` for an EU
-project; the default is the US ingestion host.
+The backend attributes signed-in events to the authenticated account. Before
+sign-in, events use a random installation ID. Events are filtered against the
+desktop catalog. Set `POSTHOG_DISABLED=true` to disable desktop analytics.
 
 ## Files
 
@@ -166,10 +165,7 @@ project; the default is the US ingestion host.
 | --- | --- |
 | `src/main.js` | App lifecycle, global hotkey, tray, orchestration |
 | `src/selection.js` | Captures the current selection via ⌘C (clipboard-safe) |
-| `src/elevenlabs.js` | Calls the ElevenLabs with-timestamps TTS endpoint |
-| `src/fishaudio.js` | Calls Fish Audio directly for bring-your-own-key users |
 | `src/service.js` | Calls the authenticated Tristr Flow voice and TTS endpoints |
-| `src/provider-routing.js` | Chooses hosted or direct-provider delivery per voice |
 | `src/overlay.{html,css,js}` | The floating karaoke overlay |
-| `src/config.js` | Loads the API key + settings |
+| `src/config.js` | Loads desktop defaults and the backend address |
 | `src/preload.js` | Secure IPC bridge to the overlay |

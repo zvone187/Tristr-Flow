@@ -1,7 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Tristr Flow — In-page",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuUICYmhD2MCN+K7w7eySfJ8uPE+Ea/JY2Lp9uaS2GlQP2Tnx+gEbVDjmjGlYsPn3cFbzXHqn/UavqdAnms0ULi6szs8euZ2lrgKUkxpm4eohtz9RsipqE9w1RtPmW2sd1H77kkVXTt7D8KdSyDHzTtsf5QYC/ZOrZ2tdC2yiRaWxIjlsO7I5y1Vwq2+1DHaQ7WTfvP+KKoITO4XI71E95fcvZXRo+ZsINOsJ0pHSI6Ud/fliiNo4RLKNlMTTvDuBiV83t3UW7/n1CV2zt47u8ooDGBdPxxpAhWlWOAaTfB8yPEit8h/TQGUQekrmFQnIB/be3pa87gNNHM5GS/qxCwIDAQAB",
   "description": "Read the selected text aloud with karaoke highlighting painted on the page itself (follows scroll).",
   "permissions": ["activeTab", "scripting"],
   "host_permissions": ["http://127.0.0.1:8757/*"],

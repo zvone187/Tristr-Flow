@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld('onb', {
   },
   login: (email, password) => ipcRenderer.invoke('account:login', { email, password, source: 'onboarding' }),
   signup: (email, password) => ipcRenderer.invoke('account:signup', { email, password, source: 'onboarding' }),
-  setOwnKey: (key) => ipcRenderer.invoke('account:setOwnKey', { key, source: 'onboarding' }),
+  logout: () => ipcRenderer.invoke('account:logout', { source: 'onboarding' }),
   curatedVoices: () => ipcRenderer.invoke('voices:curated'),
   setVoice: (voiceId, voiceName) => ipcRenderer.send('settings:setVoice', { voiceId, voiceName, source: 'onboarding' }),
   setOpenAtLogin: (value) => ipcRenderer.invoke('settings:setOpenAtLogin', { value, source: 'onboarding' }),

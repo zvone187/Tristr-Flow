@@ -4,7 +4,10 @@ const listEl = document.getElementById('list');
 const searchEl = document.getElementById('search');
 const speedEl = document.getElementById('speed');
 const speedValEl = document.getElementById('speedval');
-const keyStateEl = document.getElementById('keystate');
+const acctInfoEl = document.getElementById('acctinfo');
+const acctMsgEl = document.getElementById('acctmsg');
+const btnLogout = document.getElementById('btnlogout');
+const previewStatusEl = document.getElementById('previewStatus');
 const stabilityEl = document.getElementById('stability');
 const themeEl = document.getElementById('theme');
 const overlayModeEl = document.getElementById('overlaymode');
@@ -71,31 +74,29 @@ function selectVoice(v) {
 
 async function doPreview(v, btn) {
   stopPreview();
+  previewStatusEl.hidden = true;
   const myGen = ++previewGen; // claim this preview; a newer one/stop invalidates it
   btn.disabled = true;
   btn.textContent = '…';
   try {
     const res = await window.prefs.preview(v.voice_id, Number(speedEl.value));
-    if (myGen !== previewGen) return; // superseded by a newer preview or a stop
-    if (res && res.audioBase64) {
-      previewAudio = new Audio('data:audio/mpeg;base64,' + res.audioBase64);
-      previewAudio.preservesPitch = true;
-      previewAudio.playbackRate = Number(speedEl.value);
-      previewAudio.addEventListener('ended', stopPreview);
-      btn.disabled = false;
-      btn.textContent = '■ Stop';
-      btn.dataset.playing = '1';
-      await previewAudio.play();
-    } else {
-      btn.disabled = false;
-      btn.textContent = '⚠︎';
-      setTimeout(() => (btn.textContent = '▶ Preview'), 1500);
-    }
-  } catch {
     if (myGen !== previewGen) return;
+    if (!res?.audioBase64) throw new Error(res?.error || 'No audio was returned.');
+    previewAudio = new Audio('data:audio/mpeg;base64,' + res.audioBase64);
+    previewAudio.preservesPitch = true;
+    previewAudio.playbackRate = Number(speedEl.value);
+    previewAudio.addEventListener('ended', stopPreview);
     btn.disabled = false;
-    btn.textContent = '⚠︎';
-    setTimeout(() => (btn.textContent = '▶ Preview'), 1500);
+    btn.textContent = '■ Stop';
+    btn.dataset.playing = '1';
+    await previewAudio.play();
+  } catch (error) {
+    if (myGen !== previewGen) return;
+    stopPreview();
+    previewStatusEl.textContent = /out of credits|insufficient credits/i.test(error.message)
+      ? 'You’re out of reading credits. Choose “Manage account in browser” to see your plan.'
+      : 'Could not play this voice. Please try again.';
+    previewStatusEl.hidden = false;
   }
 }
 
@@ -141,14 +142,8 @@ function render(filter) {
       chip.className = 'chip hope';
       chip.textContent = 'Hope';
       name.appendChild(chip);
-    } else if (v.tag === 'custom') {
-      const chip = document.createElement('span');
-      chip.className = 'chip mine';
-      chip.textContent = 'Yours';
-      chip.title = 'Your own voice on Fish Audio';
-      name.appendChild(chip);
     }
-    // Which engine speaks this voice — ElevenLabs and Fish Audio side by side.
+    // Label the speech provider for each backend voice.
     const prov = document.createElement('span');
     const isFish = v.provider === 'fish';
     prov.className = 'chip prov ' + (isFish ? 'fish' : 'el');
@@ -197,10 +192,12 @@ async function init() {
   setActiveStability(cfg.stability);
   speedEl.value = cfg.speed;
   speedValEl.textContent = speedLabel(cfg.speed);
-  setFishState(cfg.fishKeyPresent, cfg.fishServiceAvailable);
-  setProviderState(cfg);
-
-  voices = await window.prefs.listVoices();
+  try {
+    voices = await window.prefs.listVoices();
+  } catch {
+    listEl.textContent = 'Could not load voices. Reopen Preferences to try again.';
+    return;
+  }
   // Make sure the currently-selected voice is visible even if not curated.
   if (selectedId && !voices.some((v) => v.voice_id === selectedId)) {
     voices.unshift({
@@ -211,7 +208,6 @@ async function init() {
     });
   }
   render('');
-  loadAccount();
 }
 
 speedEl.addEventListener('input', () => {
@@ -269,7 +265,7 @@ if (fontSizeEl) {
 
 // ---- shortcuts ----------------------------------------------------------
 function accelToSymbols(accel) {
-  if (!accel) return '—';
+  if (!accel) return 'Unset';
   return accel
     .replace('CommandOrControl', '⌘').replace('Command', '⌘')
     .replace('Control', '⌃').replace('Alt', '⌥').replace('Option', '⌥')
@@ -337,7 +333,7 @@ document.addEventListener('keydown', async (e) => {
       return;
     }
     if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) {
-      scHintEl.textContent = 'Modifiers held — now press a key (a letter, number, or F-key)…';
+      scHintEl.textContent = 'Modifiers held. Now press a key (a letter, number, or F-key)…';
       return;
     }
     const { mods, key } = eventToAccel(e);
@@ -377,185 +373,47 @@ window.addEventListener('blur', () => {
   });
 });
 
-// ---- account / service mode ---------------------------------------------
-const acctInfoEl = document.getElementById('acctinfo');
-const acctSignedOutEl = document.getElementById('acctsignedout');
-const acctSignedInEl = document.getElementById('acctsignedin');
-const acctEmailEl = document.getElementById('acctemail');
-const acctPassEl = document.getElementById('acctpass');
-const acctMsgEl = document.getElementById('acctmsg');
-const ownKeyEl = document.getElementById('ownkey');
-const btnLogin = document.getElementById('btnlogin');
-const btnSignup = document.getElementById('btnsignup');
-const btnLogout = document.getElementById('btnlogout');
-const btnOwnKey = document.getElementById('btnownkey');
-const fishKeyEl = document.getElementById('fishkey');
-const btnFishKey = document.getElementById('btnfishkey');
-const fishStateEl = document.getElementById('fishstate');
-const fishMsgEl = document.getElementById('fishmsg');
-const btnClearKey = document.getElementById('btnclearkey');
-const btnUpgrade = document.getElementById('btnupgrade');
-const btnBilling = document.getElementById('btnbilling');
-
-function acctMsg(text, isErr) {
-  if (!acctMsgEl) return;
-  acctMsgEl.textContent = text || '';
-  acctMsgEl.classList.toggle('err', !!isErr);
-}
-
-function renderAccount(a) {
-  const signedIn = !!a.signedIn;
-  const ownKey = !!a.hasOwnKey;
-  acctSignedOutEl.hidden = signedIn;
-  acctSignedInEl.hidden = !(signedIn || ownKey);
-  if (signedIn) {
-    const left = a.minutesLeft != null
-      ? ` · ~${a.minutesLeft} min left`
-      : (a.creditsDollars != null ? ` · $${a.creditsDollars} left` : '');
-    const planTag = a.plan === 'pro' ? ' · Pro' : '';
-    const directTag = ownKey ? ' · personal ElevenLabs key' : '';
-    acctInfoEl.textContent = `Signed in as ${a.email}${planTag}${left}${directTag}`;
-    btnLogout.hidden = false;
-    btnClearKey.hidden = !ownKey || a.ownKeyFromEnv;
-    btnUpgrade.hidden = a.plan === 'pro';  // offer upgrade only on the free plan
-    btnBilling.hidden = a.plan !== 'pro';  // manage only when subscribed
-  } else if (ownKey) {
-    acctInfoEl.textContent = a.ownKeyFromEnv
-      ? 'Using your ElevenLabs key (from .env)'
-      : 'Using your own ElevenLabs key';
-    btnLogout.hidden = true;
-    btnClearKey.hidden = a.ownKeyFromEnv; // an env-provided key can't be cleared in-app
-    btnUpgrade.hidden = true;
-    btnBilling.hidden = true;
-  } else {
-    acctInfoEl.textContent = 'Sign in for $2 of free reading — or use your own key.';
-  }
-  if (a.error) acctMsg(a.error, true);
-}
+let accountRevision = 0;
 
 async function loadAccount() {
+  const revision = ++accountRevision;
   try {
-    renderAccount(await window.prefs.account());
+    const account = await window.prefs.account();
+    if (revision !== accountRevision) return;
+    const summary = [account.email];
+    if (account.plan) summary.push(account.plan[0].toUpperCase() + account.plan.slice(1));
+    if (account.creditsDollars != null) summary.push(`$${account.creditsDollars} credit`);
+    if (account.minutesLeft != null) summary.push(`≈ ${account.minutesLeft} min left`);
+    acctInfoEl.textContent = summary.filter(Boolean).join(' · ') || 'Account unavailable';
+    acctMsgEl.textContent = account.error ? 'Could not refresh your balance. Check your connection and reopen Preferences.' : '';
+    acctMsgEl.hidden = !account.error;
   } catch {
-    if (acctInfoEl) acctInfoEl.textContent = 'Account unavailable.';
+    if (revision !== accountRevision) return;
+    acctInfoEl.textContent = 'Account unavailable';
+    acctMsgEl.textContent = 'Could not load your account. Check your connection and reopen Preferences.';
+    acctMsgEl.hidden = false;
   }
 }
 
-async function doAuth(fn, action) {
-  const email = (acctEmailEl.value || '').trim();
-  const pass = acctPassEl.value || '';
-  if (!email || !pass) {
-    window.prefs.track('account_action_completed', {
-      surface: 'preferences',
-      action,
-      outcome: 'rejected',
-      reason: 'invalid-request',
-    });
-    acctMsg('Enter your email and password.', true);
-    return;
-  }
-  acctMsg('Working…');
-  btnLogin.disabled = btnSignup.disabled = true;
-  const r = await fn(email, pass);
-  btnLogin.disabled = btnSignup.disabled = false;
-  if (r && r.ok) {
-    acctPassEl.value = '';
-    acctMsg('');
-    await loadAccount();
-    await refreshVoiceAccess();
-  }
-  else { acctMsg((r && r.error) || 'Could not sign in.', true); }
-}
-
-if (btnLogin) btnLogin.addEventListener('click', () => doAuth(window.prefs.login, 'login'));
-if (btnSignup) btnSignup.addEventListener('click', () => doAuth(window.prefs.signup, 'signup'));
-if (btnLogout) btnLogout.addEventListener('click', async () => {
-  await window.prefs.logout();
-  await loadAccount();
-  await refreshVoiceAccess();
-});
-if (btnOwnKey) btnOwnKey.addEventListener('click', async () => {
-  const key = (ownKeyEl.value || '').trim();
-  if (!key) {
-    window.prefs.track('account_action_completed', {
-      surface: 'preferences',
-      action: 'set_elevenlabs_key',
-      outcome: 'rejected',
-      reason: 'invalid-request',
-    });
-    acctMsg('Paste your ElevenLabs key (starts with sk_).', true);
-    return;
-  }
-  await window.prefs.setOwnKey(key);
-  ownKeyEl.value = '';
-  await loadAccount();
-  await refreshVoiceAccess();
-});
-function setProviderState(cfg) {
-  if (!keyStateEl) return;
-  keyStateEl.classList.remove('warn');
-  if (cfg.apiKeyPresent) keyStateEl.textContent = '✓ personal ElevenLabs key';
-  else if (cfg.fishServiceAvailable) keyStateEl.textContent = '✓ ElevenLabs + Fish included';
-  else {
-    keyStateEl.textContent = '⚠ Sign in or add a key';
-    keyStateEl.classList.add('warn');
-  }
-}
-function setFishState(present, serviceAvailable) {
-  if (fishStateEl) {
-    fishStateEl.textContent = present
-      ? '✓ personal key'
-      : (serviceAvailable ? '✓ included with account' : 'sign in or add a key');
-  }
-  if (fishKeyEl) fishKeyEl.placeholder = present ? 'Key saved — paste a new one to replace' : 'Fish Audio API key (sk-…)';
-}
-
-async function refreshVoiceAccess() {
-  const cfg = await window.prefs.get();
-  setProviderState(cfg);
-  setFishState(cfg.fishKeyPresent, cfg.fishServiceAvailable);
-  voices = await window.prefs.listVoices();
-  if (selectedId && !voices.some((v) => v.voice_id === selectedId)) {
-    voices.unshift({
-      voice_id: selectedId,
-      name: cfg.voiceName || 'Current voice',
-      description: '',
-      provider: selectedId.startsWith('fish:') ? 'fish' : 'elevenlabs',
-    });
-  }
-  render(searchEl.value || '');
-}
-
-// Saving a Fish key changes which voices exist, so refresh the list in place
-// rather than making the user reopen Preferences.
-if (btnFishKey) btnFishKey.addEventListener('click', async () => {
-  const key = (fishKeyEl.value || '').trim();
-  const r = await window.prefs.setFishKey(key);
-  fishKeyEl.value = '';
-  setFishState(r && r.present, r && r.serviceAvailable);
-  if (fishMsgEl) {
-    fishMsgEl.textContent = key
-      ? (r && r.present ? 'Saved. Loading Fish Audio voices…' : 'Could not save that key.')
-      : (r && r.serviceAvailable ? 'Personal key removed — using Fish Audio through your account.' : 'Fish Audio key removed.');
-    fishMsgEl.classList.toggle('err', !!key && !(r && r.present));
-  }
-  voices = await window.prefs.listVoices();
-  render(searchEl.value || '');
-  if (fishMsgEl && key && r && r.present) {
-    const n = voices.filter((v) => v.provider === 'fish').length;
-    fishMsgEl.textContent = n ? `Saved — ${n} Fish Audio voices available.` : 'Saved, but no voices came back.';
+btnLogout.addEventListener('click', async () => {
+  if (btnLogout.disabled) return;
+  btnLogout.disabled = true;
+  stopPreview();
+  try {
+    await window.prefs.logout();
+  } catch {
+    acctMsgEl.textContent = 'Could not sign out. Try again.';
+    acctMsgEl.hidden = false;
+  } finally {
+    btnLogout.disabled = false;
   }
 });
-
-if (btnClearKey) btnClearKey.addEventListener('click', async () => {
-  await window.prefs.setOwnKey('');
-  await loadAccount();
-  await refreshVoiceAccess();
-});
-if (btnUpgrade) btnUpgrade.addEventListener('click', () => window.prefs.openBilling());
-if (btnBilling) btnBilling.addEventListener('click', () => window.prefs.openBilling());
-[acctEmailEl, acctPassEl].forEach((el) => el && el.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); doAuth(window.prefs.login, 'login'); }
-}));
-
+document.getElementById('btnbilling').addEventListener('click', () => window.prefs.openBilling());
+const unsubscribeAccount = window.prefs.onAccountChanged(loadAccount);
+window.addEventListener('pagehide', () => {
+  stopPreview();
+  unsubscribeAccount();
+}, { once: true });
+window.addEventListener('focus', loadAccount);
+loadAccount();
 init();

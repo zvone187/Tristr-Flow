@@ -16,24 +16,10 @@
         <span class="dot" data-step="2"></span>
       </div>
 
-      <section id="accessCard" class="card" data-status="unknown" aria-labelledby="accessTitle">
-        <h2 id="accessTitle">Read selected text</h2>
-        <p id="accessStatus" role="status">Checking Accessibility permission…</p>
-        <button type="button" id="btnAccessSettings" class="ghost" hidden>Open Accessibility Settings</button>
-        <button type="button" id="btnRetryAccess" class="ghost" hidden>Check again</button>
-        <details id="accessRecovery" hidden>
-          <summary>Already enabled in System Settings?</summary>
-          <p>Repair clears the saved Accessibility permission for Tristr Flow. Then you can allow the installed app again.</p>
-          <button type="button" id="btnRepairAccess" class="ghost">Repair permission…</button>
-        </details>
-        <p id="accessMessage" role="status"></p>
-      </section>
-
-      <!-- STEP 1 — account -->
       <section class="step" id="step1">
-        <h1>Welcome to Tristr&nbsp;Flow</h1>
+        <h1 id="accountTitle">Sign in to Tristr Flow</h1>
         <p class="lede">
-          Select text in any app and press your shortcut to hear it read aloud.
+          Use your Tristr Flow account to read with your available credits.
         </p>
 
         <div class="card">
@@ -43,29 +29,35 @@
           </div>
           <form id="accountForm">
             <div class="fields">
-              <input id="email" type="email" aria-label="Email" placeholder="Email address" autocomplete="username" required />
+              <input id="email" type="email" aria-label="Email" placeholder="Email address" autocomplete="username" required autofocus />
               <input id="pass" type="password" aria-label="Password" placeholder="Password" autocomplete="current-password" required />
             </div>
             <button id="btnAuthSubmit" type="submit" class="primary wide">Sign in</button>
           </form>
           <p id="acctMsg" class="msg" role="status" aria-live="polite"></p>
-          <button id="btnContinueKey" class="ghost" hidden>Continue with my saved key</button>
         </div>
-
-        <details id="ownKeyWrap" class="card subtle">
-          <summary>Use my own ElevenLabs key</summary>
-          <p class="muted">Runs entirely on your own ElevenLabs account. No login, no credits.</p>
-          <div class="fields">
-            <input id="ownKey" type="password" placeholder="sk_…" autocomplete="off" />
-            <button id="btnOwnKey" class="ghost">Use my key</button>
-          </div>
-        </details>
       </section>
 
-      <!-- STEP 2 — setup -->
       <section class="step" id="step2" hidden>
-        <h1>You’re in <span id="who"></span> 🎉</h1>
-        <p class="lede">Two quick choices and you’re ready to go.</p>
+        <h1 id="setupTitle" tabindex="-1">Set up Tristr Flow</h1>
+        <div class="signed-account">
+          <span>Signed in as <span id="who"></span></span>
+          <button type="button" id="btnSignOut" class="ghost">Sign out</button>
+        </div>
+        <p id="logoutMessage" role="status" class="msg err" hidden></p>
+
+        <section id="accessCard" class="card" data-status="unknown" aria-labelledby="accessTitle">
+          <h2 id="accessTitle">Read selected text</h2>
+          <p id="accessStatus" role="status">Checking Accessibility permission…</p>
+          <button type="button" id="btnAccessSettings" class="ghost" hidden>Open Accessibility Settings</button>
+          <button type="button" id="btnRetryAccess" class="ghost" hidden>Check again</button>
+          <details id="accessRecovery" hidden>
+            <summary>Already enabled in System Settings?</summary>
+            <p>Repair clears the saved Accessibility permission for Tristr Flow. Then you can allow the installed app again.</p>
+            <button type="button" id="btnRepairAccess" class="ghost">Repair permission…</button>
+          </details>
+          <p id="accessMessage" role="status"></p>
+        </section>
 
         <div class="card">
           <h2>Voice</h2>
@@ -89,8 +81,7 @@
         </label>
 
         <p class="muted small">
-          Everything else — speed, appearance, more voices — lives in the
-          <strong>menu-bar icon ▸ Preferences</strong>.
+          Find more voices and your credit balance in <strong>Preferences</strong> in the menu bar.
         </p>
 
         <button id="btnDone" class="primary wide">Start using Tristr Flow</button>

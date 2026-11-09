@@ -1,43 +1,17 @@
-# Tristr Flow — In-page (Chrome extension)
+# Tristr Flow in-page reader
 
-Highlights the **actual text on the page**, karaoke-style, as it's read aloud —
-and the highlight stays glued to the words as you scroll (it uses Chrome's CSS
-Custom Highlight API, so there's no DOM rewriting).
+The Chrome extension reads selected text and highlights each word on the page. It uses the voice, account and credits of the signed-in Tristr Flow desktop app. The desktop app sends each speech request to the Tristr Flow backend and keeps the account token out of the browser.
 
-It talks to the **Tristr Flow app** over `127.0.0.1:8757` (the app holds your
-ElevenLabs key and does the streaming), so the key never lives in the browser.
+## Install or update
 
-## Requirements
+1. Install Tristr Flow 0.1.7 or later and sign in to the desktop app.
+2. Open `chrome://extensions` in Chrome or `edge://extensions` in Edge and turn on **Developer mode**.
+3. Choose **Load unpacked** and select the updated `extension/` folder. Browser version 105 or later supports the CSS Custom Highlight API used by the reader.
+4. If you previously installed an unpacked copy, remove the old extension entry after loading the updated folder. The current extension ID is `jllpigimfnadoijjooemcapddkfpafjd`. The desktop app accepts this ID for reading requests. An old copy can display “Bridge error 403” after a desktop update.
+5. Reload any tabs where you want to use the extension. If you customized your keyboard shortcut, set it for the new extension in `chrome://extensions/shortcuts` or `edge://extensions/shortcuts`.
 
-- The **Tristr Flow app must be running** (it provides the local bridge).
-- Chrome/Edge 105+ (for the CSS Custom Highlight API). Chrome 128+ recommended.
+## Read a selection
 
-## Install (load unpacked)
+Select text on a web page, then click the extension’s toolbar button or press **Control+Shift+Y**. The toolbar in the page offers play, pause and stop. Esc also stops the stream. If the browser blocks autoplay, press the play button. Keep the desktop app running while reading.
 
-1. Open **chrome://extensions**
-2. Turn on **Developer mode** (top-right)
-3. Click **Load unpacked** and select this `extension/` folder
-4. (Optional) Open **chrome://extensions/shortcuts** and set/confirm the shortcut
-   for *“Read the selected text aloud with in-page highlighting.”* Default is
-   **⌃⇧Y** (Control+Shift+Y) on macOS — change it to whatever you like.
-
-## Use
-
-1. Select text on any web page.
-2. Press the shortcut (or click the extension's toolbar icon).
-3. It reads aloud and highlights each word **in place**; scroll freely — the
-   highlight follows the text. A small pill (bottom-center) has **play/pause**
-   and **stop** (Esc also stops).
-
-> If audio doesn't auto-start (some sites block autoplay), click the **▶** on the
-> pill once — the browser then allows playback.
-
-## Notes
-
-- Uses the **voice and stability** you've chosen in the app's Preferences.
-- Long selections are auto-split under the model's limit and streamed
-  continuously — no length cap.
-- This is the **browser-only** counterpart to the app's floating overlay; for
-  Claude, PDFs, and native apps, keep using the app's global hotkey + overlay.
-- The bridge is localhost-only and gated by a shared token, so other web pages
-  can't reach it.
+The app streams long selections in segments and checks available credits on the backend. Sign out in the desktop app to stop new extension reads on that account.

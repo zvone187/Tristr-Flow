@@ -24,15 +24,14 @@ const { createAccessibilityController } = require('./accessibility');
 const { repairAccessibility } = require('./accessibility-repair');
 const { needsInstallation, offerInstallation } = require('./install-location');
 
-const { loadConfig } = require('./config');
+const { loadConfig, clampSpeed, clampStability } = require('./config');
 const { getSelectedText, getFrontmostApplicationPid, probeSelectionAccessibility } = require('./selection');
 const { readClipboardContent } = require('./clipboard-content');
-const { synthesize, synthesizeStream, clampSpeed, clampStability } = require('./elevenlabs');
-const { isFishVoice, synthesizeFish, synthesizeFishStream } = require('./fishaudio');
 const svc = require('./service');
 const updater = require('./update');
-const { listVoices, mergeVoices, CURATED } = require('./voices');
-const { routeVoice } = require('./provider-routing');
+const { restoreVoice, mergeVoices, CURATED, isFishVoice } = require('./voices');
+const { segmentsForVoice } = require('./speech-segments');
+const { createDesktopSession } = require('./desktop-session');
 const settingsStore = require('./settings');
 const localserver = require('./localserver');
 const mediaCtl = require('./media');
@@ -54,7 +53,7 @@ let config = null;
 let state = null; // mutable, persisted: { voiceId, voiceName, speed }
 let busy = false;
 let speakGen = 0; // bumped on every new request / stop, to cancel stale in-flight synthesis
-let activeStream = null; // current in-flight ElevenLabs stream handle (abortable)
+let activeStream = null; // current backend speech request
 let musicPausePromise = null; // resolves to the apps we paused; null when not paused
 let pendingUpdate = null; // { version, url } when a newer GitHub release exists
 let trayMenu = null; // built menu, shown on right-click (or left-click in floating mode)
@@ -70,6 +69,9 @@ let currentReading = null;
 let appQuitCaptured = false;
 let accessibility = null;
 let repairInProgress = null;
+let session = null;
+let extensionBridge = null;
+let accountRequests = new AbortController();
 
 function maybePauseMusic() {
   if (state.pauseMusic && !musicPausePromise) musicPausePromise = mediaCtl.pauseMusic();
@@ -85,15 +87,6 @@ const OVERLAY_W = 820;
 const OVERLAY_H = 440;
 const OVERLAY_MIN_W = 360;
 const OVERLAY_MIN_H = 200;
-// v3's /stream/with-timestamps caps a request at 5000 chars; split below that
-// (with margin) and stream the segments back-to-back into one continuous timeline.
-const SEGMENT_CHARS = 4500;
-// Fish drops trailing text on long requests, silently and intermittently:
-// measured over repeated identical requests, 965 chars lost 21 words on 1 run in
-// 3, while 400 and 700 chars came back complete every time. Keep Fish requests
-// short and let the existing multi-segment path stitch them.
-const FISH_SEGMENT_CHARS = 700;
-
 function hotkeyLabel(accel) {
   return (accel || config.hotkey)
     .replace('CommandOrControl', '⌘')
@@ -133,12 +126,21 @@ function shortcutAnalyticsProperties(status, extra = {}) {
 }
 
 function captureAnalytics(event, properties) {
-  if (analytics) analytics.capture(event, properties);
+  if (!analytics) return;
+  if (state.serviceToken && !state.serviceToken.startsWith('tfdesk_')) {
+    // Preserve the account on events captured while an old installation migrates.
+    const signal = accountRequests.signal;
+    void session.deviceToken().then(token => {
+      if (!signal.aborted && token && token === state.serviceToken) analytics.capture(event, properties);
+    }).catch(() => {});
+    return;
+  }
+  analytics.capture(event, properties);
 }
 
 function providerForVoice(voiceId = state && state.voiceId) {
   if (isFishVoice(voiceId)) return 'fish';
-  return useService() ? 'service' : 'elevenlabs';
+  return 'elevenlabs';
 }
 
 function repairHotkeys(source = 'periodic') {
@@ -200,7 +202,7 @@ function hasAccessibility() {
 }
 
 function persist() {
-  settingsStore.save({
+  return settingsStore.save({
     voiceId: state.voiceId,
     voiceName: state.voiceName,
     speed: state.speed,
@@ -212,17 +214,13 @@ function persist() {
     fontSize: state.fontSize,
     theme: state.theme,
     overlayMode: state.overlayMode,
-    // Account (service mode). ownKey lets a user run in direct mode with their
-    // own ElevenLabs key without editing .env.
     serviceToken: state.serviceToken || '',
     serviceEmail: state.serviceEmail || '',
-    ownKey: state.ownKey || '',
-    fishKey: state.fishKey || '',
+    pendingRevocations: state.pendingRevocations,
     onboarded: state.onboarded || false,
     accessibilityPrompted: !!state.accessibilityPrompted,
     launchCount: state.launchCount || 0,
-    // Random per-install analytics identifier. It is not tied to an email or
-    // account and PostHog person-profile processing is disabled for all events.
+    // The installation identifier is used for signed-out product events.
     analyticsId: state.analyticsId || '',
   });
 }
@@ -550,6 +548,7 @@ function stopEverything(source = 'system') {
 // ---- settings window -----------------------------------------------------
 
 function openSettings(source = 'system') {
+  if (!state.serviceToken) return openOnboarding(source);
   captureAnalytics('window_opened', { surface: 'preferences', source });
   if (settingsWin && !settingsWin.isDestroyed()) {
     settingsWin.show();
@@ -559,6 +558,8 @@ function openSettings(source = 'system') {
   settingsWin = new BrowserWindow({
     width: 640,
     height: 680,
+    minWidth: 320,
+    minHeight: 300,
     title: 'Tristr Flow — Preferences',
     resizable: true,
     minimizable: true,
@@ -616,114 +617,34 @@ function openOnboarding(source = 'system') {
 
 // ---- speak pipeline ------------------------------------------------------
 
-// Split long text into back-to-back streamed requests at sentence/space
-// boundaries so there is effectively no length limit.
-function segmentText(text, maxChars = SEGMENT_CHARS) {
-  if (text.length <= maxChars) return [text];
-  const segs = [];
-  let i = 0;
-  while (i < text.length) {
-    let end = Math.min(i + maxChars, text.length);
-    if (end < text.length) {
-      const slice = text.slice(i, end);
-      let cut = Math.max(
-        slice.lastIndexOf('. '),
-        slice.lastIndexOf('! '),
-        slice.lastIndexOf('? '),
-        slice.lastIndexOf('\n')
-      );
-      if (cut < SEGMENT_CHARS * 0.5) cut = slice.lastIndexOf(' ');
-      if (cut > 0) end = i + cut + 1;
-    }
-    segs.push(text.slice(i, end));
-    i = end;
-  }
-  return segs;
-}
-
-// The ElevenLabs key actually in effect: a key the user pasted in Preferences
-// wins over one found in the environment / pazi .env.
-function effectiveKey() {
-  return (state && state.ownKey) || config.apiKey || '';
-}
-
-// Whether to route through the hosted service instead of calling ElevenLabs
-// directly: forced for testing, otherwise whenever there's no own key but the
-// user is signed in. (No key + not signed in => onboarding handles it.)
-function useService() {
-  if (config.forceService) return !!(state && state.serviceToken);
-  return !effectiveKey() && !!(state && state.serviceToken);
-}
-
-// A personal Fish key remains an optional direct-provider override. Otherwise,
-// signed-in users use the same authenticated service proxy as ElevenLabs.
-function effectiveFishKey() {
-  return (state && state.fishKey) || config.fishApiKey || '';
-}
-
-function routeForVoice(voiceId) {
-  return routeVoice({
-    voiceId,
-    elevenKey: effectiveKey(),
-    fishKey: effectiveFishKey(),
-    serviceToken: (state && state.serviceToken) || '',
-    forceService: !!config.forceService,
-  });
-}
-
-// Can we speak at all right now? Either provider being usable is enough.
-function canSpeak() {
-  return !!(effectiveKey() || (state && state.serviceToken) || effectiveFishKey());
-}
-
-function streamSegment(text, gen, index) {
+function streamSegment(text, gen, index, token, voiceId) {
   return new Promise((resolve, reject) => {
     if (gen !== speakGen || !overlayWin || overlayWin.isDestroyed()) return resolve();
     overlayWin.webContents.send('overlay:segment', { gen, index });
-    const onLine = (line) => {
-      if (gen !== speakGen) { if (activeStream) activeStream.abort(); return; }
-      if (overlayWin && !overlayWin.isDestroyed()) {
+    activeStream = svc.serviceStream({
+      baseUrl: config.serviceBaseUrl, token, voiceId, stability: state.stability, text,
+      onLine(line) {
+        if (gen !== speakGen || !overlayWin || overlayWin.isDestroyed()) return;
         overlayWin.webContents.send('overlay:chunk', {
-          gen,
-          audioBase64: line.audio_base64 || null,
-          alignment: line.alignment || null,
+          gen, audioBase64: line.audio_base64 || null, alignment: line.alignment || null,
         });
-      }
-    };
-    const onEnd = () => { activeStream = null; resolve(); };
-    const onError = (err) => { activeStream = null; reject(err); };
-
-    const route = routeForVoice(state.voiceId);
-    if (route === 'fish-direct') {
-      activeStream = synthesizeFishStream({
-        apiKey: effectiveFishKey(),
-        voiceId: state.voiceId,
-        modelId: config.fishModelId,
-        text,
-        onLine, onEnd, onError,
-      });
-    } else if (route === 'service') {
-      activeStream = svc.serviceStream({
-        baseUrl: config.serviceBaseUrl,
-        token: state.serviceToken,
-        voiceId: state.voiceId,
-        stability: state.stability,
-        text,
-        onLine, onEnd, onError,
-      });
-    } else if (route === 'elevenlabs-direct') {
-      activeStream = synthesizeStream({
-        apiKey: effectiveKey(),
-        voiceId: state.voiceId,
-        modelId: config.modelId,
-        text,
-        stability: state.stability,
-        onLine, onEnd, onError,
-      });
-    } else {
-      reject(new Error('Sign in to Tristr Flow or add an API key to use this voice.'));
-    }
+      },
+      onEnd() {
+        if (gen === speakGen) activeStream = null;
+        resolve();
+      },
+      onError(error) {
+        if (gen === speakGen) activeStream = null;
+        reject(error);
+      },
+    });
   });
+}
+
+function refreshBalance(token) {
+  if (token && token === state.serviceToken && settingsWin && !settingsWin.isDestroyed()) {
+    settingsWin.webContents.send('account:changed');
+  }
 }
 
 // Resolves when the overlay reports back the canonical text it built from rich
@@ -739,6 +660,10 @@ function waitRichReady(gen) {
 }
 
 async function speakText(rawText, html, { trigger = 'unknown' } = {}) {
+  const signal = accountRequests.signal;
+  const token = await session.deviceToken();
+  if (signal.aborted || token !== state.serviceToken) return;
+  if (!token) return openOnboarding();
   const text = (rawText || '').trim();
   const hasHtml = !!(html && html.trim());
   if (!text && !hasHtml) {
@@ -805,14 +730,12 @@ async function speakText(rawText, html, { trigger = 'unknown' } = {}) {
     has_formatting: hasHtml,
   });
 
-  const segments = segmentText(
-    ttsText,
-    isFishVoice(state.voiceId) ? FISH_SEGMENT_CHARS : SEGMENT_CHARS
-  );
+  const voiceId = state.voiceId;
+  const segments = segmentsForVoice(ttsText, voiceId);
   try {
     for (let i = 0; i < segments.length; i++) {
       if (myGen !== speakGen) return;
-      await streamSegment(segments[i], myGen, i);
+      await streamSegment(segments[i], myGen, i, token, voiceId);
     }
     if (myGen === speakGen && overlayWin && !overlayWin.isDestroyed()) {
       overlayWin.webContents.send('overlay:all-done', { gen: myGen });
@@ -827,6 +750,8 @@ async function speakText(rawText, html, { trigger = 'unknown' } = {}) {
       });
     }
   } catch (err) {
+    if (err.status === 401) session.invalidate(token);
+    if (myGen !== speakGen) return;
     console.error('[speak] stream failed:', err);
     captureAnalytics('reading_failed', {
       trigger,
@@ -840,12 +765,22 @@ async function speakText(rawText, html, { trigger = 'unknown' } = {}) {
     }
     resumeMusicIfNeeded();
     if (currentReading && currentReading.gen === myGen) currentReading = null;
+  } finally {
+    refreshBalance(token);
   }
 }
 
-async function onHotkey(trigger = 'shortcut', { targetPid = 0 } = {}) {
-  console.log(`[shortcut] read invoked via ${trigger}`);
+function requestRead(trigger, surface) {
   captureAnalytics('read_requested', { trigger });
+  if (state.serviceToken) return true;
+  captureAnalytics('read_rejected', { trigger, reason: 'signed-out' });
+  openOnboarding(surface);
+  return false;
+}
+
+async function onHotkey(trigger = 'shortcut', { targetPid = 0 } = {}) {
+  if (!requestRead(trigger, 'shortcut')) return;
+  const signal = accountRequests.signal;
   // Second press while the overlay is up = stop & dismiss.
   if (overlayWin && overlayWin.isVisible()) {
     stopEverything();
@@ -863,7 +798,9 @@ async function onHotkey(trigger = 'shortcut', { targetPid = 0 } = {}) {
       openOnboarding('shortcut');
       return;
     }
+    if (signal.aborted) return;
     const { text, html, reason, source } = await getSelectedText({ targetPid });
+    if (signal.aborted) return;
     if (!text) {
       captureAnalytics('selection_capture_finished', {
         trigger,
@@ -895,6 +832,7 @@ async function onHotkey(trigger = 'shortcut', { targetPid = 0 } = {}) {
     });
     await speakText(text, html, { trigger });
   } catch (err) {
+    if (signal.aborted) return;
     console.error('[speak] hotkey error:', err);
     captureAnalytics('selection_capture_finished', {
       trigger,
@@ -909,14 +847,18 @@ async function onHotkey(trigger = 'shortcut', { targetPid = 0 } = {}) {
 }
 
 async function speakFromClipboard() {
-  captureAnalytics('read_requested', { trigger: 'clipboard_menu' });
+  if (!requestRead('clipboard_menu', 'tray')) return;
   const { text, html } = readClipboardContent(clipboard);
   if (!text && !html) {
     captureAnalytics('read_rejected', { trigger: 'clipboard_menu', reason: 'empty-clipboard' });
     notify('Clipboard is empty', 'Copy some text, then use this menu item.');
     return;
   }
-  await speakText(text, html, { trigger: 'clipboard_menu' });
+  try {
+    await speakText(text, html, { trigger: 'clipboard_menu' });
+  } catch (error) {
+    notify('Could not read clipboard', error.message);
+  }
 }
 
 function setVoice(voiceId, voiceName, source = 'preferences') {
@@ -1085,7 +1027,7 @@ function updateTrayMenu() {
     { label: 'Read clipboard text aloud', click: speakFromClipboard },
     { type: 'separator' },
     { label: 'Preferences — Voice, Shortcuts…', click: () => openSettings('tray'), accelerator: 'Command+,' },
-    { label: 'Setup — Account…', click: () => openOnboarding('tray') },
+    { label: 'Account setup…', click: () => openOnboarding('tray') },
     { label: `Voice:  ${state.voiceName}`, submenu: voiceItems },
     { label: 'Stability', submenu: stabilityItems },
     {
@@ -1116,13 +1058,8 @@ function updateTrayMenu() {
       },
     },
     {
-      label:
-        accountMode() === 'direct'
-          ? '✓ Using your ElevenLabs key'
-          : accountMode() === 'service'
-            ? `✓ Signed in${state.serviceEmail ? ' — ' + state.serviceEmail : ''}`
-            : '⚠️  Not set up — open Setup',
-      enabled: false,
+      label: state.serviceToken ? `Signed in as ${state.serviceEmail || 'Tristr Flow user'}` : 'Sign in to Tristr Flow',
+      click: () => state.serviceToken ? openSettings('tray') : openOnboarding('tray'),
     },
     { type: 'separator' },
     { label: 'Check for Updates…', click: () => checkUpdates({ manual: true }) },
@@ -1187,10 +1124,6 @@ ipcMain.handle('settings:get', () => ({
   voiceName: state.voiceName,
   speed: state.speed,
   stability: state.stability,
-  apiKeyPresent: !!effectiveKey(),
-  fishKeyPresent: !!effectiveFishKey(),
-  fishServiceAvailable: !!state.serviceToken,
-  model: config.modelId,
   speedSupported: true, // speed is now client-side playbackRate — works on every model
   hotkey: state.hotkey,
   hotkey2: state.hotkey2 || '',
@@ -1235,21 +1168,18 @@ ipcMain.handle('settings:setOpenAtLogin', (_e, { value, source = 'preferences' }
 // ---- IPC: account / service mode ----------------------------------------
 
 function accountMode() {
-  if (effectiveKey() && !config.forceService) return 'direct'; // own key -> ElevenLabs directly
-  if (state.serviceToken) return 'service';                    // signed in -> hosted proxy
-  return 'unconfigured';                                       // needs onboarding
+  return state?.serviceToken ? 'service' : 'unconfigured';
 }
 
 ipcMain.handle('onboarding:account', () => ({
   onboarded: !!state.onboarded,
   mode: accountMode(),
   email: state.serviceToken ? state.serviceEmail || '' : '',
-  hasDirectKey: !!(effectiveKey() || effectiveFishKey()),
 }));
 
 // Only the setup window can invoke system settings and consent to a repair.
 function isSetupSender(event) {
-  return onboardingWin && !onboardingWin.isDestroyed() &&
+  return state?.serviceToken && onboardingWin && !onboardingWin.isDestroyed() &&
     event.sender === onboardingWin.webContents && event.senderFrame === event.sender.mainFrame;
 }
 ipcMain.handle('accessibility:status', (event) => isSetupSender(event) ? accessibility.check() : 'unavailable');
@@ -1279,104 +1209,60 @@ ipcMain.handle('accessibility:repair', (event) => {
 });
 
 ipcMain.handle('account:get', async () => {
-  const out = {
-    mode: accountMode(),
-    signedIn: !!state.serviceToken,
-    email: state.serviceEmail || '',
-    hasOwnKey: !!effectiveKey(),
-    ownKeyFromEnv: !!config.apiKey, // key came from env/.env (can't be cleared in-app)
-    serviceUrl: config.serviceBaseUrl,
-    creditsMicros: null,
-    creditsDollars: null,
-    minutesLeft: null,
-    plan: null,
-  };
-  if (state.serviceToken) {
-    try {
-      const me = await svc.me({ baseUrl: config.serviceBaseUrl, token: state.serviceToken });
-      out.email = me.email;
-      out.creditsMicros = me.creditsMicros;
-      out.creditsDollars = me.creditsDollars;
-      out.minutesLeft = me.minutesLeft;
-      out.plan = me.plan;
-    } catch (e) {
-      out.error = String(e.message || e);
+  try {
+    const me = await session.refresh();
+    if (me) {
+      return {
+        signedIn: true, mode: 'service', email: me.email || state.serviceEmail,
+        creditsMicros: me.creditsMicros, creditsDollars: me.creditsDollars,
+        minutesLeft: me.minutesLeft, plan: me.plan,
+      };
     }
+  } catch (error) {
+    return { signedIn: !!state.serviceToken, mode: accountMode(), email: state.serviceEmail, error: error.message };
   }
-  return out;
+  return { signedIn: !!state.serviceToken, mode: accountMode(), email: state.serviceEmail };
 });
 
 // Opens the hosted account/billing page in the browser (upgrade / manage Pro).
 ipcMain.handle('account:openBilling', () => {
+  if (!state.serviceToken) return { ok: false };
   captureAnalytics('billing_opened', { surface: 'preferences', account_mode: accountMode() });
   shell.openExternal(`${config.serviceBaseUrl || 'https://tristr-flow-5iy7.onrender.com'}/account`);
   return { ok: true };
 });
 
-ipcMain.handle('account:login', async (_e, { email, password, source = 'preferences' }) => {
-  try {
-    const r = await svc.login({ baseUrl: config.serviceBaseUrl, email, password });
-    state.serviceToken = r.apiToken;
-    state.serviceEmail = r.email;
-    if (source !== 'onboarding') state.onboarded = true;
-    persist();
-    updateTrayMenu();
-    captureAnalytics('account_action_completed', {
-      action: 'login',
-      outcome: 'success',
-      account_mode: accountMode(),
-      surface: source,
-    });
-    return { ok: true, email: r.email, creditsMicros: r.creditsMicros };
-  } catch (e) {
-    captureAnalytics('account_action_completed', {
-      action: 'login',
-      outcome: 'failed',
-      surface: source,
-      error_name: e && e.name ? e.name : 'Error',
-    });
-    return { ok: false, error: String(e.message || e) };
-  }
-});
-
-ipcMain.handle('account:signup', async (_e, { email, password, source = 'preferences' }) => {
-  try {
-    const r = await svc.signup({ baseUrl: config.serviceBaseUrl, email, password });
-    state.serviceToken = r.apiToken;
-    state.serviceEmail = r.email;
-    if (source !== 'onboarding') state.onboarded = true;
-    persist();
-    updateTrayMenu();
-    captureAnalytics('account_action_completed', {
-      action: 'signup',
-      outcome: 'success',
-      account_mode: accountMode(),
-      surface: source,
-    });
-    return { ok: true, email: r.email, creditsMicros: r.creditsMicros };
-  } catch (e) {
-    captureAnalytics('account_action_completed', {
-      action: 'signup',
-      outcome: 'failed',
-      surface: source,
-      error_name: e && e.name ? e.name : 'Error',
-    });
-    return { ok: false, error: String(e.message || e) };
-  }
-});
-
-ipcMain.handle('account:logout', () => {
-  state.serviceToken = '';
-  state.serviceEmail = '';
-  persist();
-  updateTrayMenu();
-  captureAnalytics('account_action_completed', {
-    action: 'logout',
-    outcome: 'success',
-    account_mode: accountMode(),
-    surface: 'preferences',
+for (const action of ['login', 'signup']) {
+  ipcMain.handle('account:' + action, async (_event, { email, password, source = 'onboarding' }) => {
+    const signal = accountRequests.signal;
+    try {
+      const account = await session.authenticate(action, email, password);
+      captureAnalytics('account_action_completed', {
+        action, outcome: 'success', account_mode: accountMode(), surface: source,
+      });
+      void accessibility.request();
+      return { ok: true, email: account.email, creditsMicros: account.creditsMicros };
+    } catch (error) {
+      if (!signal.aborted) captureAnalytics('account_action_completed', {
+        action, outcome: 'failed', surface: source, error_name: error.name,
+      });
+      return { ok: false, error: error.message };
+    }
   });
-  return { ok: true };
+}
+
+ipcMain.handle('account:logout', async (_event, { source = 'preferences' } = {}) => {
+  captureAnalytics('account_action_completed', {
+    action: 'logout', outcome: 'success', account_mode: accountMode(), surface: source,
+  });
+  try {
+    const result = await session.logout();
+    return { ok: true, ...result };
+  } catch (error) {
+    // The login window has already replaced the account window that sent this IPC.
+    dialog.showErrorBox('Could not save sign-out', error.message);
+    return { ok: false, error: error.message };
+  }
 });
 
 // Onboarding starts with the curated ElevenLabs voices, then refreshes after
@@ -1384,6 +1270,7 @@ ipcMain.handle('account:logout', () => {
 ipcMain.handle('voices:curated', () => availableVoices());
 
 ipcMain.on('onboarding:finish', () => {
+  if (!state.serviceToken) return;
   state.onboarded = true;
   persist();
   updateTrayMenu();
@@ -1392,47 +1279,6 @@ ipcMain.on('onboarding:finish', () => {
     account_mode: accountMode(),
   });
   if (onboardingWin && !onboardingWin.isDestroyed()) onboardingWin.close();
-});
-
-// Lets a user run in direct mode with their own ElevenLabs key (no login),
-// without editing .env. Empty string clears it (falls back to env key if any).
-// Fish Audio key. Kept separate from the ElevenLabs own-key: a user can have
-// one, both, or neither. A local key is a direct-provider override; without it,
-// signed-in users use the service's Fish account.
-ipcMain.handle('account:setFishKey', (_e, { key, source = 'preferences' }) => {
-  state.fishKey = String(key || '').trim();
-  if (state.fishKey) state.onboarded = true;
-  persist();
-  updateTrayMenu();
-  captureAnalytics('account_action_completed', {
-    action: 'set_fish_key',
-    outcome: 'success',
-    account_mode: accountMode(),
-    surface: source,
-    setting_value: state.fishKey ? 'configured' : 'cleared',
-  });
-  // voices.js keys its Fish cache on the key value, so the next listVoices()
-  // refetches on its own.
-  return {
-    ok: true,
-    present: !!effectiveFishKey(),
-    serviceAvailable: !!state.serviceToken,
-  };
-});
-
-ipcMain.handle('account:setOwnKey', (_e, { key, source = 'preferences' }) => {
-  state.ownKey = (key || '').trim();
-  if (source !== 'onboarding' && state.ownKey) state.onboarded = true;
-  persist();
-  updateTrayMenu();
-  captureAnalytics('account_action_completed', {
-    action: 'set_elevenlabs_key',
-    outcome: 'success',
-    account_mode: accountMode(),
-    surface: source,
-    setting_value: state.ownKey ? 'configured' : 'cleared',
-  });
-  return { ok: true, hasOwnKey: !!effectiveKey(), mode: accountMode() };
 });
 
 ipcMain.on('settings:setTheme', (_e, { theme, source = 'preferences' }) => {
@@ -1506,24 +1352,24 @@ ipcMain.handle('settings:setHotkey', (_e, { which, accel, source = 'preferences'
 });
 
 async function availableVoices() {
-  const localVoices = await listVoices(effectiveKey(), effectiveFishKey());
-  if (!state.serviceToken || effectiveFishKey()) return localVoices;
+  let token;
   try {
-    const serviceVoices = await svc.listServiceVoices({
-      baseUrl: config.serviceBaseUrl,
-      token: state.serviceToken,
-    });
-    return mergeVoices(localVoices, serviceVoices);
+    token = await session.deviceToken();
+    if (!token) return [];
+    const voices = await svc.listServiceVoices({ baseUrl: config.serviceBaseUrl, token });
+    return token === state.serviceToken ? mergeVoices(CURATED, voices) : [];
   } catch (error) {
-    console.warn('[voices] service catalogue unavailable:', error && error.message ? error.message : 'unknown error');
-    return localVoices;
+    if (error.status === 401) session.invalidate(token);
+    return state.serviceToken && (!token || state.serviceToken === token) ? CURATED : [];
   }
 }
 
 ipcMain.handle('settings:listVoices', async (_e, { source = 'preferences' } = {}) => {
   const startedAt = Date.now();
+  const signal = accountRequests.signal;
   try {
     const voices = await availableVoices();
+    if (signal.aborted) return [];
     captureAnalytics('voice_list_completed', {
       surface: source,
       outcome: 'success',
@@ -1532,7 +1378,7 @@ ipcMain.handle('settings:listVoices', async (_e, { source = 'preferences' } = {}
     });
     return voices;
   } catch (error) {
-    captureAnalytics('voice_list_completed', {
+    if (!signal.aborted) captureAnalytics('voice_list_completed', {
       surface: source,
       outcome: 'failed',
       duration_ms: Date.now() - startedAt,
@@ -1545,70 +1391,28 @@ ipcMain.handle('settings:listVoices', async (_e, { source = 'preferences' } = {}
 ipcMain.handle('settings:preview', async (_e, { voiceId, speed, source = 'preferences' }) => {
   const startedAt = Date.now();
   const provider = isFishVoice(voiceId) ? 'fish' : 'elevenlabs';
-  const route = routeForVoice(voiceId);
-  const text = "Hey! This is how I sound. I'll read your selected text aloud, just like this.";
+  const signal = accountRequests.signal;
+  let token;
   try {
-    if (route === 'service') {
-      const result = await svc.serviceSynthesize({
-        baseUrl: config.serviceBaseUrl,
-        token: state.serviceToken,
-        voiceId,
-        stability: state.stability,
-        text,
-      });
-      captureAnalytics('voice_preview_completed', {
-        surface: source,
-        provider,
-        delivery: 'service',
-        outcome: 'success',
-        duration_ms: Date.now() - startedAt,
-      });
-      return result;
-    }
-    if (route === 'fish-direct') {
-      const fr = await synthesizeFish({
-        apiKey: effectiveFishKey(),
-        voiceId,
-        modelId: config.fishModelId,
-        text,
-      });
-      captureAnalytics('voice_preview_completed', {
-        surface: source,
-        provider,
-        delivery: 'direct',
-        outcome: 'success',
-        duration_ms: Date.now() - startedAt,
-      });
-      return { audioBase64: fr.audio_base64 };
-    }
-    if (route !== 'elevenlabs-direct') {
-      throw new Error('Sign in to Tristr Flow or add an API key to preview this voice.');
-    }
-    const result = await synthesize({
-      apiKey: effectiveKey(),
-      voiceId,
-      modelId: config.modelId,
-      speed: clampSpeed(speed),
-      stability: state.stability,
-      text,
+    token = await session.deviceToken();
+    if (!token || signal.aborted) throw new Error('Sign in to preview a voice.');
+    const result = await svc.serviceSynthesize({
+      baseUrl: config.serviceBaseUrl, token, voiceId, stability: state.stability,
+      text: "Hey! This is how I sound. I'll read your selected text aloud, just like this.", signal,
     });
+    if (signal.aborted) throw new Error('The account changed.');
     captureAnalytics('voice_preview_completed', {
-      surface: source,
-      provider,
-      delivery: 'direct',
-      outcome: 'success',
-      duration_ms: Date.now() - startedAt,
+      surface: source, provider, delivery: 'service', outcome: 'success', duration_ms: Date.now() - startedAt,
     });
-    return { audioBase64: result.audio_base64 };
-  } catch (err) {
-    captureAnalytics('voice_preview_completed', {
-      surface: source,
-      provider,
-      outcome: 'failed',
-      duration_ms: Date.now() - startedAt,
-      error_name: err && err.name ? err.name : 'Error',
+    return result;
+  } catch (error) {
+    if (error.status === 401) session.invalidate(token);
+    if (!signal.aborted) captureAnalytics('voice_preview_completed', {
+      surface: source, provider, outcome: 'failed', duration_ms: Date.now() - startedAt, error_name: error.name,
     });
-    return { error: String(err.message || err) };
+    return { error: error.message };
+  } finally {
+    refreshBalance(token);
   }
 });
 
@@ -1690,7 +1494,7 @@ ipcMain.on('overlay:openSettings', () => openSettings('overlay'));
 if (hasSingleInstanceLock) {
   const reopen = () => {
     if (!tray) return;
-    if (!hasAccessibility() || !state.onboarded || !canSpeak() || onboardingWin) openOnboarding('system');
+    if (!hasAccessibility() || !state.onboarded || !state.serviceToken || onboardingWin) openOnboarding('system');
     else openSettings('system');
   };
   app.on('second-instance', () => {
@@ -1704,8 +1508,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
   config = loadConfig({ packaged: app.isPackaged });
   const saved = settingsStore.load();
   state = {
-    voiceId: saved.voiceId || config.voiceId,
-    voiceName: saved.voiceName || config.voiceName,
+    ...restoreVoice(saved, config),
     speed: clampSpeed(saved.speed != null ? saved.speed : config.speed),
     stability: clampStability(
       saved.stability != null ? saved.stability : config.stability
@@ -1718,22 +1521,40 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     theme: cleanTheme(saved.theme || config.theme),
     overlayMode: saved.overlayMode === 'menubar' ? 'menubar' : (config.overlayMode || 'floating'),
     // Account (service mode).
-    serviceToken: saved.serviceToken || '',
+    serviceToken: typeof saved.serviceToken === 'string' ? saved.serviceToken : '',
     serviceEmail: saved.serviceEmail || '',
-    ownKey: saved.ownKey || '',
-    fishKey: saved.fishKey || '',
+    pendingRevocations: Array.isArray(saved.pendingRevocations) ? saved.pendingRevocations.filter(proof => typeof proof === 'string' && /^[0-9a-f]{64}$/.test(proof)) : [],
     // An explicit false means the user signed in but hasn't finished setup.
-    onboarded: saved.onboarded ?? !!(saved.serviceToken || saved.ownKey || saved.fishKey || config.apiKey || config.fishApiKey),
+    onboarded: saved.onboarded ?? !!saved.serviceToken,
     accessibilityPrompted: !!saved.accessibilityPrompted,
     launchCount: saved.launchCount || 0,
     analyticsId: saved.analyticsId || randomUUID(),
   };
+  session = createDesktopSession({
+    state, baseUrl: config.serviceBaseUrl, service: svc, persist,
+    beforeRevoke: token => analytics?.flushSession(token),
+    onChange(reason) {
+      if (reason !== 'migration') {
+        accountRequests.abort();
+        accountRequests = new AbortController();
+        extensionBridge?.cancelReads();
+      }
+      if (reason === 'expired' || reason === 'logout') {
+        stopEverything();
+        accessibility?.stopWatching();
+        settingsWin?.destroy();
+        onboardingWin?.destroy();
+        openOnboarding('system');
+      }
+      updateTrayMenu();
+    },
+  });
   state.launchCount += 1; // count this launch
   persist();
   analytics = createAnalytics({
-    token: config.posthogToken,
-    host: config.posthogHost,
-    distinctId: state.analyticsId,
+    enabled: !config.analyticsDisabled,
+    installationId: state.analyticsId,
+    getSession: () => ({ baseUrl: config.serviceBaseUrl, token: state.serviceToken.startsWith('tfdesk_') ? state.serviceToken : '' }),
     appVersion: app.getVersion(),
     platform: process.platform,
     arch: process.arch,
@@ -1760,7 +1581,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
       else updateTrayMenu();
     },
   });
-  await accessibility.check();
+  if (state.serviceToken) await accessibility.check();
 
   if (app.dock) app.dock.hide();
 
@@ -1773,9 +1594,12 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
   createTray();
   // Localhost bridge for the Chrome extension's in-page highlighting.
   try {
-    localserver.start({
+    extensionBridge = localserver.start({
       getConfig: () => config,
       getState: () => state,
+      getToken: session.deviceToken,
+      onUnauthorized: session.invalidate,
+      onUsage: refreshBalance,
       captureAnalytics,
     });
   } catch (e) {
@@ -1800,20 +1624,26 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
 
   // macOS can drop global registrations across sleep/unlock, and an accelerator
   // conflict can disappear while this app stays open. Recover without a restart.
-  shortcutHealthTimer = setInterval(() => repairHotkeys('periodic'), 30000);
+  shortcutHealthTimer = setInterval(() => {
+    repairHotkeys('periodic');
+    if (state.pendingRevocations.length) void session.retryRevocations();
+  }, 30000);
+  void session.retryRevocations();
   const repairAfterSystemTransition = (source) => {
     setTimeout(() => refreshHotkeys(source), 1000);
   };
   powerMonitor.on('resume', () => repairAfterSystemTransition('resume'));
   powerMonitor.on('unlock-screen', () => repairAfterSystemTransition('unlock-screen'));
 
-  if (!state.onboarded || !canSpeak() || !hasAccessibility()) {
+  if (!state.onboarded || !state.serviceToken || !hasAccessibility()) {
     openOnboarding('system');
     // Account controls remain available after dismissing the native prompt.
-    await accessibility.request();
+    if (state.serviceToken) await accessibility.request();
   } else {
     setTimeout(() => maybePromptOpenAtLogin(), 1500);
   }
+
+  if (state.serviceToken) void session.refresh().catch(() => {});
 
   // Check for a newer release shortly after launch, then periodically.
   setTimeout(() => checkUpdates(), 8000);

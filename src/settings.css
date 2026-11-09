@@ -32,14 +32,11 @@
 
 html,
 body {
-  height: 100%;
+  min-height: 100%;
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 13px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
 }
 
 #head {
@@ -57,19 +54,6 @@ body {
   font-size: 12px;
   margin-top: 2px;
 }
-.badge {
-  font-size: 11px;
-  padding: 4px 9px;
-  border-radius: 20px;
-  background: rgba(70, 200, 120, 0.16);
-  color: #6fe0a0;
-  white-space: nowrap;
-}
-.badge.warn {
-  background: rgba(255, 170, 60, 0.16);
-  color: #ffc06a;
-}
-
 #searchwrap {
   padding: 4px 18px 12px;
 }
@@ -88,7 +72,7 @@ body {
 }
 
 #list {
-  flex: 1;
+  max-height: clamp(10rem, 38vh, 28rem);
   overflow-y: auto;
   padding: 0 12px 8px;
 }
@@ -165,10 +149,6 @@ body {
   border: 1px solid currentColor;
   font-weight: 700;
   opacity: 0.85;
-}
-.vname .chip.mine {
-  background: rgba(63, 191, 166, 0.22);
-  color: #5fd8bd;
 }
 .vname .chip.prov.el { color: #7bb7ff; }
 .vname .chip.prov.fish { color: #3fbfa6; }
@@ -397,33 +377,9 @@ body {
   gap: 10px;
   margin-bottom: 8px;
 }
-.acct-head label { font-weight: 600; width: 64px; }
-.acct-info { color: var(--muted); font-size: 12px; flex: 1; }
-.acct-fields { display: flex; gap: 8px; margin-bottom: 8px; }
-.acct-fields input {
-  flex: 1;
-  min-width: 0;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 7px 11px;
-  color: var(--text);
-  font-size: 13px;
-}
-.acct-fields input:focus { outline: none; border-color: var(--accent); }
-.acct-btns { display: flex; gap: 8px; margin-bottom: 6px; }
-.acct-primary {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.acct-primary:hover { filter: brightness(1.08); }
-.acct-primary:disabled { opacity: 0.5; cursor: default; }
+.acct-head h2 { font-size: 13px; font-weight: 600; }
+.acct-info { color: var(--muted); font-size: 12px; flex: 1; overflow-wrap: anywhere; }
+.acct-actions { display: flex; gap: 8px; }
 .acct-ghost {
   background: var(--panel-hi);
   color: var(--text);
@@ -434,32 +390,14 @@ body {
   cursor: pointer;
 }
 .acct-ghost:hover { border-color: var(--accent); color: var(--accent); }
-.acct-msg { color: var(--muted); font-size: 11px; margin: 4px 0 0; min-height: 13px; }
-.acct-msg.err { color: #e06a4f; }
-#ownkeywrap { margin-top: 2px; }
-#ownkeywrap summary {
-  color: var(--muted);
-  font-size: 11px;
-  cursor: pointer;
-  margin-bottom: 8px;
-  list-style: none;
-}
-#ownkeywrap summary::-webkit-details-marker { display: none; }
-#ownkeywrap summary:hover { color: var(--text); }
-#acctsignedin { display: flex; gap: 8px; }
+.acct-msg { color: #e06a4f; font-size: 12px; margin-top: 6px; }
 
-/* Fish Audio key: the only way an installed build can get one. */
-#fishwrap {
-  margin-bottom: 14px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
+#previewStatus { color: var(--text); padding: 6px 18px; }
+
+@media (max-width: 440px) {
+  .vname, .acct-head, .acct-actions { flex-wrap: wrap; }
+  .combo { min-width: 0; overflow-wrap: anywhere; }
+  #speedval { width: auto; }
+  #speed, #fontsize { min-width: 0; }
+  #speedrow, #textsizerow, #themerow, #moderow, #stabilityrow { flex-wrap: wrap; }
 }
-#fishwrap summary {
-  cursor: pointer;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-#fishwrap #fishstate { font-weight: 400; }
-#fishwrap .acct-fields { margin-top: 8px; }

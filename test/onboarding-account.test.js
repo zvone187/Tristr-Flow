@@ -18,12 +18,13 @@ function setup(overrides = {}) {
       hidden: false, disabled: false, textContent: '', value: '', dataset: {},
       classList: { toggle() {} },
       setAttribute() {},
+      focus() { this.focused = true; },
       addEventListener(event, handler) { handlers[event] = handler; },
       emit(event, data = {}) { return handlers[event]?.({ preventDefault() {}, ...data }); },
       appendChild() {},
     };
   }
-  for (const [tag, id] of html.matchAll(/<[a-z]+\b[^>]*? id="([^"]+)"[^>]*>/g)) {
+  for (const [tag, id] of html.matchAll(/<[a-z][a-z0-9]*\b[^>]*? id="([^"]+)"[^>]*>/g)) {
     const node = element();
     node.hidden = /\shidden\b/.test(tag);
     node.disabled = /\sdisabled\b/.test(tag);
@@ -39,7 +40,8 @@ function setup(overrides = {}) {
     track() {},
     ...overrides,
   };
-  vm.runInNewContext(script, { document, window: { onb } });
+  const window = Object.assign(new EventTarget(), { onb });
+  vm.runInNewContext(script, { document, window, Event });
   get('email').value = ' user@example.test ';
   get('pass').value = 'mock-password';
   async function submit() {
@@ -60,6 +62,7 @@ test('the default account form signs in and shows setup while voice loading is p
   await submit();
   assert.deepEqual(requests, [['login', 'user@example.test', 'mock-password']]);
   assert.equal(get('step2').hidden, false);
+  assert.equal(get('setupTitle').focused, true);
 });
 
 test('selecting Create account makes a form submission sign up and allows retry after an error', async () => {
@@ -73,6 +76,8 @@ test('selecting Create account makes a form submission sign up and allows retry 
   });
   await tick();
   await get('btnSignup').emit('click');
+  assert.match(get('accountTitle').textContent, /Create your/);
+  assert.equal(get('pass').autocomplete, 'new-password');
   assert.equal(attempts, 0);
   await submit();
   assert.ok(get('acctMsg').textContent);
@@ -83,6 +88,23 @@ test('selecting Create account makes a form submission sign up and allows retry 
   assert.equal(get('step2').hidden, false);
 });
 
+test('repeated Return transmits one login and permits correction after rejection', async () => {
+  let respond;
+  let calls = 0;
+  const { get, submit } = setup({
+    login: () => { calls++; return new Promise(resolve => { respond = resolve; }); },
+  });
+  await tick();
+  const inProgress = submit();
+  await submit();
+  assert.equal(calls, 1);
+  respond({ ok: false, error: 'Invalid email or password' });
+  await inProgress;
+  assert.equal(get('step1').hidden, false);
+  assert.equal(get('btnAuthSubmit').disabled, false);
+  assert.equal(get('acctMsg').textContent, 'Invalid email or password');
+});
+
 test('reopening setup restores the signed-in account without reentering a password', async () => {
   const { get } = setup({
     account: async () => ({ mode: 'service', email: 'saved@example.test' }),
@@ -91,18 +113,29 @@ test('reopening setup restores the signed-in account without reentering a passwo
   await tick();
   assert.equal(get('step2').hidden, false);
   assert.equal(get('step1').hidden, true);
-  assert.equal(get('who').textContent, 'saved');
+  assert.equal(get('who').textContent, 'saved@example.test');
 });
 
-test('an existing provider key leaves account sign-in available and can continue without reentry', async () => {
+test('a migrated API-key profile must sign in before setup or permission controls', async () => {
   const { get } = setup({
-    account: async () => ({ mode: 'unconfigured', hasDirectKey: true }),
+    account: async () => ({ mode: 'unconfigured', email: '', onboarded: true }),
   });
   await tick();
   assert.equal(get('step1').hidden, false);
-  assert.equal(get('btnContinueKey').hidden, false);
-  await get('btnContinueKey').emit('click');
-  assert.equal(get('step2').hidden, false);
+  assert.equal(get('step2').hidden, true);
+  assert.doesNotMatch(html, /ownKey|btnContinueKey|ElevenLabs key/);
+  assert.ok(html.indexOf('id="accessCard"') > html.indexOf('id="step2"'));
+});
+
+test('a signed-in user can log out before completing setup', async () => {
+  let signouts = 0;
+  const { get } = setup({
+    account: async () => ({ mode: 'service', email: 'saved@example.test' }),
+    logout: async () => { signouts++; return { ok: true }; },
+  });
+  await tick();
+  await get('btnSignOut').emit('click');
+  assert.equal(signouts, 1);
 });
 
 test('finishing repeat setup preserves the existing Open at Login choice', async () => {

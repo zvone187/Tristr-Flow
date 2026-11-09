@@ -7,7 +7,7 @@
       content="default-src 'none'; media-src data:; style-src 'self' 'unsafe-inline'; script-src 'self';"
     />
     <link rel="stylesheet" href="settings.css" />
-    <title>Tristr Flow — Preferences</title>
+    <title>Tristr Flow Preferences</title>
   </head>
   <body>
     <header id="head">
@@ -15,7 +15,6 @@
         <h1>Tristr Flow</h1>
         <p id="sub">Choose a voice and reading speed</p>
       </div>
-      <span id="keystate" class="badge"></span>
     </header>
 
     <div id="searchwrap">
@@ -23,48 +22,20 @@
     </div>
 
     <div id="list" aria-label="Voices"></div>
+    <p id="previewStatus" role="status" hidden></p>
 
     <footer id="foot">
-      <div id="accountrow">
+      <section id="accountrow" aria-labelledby="account-heading">
         <div class="acct-head">
-          <label>Account</label>
-          <span id="acctinfo" class="acct-info">Checking…</span>
+          <h2 id="account-heading">Account</h2>
+          <span id="acctinfo" class="acct-info" role="status">Loading account…</span>
         </div>
-        <div id="acctsignedout" hidden>
-          <div class="acct-fields">
-            <input id="acctemail" type="email" placeholder="you@email.com" autocomplete="username" />
-            <input id="acctpass" type="password" placeholder="Password (8+ characters)" autocomplete="current-password" />
-          </div>
-          <div class="acct-btns">
-            <button id="btnlogin" class="acct-primary">Sign in</button>
-            <button id="btnsignup" class="acct-ghost">Create account</button>
-          </div>
-          <details id="ownkeywrap">
-            <summary>Use my own ElevenLabs key instead (no account)</summary>
-            <div class="acct-fields">
-              <input id="ownkey" type="password" placeholder="sk_…" autocomplete="off" />
-              <button id="btnownkey" class="acct-ghost">Save key</button>
-            </div>
-          </details>
-          <p id="acctmsg" class="acct-msg"></p>
-        </div>
-        <div id="acctsignedin" hidden>
-          <button id="btnupgrade" class="acct-primary" hidden>Upgrade to Pro ↗</button>
-          <button id="btnbilling" class="acct-ghost" hidden>Manage plan ↗</button>
+        <div class="acct-actions">
+          <button id="btnbilling" class="acct-ghost">Manage account in browser ↗</button>
           <button id="btnlogout" class="acct-ghost">Sign out</button>
-          <button id="btnclearkey" class="acct-ghost" hidden>Remove my key</button>
         </div>
-      </div>
-
-      <details id="fishwrap">
-        <summary>Fish Audio voices <span id="fishstate" class="acct-info"></span></summary>
-        <p class="muted">Included when you sign in. Optionally add your own Fish Audio key to send Fish requests directly from this Mac.</p>
-        <div class="acct-fields">
-          <input id="fishkey" type="password" placeholder="Fish Audio API key (sk-…)" autocomplete="off" />
-          <button id="btnfishkey" class="acct-ghost">Save key</button>
-        </div>
-        <p id="fishmsg" class="acct-msg"></p>
-      </details>
+        <p id="acctmsg" role="status" class="acct-msg" hidden></p>
+      </section>
 
       <div id="shortcuts">
         <div class="sc-row">

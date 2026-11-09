@@ -1,8 +1,6 @@
 # Product analytics
 
-The desktop app uses `posthog-node` from the Electron main process. Events are
-queued asynchronously, use a random installation-scoped distinct ID, do not
-create PostHog person profiles, and disable IP geolocation.
+The Electron main process sends validated event batches to the Tristr Flow backend at `/api/desktop/events`. For signed-in events, the backend resolves the account from the session bearer and assigns its account identifier in PostHog. Before sign-in, a smaller set of setup and reliability events uses a random installation ID. A shared Mac can therefore produce account activity for multiple people. The backend disables IP geolocation and person profile processing.
 
 ## Desktop events
 
@@ -37,8 +35,7 @@ The app never records:
 - Voice IDs or voice names.
 - Free-form error messages or arbitrary renderer-provided strings.
 
-Unknown events, properties, enum values, and out-of-range numbers are dropped.
-Set `POSTHOG_DISABLED=true` to turn analytics off entirely.
+Unknown events, properties, enum values and out-of-range numbers are dropped. Each event keeps the identity it had when captured. Queues stay in memory. During a service cold start, delivery retries with increasing delays and keeps the original timestamp and event UUID. Logout and quit each allow a bounded final flush. Set `POSTHOG_DISABLED=true` to disable desktop product analytics. The backend records accepted speech usage on the account to calculate credits independently of product analytics.
 
 ## Suggested PostHog views
 

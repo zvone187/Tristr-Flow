@@ -9,12 +9,11 @@ const dots = document.querySelectorAll('.dot');
 const emailEl = $('email');
 const passEl = $('pass');
 const acctMsgEl = $('acctMsg');
-const ownKeyEl = $('ownKey');
 const btnSignup = $('btnSignup');
 const btnLogin = $('btnLogin');
-const btnOwnKey = $('btnOwnKey');
 const btnAuthSubmit = $('btnAuthSubmit');
-const btnContinueKey = $('btnContinueKey');
+const btnSignOut = $('btnSignOut');
+const logoutMessage = $('logoutMessage');
 
 const voiceEl = $('voice');
 const whoEl = $('who');
@@ -30,7 +29,7 @@ let useExistingLoginPreference = true;
 
 // ---- shortcut encoding (mirrors settings-renderer) ----------------------
 function accelToSymbols(accel) {
-  if (!accel) return '—';
+  if (!accel) return 'Unset';
   return accel
     .replace('CommandOrControl', '⌘').replace('Command', '⌘')
     .replace('Control', '⌃').replace('Alt', '⌥').replace('Option', '⌥')
@@ -68,9 +67,11 @@ function acctMsg(text, isErr) {
 function goStep2(email = '') {
   if (!step2.hidden) return;
   openAtLoginEl.disabled = useExistingLoginPreference;
-  whoEl.textContent = email.split('@')[0];
+  whoEl.textContent = email || 'your Tristr Flow account';
   step1.hidden = true;
   step2.hidden = false;
+  $('setupTitle').focus();
+  window.dispatchEvent(new Event('onboarding-setup-opened'));
   dots.forEach((d) => d.classList.toggle('active', d.dataset.step === '2'));
   window.onb.track('onboarding_step_viewed', { surface: 'onboarding', step: 2 });
   loadStep2Data();
@@ -81,6 +82,7 @@ let accountAction = 'login';
 function selectAccountAction(action) {
   accountAction = action;
   const login = action === 'login';
+  $('accountTitle').textContent = login ? 'Sign in to Tristr Flow' : 'Create your Tristr Flow account';
   btnLogin.setAttribute('aria-pressed', String(login));
   btnSignup.setAttribute('aria-pressed', String(!login));
   passEl.autocomplete = login ? 'current-password' : 'new-password';
@@ -91,7 +93,7 @@ function selectAccountAction(action) {
 }
 
 function setAccountBusy(busy) {
-  for (const button of [btnAuthSubmit, btnSignup, btnLogin, btnOwnKey, btnContinueKey]) {
+  for (const button of [btnAuthSubmit, btnSignup, btnLogin]) {
     button.disabled = busy;
   }
 }
@@ -120,32 +122,17 @@ $('accountForm').addEventListener('submit', async (event) => {
   }
 });
 
-btnContinueKey.addEventListener('click', () => goStep2());
-btnOwnKey.addEventListener('click', async () => {
-  const key = ownKeyEl.value.trim();
-  if (!key) {
-    window.onb.track('account_action_completed', {
-      surface: 'onboarding',
-      action: 'set_elevenlabs_key',
-      outcome: 'rejected',
-      reason: 'invalid-request',
-    });
-    acctMsg('Paste your ElevenLabs key (starts with sk_).', true);
-    return;
-  }
-  setAccountBusy(true);
+btnSignOut.addEventListener('click', async () => {
+  if (btnSignOut.disabled) return;
+  btnSignOut.disabled = true;
+  logoutMessage.hidden = true;
   try {
-    const result = await window.onb.setOwnKey(key);
-    if (result && result.ok && result.hasOwnKey) {
-      ownKeyEl.value = '';
-      goStep2();
-    } else {
-      acctMsg('Check your key and try again.', true);
-    }
+    await window.onb.logout();
   } catch {
-    acctMsg('Could not save your key. Try again.', true);
+    logoutMessage.textContent = 'Could not sign out. Try again.';
+    logoutMessage.hidden = false;
   } finally {
-    setAccountBusy(false);
+    btnSignOut.disabled = false;
   }
 });
 
@@ -187,7 +174,7 @@ btnRec.addEventListener('click', () => {
   recording = true;
   comboEl.classList.add('recording');
   comboEl.textContent = 'Press keys…';
-  scHintEl.textContent = 'Hold a modifier (⌃ ⌥ ⌘ ⇧) and press a key — or a function key.';
+  scHintEl.textContent = 'Hold a modifier (⌃ ⌥ ⌘ ⇧) and press a key, or press a function key.';
 });
 
 document.addEventListener('keydown', async (e) => {
@@ -204,7 +191,7 @@ document.addEventListener('keydown', async (e) => {
   }
   if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
   const { mods, key } = eventToAccel(e);
-  if (!key) { scHintEl.textContent = 'That key isn’t supported — try another.'; return; }
+  if (!key) { scHintEl.textContent = 'That key isn’t supported. Try another.'; return; }
   const isFn = /^F([1-9]|1[0-9]|2[0-4])$/.test(key);
   if (mods.length === 0 && !isFn) {
     scHintEl.textContent = 'Add a modifier (⌃ ⌥ ⌘ ⇧), or use a function key.';
@@ -214,7 +201,7 @@ document.addEventListener('keydown', async (e) => {
   comboEl.classList.remove('recording');
   const res = await window.onb.setHotkey(1, mods.concat(key).join('+'));
   comboEl.textContent = accelToSymbols(res.hotkey);
-  scHintEl.textContent = res.ok ? 'Saved ✓ — ' + DEFAULT_SC_HINT : (res.error || 'That combo is unavailable.');
+  scHintEl.textContent = res.ok ? 'Saved. ' + DEFAULT_SC_HINT : (res.error || 'That combo is unavailable.');
 }, true);
 
 if (openAtLoginEl) {
@@ -229,11 +216,10 @@ btnDone.addEventListener('click', async () => {
 });
 
 window.onb.account().catch(() => ({})).then((account) => {
-  useExistingLoginPreference = !!(account.onboarded || account.email || account.mode === 'service' || account.hasDirectKey);
-  if (account.email || account.mode === 'service') {
+  useExistingLoginPreference = !!(account.onboarded || account.mode === 'service');
+  if (account.mode === 'service') {
     goStep2(account.email);
   } else {
-    btnContinueKey.hidden = !account.hasDirectKey;
     window.onb.track('onboarding_step_viewed', { surface: 'onboarding', step: 1 });
   }
 });
